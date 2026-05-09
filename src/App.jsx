@@ -37,6 +37,22 @@ const SVGIcons = () => (
 );
 
 // ==========================================
+// Hàm hỗ trợ tự động bốc Repo & Tag gần nhất
+// ==========================================
+const getLastContextFromDB = (currentDb) => {
+    const files = currentDb.files || [];
+    const tagsDb = currentDb.tags || {};
+    const latestNormal = files.find(f => f.repoName !== `${username}.github.io` && f.repoName !== username);
+    if (latestNormal) {
+        return {
+            repo: `${username}/${latestNormal.repoName}`,
+            tags: (tagsDb[`${latestNormal.repoName}/${latestNormal.fileName}`] || []).join(', ')
+        };
+    }
+    return { repo: `${username}/${username}.github.io`, tags: '' };
+};
+
+// ==========================================
 // 3. MAIN APP
 // ==========================================
 export default function App() {
@@ -62,10 +78,8 @@ export default function App() {
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   
-  // Khởi tạo Repo & Tags mặc định bằng bộ nhớ cục bộ (nếu có)
   const [repo, setRepo] = useState(() => localStorage.getItem('cms_last_repo') || `${username}/${username}.github.io`);
   const [tags, setTags] = useState(() => localStorage.getItem('cms_last_tags') || ''); 
-  
   const [title, setTitle] = useState('');
   const [slug, setSlug] = useState('');
   const [isSlugEdited, setIsSlugEdited] = useState(false); 
@@ -116,6 +130,13 @@ export default function App() {
         const reposMap = {}; dbData.allFiles.forEach(f => { if(!reposMap[f.repoName]) reposMap[f.repoName] = []; reposMap[f.repoName].push(f); });
         const loadedDb = { files: dbData.allFiles, repos: reposMap, tags: meta?.tags || {}, pinned: meta?.pinned || [], links: meta?.links || {}, colors: meta?.colors || {}, titles: meta?.titles || {}, tasks: meta?.tasks || [], customCol: meta?.customCol || [] };
         saveLocalDb(loadedDb);
+        
+        if (!title && !content && !editorOriginal.sha) {
+            const ctx = getLastContextFromDB(loadedDb);
+            setRepo(ctx.repo);
+            setTags(ctx.tags);
+        }
+
         setStatus({ text: '✅ Đã đồng bộ!', type: 'success' }); setTimeout(() => setStatus({ text: '', type: '' }), 3000);
       }
     } catch (e) { setStatus({ text: `❌ Lỗi DB: ${e.message}`, type: 'error' }); } finally { setIsSyncing(false); }
@@ -192,7 +213,7 @@ export default function App() {
   const handleRemoveLink = (index) => setUploadLinks(uploadLinks.filter((_, i) => i !== index));
   const handleAddLink = () => setUploadLinks([...uploadLinks, { title: `Link ${uploadLinks.length + 1}`, url: '' }]);
 
-  // --- HỦY SỬA BÀI (TRỞ VỀ TRẠNG THÁI RỖNG, NHƯNG PHỤC HỒI TAG & REPO TỪ BỘ NHỚ) ---
+  // --- HỦY SỬA BÀI (TRỞ VỀ TRẠNG THÁI RỖNG, KHÔI PHỤC TAG & REPO GẦN NHẤT) ---
   const cancelEdit = () => {
     setTitle('');
     setSlug('');
@@ -200,10 +221,7 @@ export default function App() {
     setUploadLinks([]);
     setIsSlugEdited(false);
     setEditorOriginal({ repo: '', filename: '', sha: '' });
-    
-    // Khôi phục cứng lại Tag và Repo đã lưu
-    setRepo(localStorage.getItem('cms_last_repo') || `${username}/${username}.github.io`);
-    setTags(localStorage.getItem('cms_last_tags') || '');
+    applyLatestTagAndRepo();
   };
 
   const handleSaveArticle = async () => {
@@ -247,23 +265,14 @@ export default function App() {
       const newState = { ...db, files: newFiles, tags: newTags, titles: newTitles, links: newLinksDb };
       await syncMetaAndDB(newState); saveLocalDb(newState);
 
-      // CẬP NHẬT BỘ NHỚ LƯU VẾT
-      const savedRepo = `${rOwner}/${rName}`;
-      const savedTags = tags;
-      localStorage.setItem('cms_last_repo', savedRepo);
-      localStorage.setItem('cms_last_tags', savedTags);
+      // CẬP NHẬT BỘ NHỚ
+      localStorage.setItem('cms_last_repo', `${rOwner}/${rName}`);
+      localStorage.setItem('cms_last_tags', tags);
 
       setStatus({ text: '✅ Đăng bài thành công!', type: 'success' });
       
-      // Xóa form bài viết NHƯNG ÉP GIỮ LẠI REPO & TAGS vửa lưu
-      setTitle(''); 
-      setSlug(''); 
-      setContent(''); 
-      setUploadLinks([]); 
-      setIsSlugEdited(false); 
-      setEditorOriginal({ repo:'', filename:'', sha:'' });
-      setRepo(savedRepo);
-      setTags(savedTags);
+      setTitle(''); setSlug(''); setContent(''); setUploadLinks([]); setIsSlugEdited(false); setEditorOriginal({ repo:'', filename:'', sha:'' });
+      applyLatestTagAndRepo(newState); 
       
       setTimeout(() => setStatus({ text: '', type: '' }), 4000);
     } catch (error) { setStatus({ text: `❌ Lỗi lưu bài`, type: 'error' }); } finally { setIsSaving(false); }
@@ -462,8 +471,8 @@ export default function App() {
                   </div>
                   <button onClick={() => window.open('https://vietndj.github.io/tin.html', '_blank')} className="w-full text-left px-3 py-2 text-xs font-bold hover:bg-[var(--bg-hover)] rounded text-[var(--text-main)] transition">📖 Mở Reader</button>
                   
-                  {/* NÚT MỞ TAB XUẤT SÁCH MỚI */}
-                  <button onClick={() => { window.open('export.html', '_blank'); setIsToolsOpen(false); }} className="w-full text-left px-3 py-2 text-xs font-bold text-[#8E44AD] hover:bg-[var(--bg-hover)] rounded transition">🤖 Xuất Sách AI</button>
+                  {/* NÚT MỞ TAB XUẤT SÁCH MỚI CÓ LINK TUYỆT ĐỐI */}
+                  <button onClick={() => { window.open('https://vietndj.github.io/export.html', '_blank'); setIsToolsOpen(false); }} className="w-full text-left px-3 py-2 text-xs font-bold text-[#8E44AD] hover:bg-[var(--bg-hover)] rounded transition">🤖 Xuất Sách AI</button>
                   
                   <hr className="my-1 border-t cms-border"/>
                   <button onClick={() => {localStorage.removeItem("cms_auth"); setIsAuthenticated(false);}} className="w-full text-left px-3 py-2 text-xs font-bold text-red-500 hover:bg-[var(--bg-hover)] rounded transition">🔒 Khóa App</button>
@@ -483,7 +492,12 @@ export default function App() {
           
           {/* EDITOR SOẠN THẢO */}
           <section className="cms-card overflow-hidden border border-[var(--border)]">
-            <button onClick={() => { setIsEditorOpen(!isEditorOpen); }} className="w-full px-6 py-3 flex justify-between items-center bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] font-bold text-[var(--accent)] outline-none">
+            <button onClick={() => {
+                setIsEditorOpen(!isEditorOpen); 
+                if (!isEditorOpen && !title && !content && !editorOriginal.sha) {
+                    applyLatestTagAndRepo();
+                }
+            }} className="w-full px-6 py-3 flex justify-between items-center bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] font-bold text-[var(--accent)] outline-none">
                 <span className="flex items-center gap-2">
                     <svg className="svg-icon"><use href="#icon-edit"></use></svg> Soạn thảo HTML <span className="text-[9px] text-[var(--text-muted)] border border-[var(--border)] px-1.5 py-0.5 rounded font-mono ml-2 uppercase bg-[var(--bg-body)]">Ctrl E</span>
                 </span>
