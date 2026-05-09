@@ -74,7 +74,7 @@ export default function App() {
   const toolsMenuRef = useRef(null);
   const editorInputRef = useRef(null); 
 
-  // Tự động focus ô NHẬP HTML khi bật Editor
+  // Focus ô NHẬP HTML khi mở Editor
   useEffect(() => {
     if (isEditorOpen && editorInputRef.current) {
         setTimeout(() => editorInputRef.current.focus(), 100);
@@ -150,7 +150,7 @@ export default function App() {
       setActiveModal({ type: null, data: null });
   };
 
-  // --- XUẤT SÁCH AI (API Trực tiếp, không phụ thuộc Link Public) ---
+  // --- XUẤT SÁCH AI ---
   const handleExportAI = async () => {
       if (!token) return alert("Cần Token PAT!");
       setStatus({ text: "Đang đóng gói sách...", type: "loading" });
@@ -162,7 +162,6 @@ export default function App() {
               const f = targets[i];
               setStatus({ text: `Đang nạp (${i+1}/${targets.length}): ${f.name}`, type: "loading" });
               
-              // Lấy qua API chuẩn để đảm bảo lấy được content
               let rC = await fetchText(`https://api.github.com/repos/${username}/${f.repoName}/contents/${safeEnc(f.fileName)}?t=${Date.now()}`, token);
               
               if (rC) {
@@ -171,7 +170,7 @@ export default function App() {
                   const textContent = (d.body.innerText || d.body.textContent || "").replace(/\n{3,}/g, '\n\n').trim();
                   ct += `BÀI: ${db.titles[`${f.repoName}/${f.fileName}`] || f.name}\n${textContent}\n\n------------------------\n\n`;
               }
-              await new Promise(r => setTimeout(r, 20)); // Tránh limit API
+              await new Promise(r => setTimeout(r, 40)); // Tránh limit API
           }
           
           const blob = new Blob([ct], { type: 'text/plain;charset=utf-8' });
@@ -300,12 +299,13 @@ export default function App() {
   }, [unpinnedFiles]);
 
   // ==========================================
-  // RENDER THẺ BÀI VIẾT (CARD) - SIÊU NÉN CẤP ĐỘ 2
+  // RENDER THẺ BÀI VIẾT (CARD) - TỐI ƯU CHIỀU CAO
   // ==========================================
   const renderCard = (file, isRecent = false) => {
     const isP = db.pinned.includes(`${file.repoName}/${file.fileName}`);
     const col = db.colors[`${file.repoName}/${file.fileName}`];
-    // Xác định màu chữ phụ thuộc vào màu nền (Light/Dark) để không bị chìm
+    
+    // Xử lý màu chữ khi đổi nền
     const isDark = col && getContrastYIQ(col) === '#FFFFFF';
     const textColor = col ? (isDark ? '#FFF' : '#1D1D1F') : 'var(--text-main)';
     const textMutedColor = col ? (isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)') : 'var(--text-muted)';
@@ -318,9 +318,10 @@ export default function App() {
     if (isRecent) {
       return (
         <div key={file.sha} className="cms-card p-3 min-w-[220px] max-w-[220px] flex flex-col transition border cms-border hover:border-[var(--accent)] bg-[var(--bg-card)] cursor-pointer" onClick={() => window.open(file.url, '_blank')}>
-          <h4 className="font-bold text-sm leading-snug line-clamp-2 mb-2 text-[var(--text-main)] flex-1">{file.name}</h4>
-          <div className="flex justify-between items-end mt-auto pt-2 border-t border-black/5 dark:border-white/5">
-             <div className="flex flex-col gap-0.5 opacity-60">
+          <h4 className="font-bold text-sm leading-snug line-clamp-2 mb-3 text-[var(--text-main)] flex-1">{file.name}</h4>
+          <div className="flex justify-between items-center mt-auto border-t border-black/5 dark:border-white/5 pt-2">
+             <div className="flex items-center gap-1.5 opacity-60">
+                 <svg className="w-2.5 h-2.5"><use href="#icon-folder"></use></svg>
                  <span className="text-[9px] uppercase font-bold tracking-tight">{file.repoName}</span>
              </div>
              <button onClick={(e)=>{e.stopPropagation(); editFileContent(file.repoName, file.fileName, file.sha)}} className="text-[9px] font-black uppercase text-[var(--text-main)] px-2 py-1 rounded border cms-border opacity-50 hover:opacity-100 transition">Sửa</button>
@@ -330,29 +331,28 @@ export default function App() {
     }
 
     return (
-      <div key={file.sha} className="cms-card p-4 flex flex-col relative transition border cms-border hover:border-[var(--accent)] bg-[var(--bg-card)] cursor-pointer hover:-translate-y-0.5 shadow-sm" onClick={() => window.open(file.url, '_blank')} style={{backgroundColor: col || 'var(--bg-card)', color: textColor, border: `1px solid ${borderColor}`}}>
+      <div key={file.sha} className="cms-card p-4 flex flex-col relative transition border cms-border hover:border-[var(--accent)] bg-[var(--bg-card)] cursor-pointer group hover:-translate-y-0.5 shadow-sm" onClick={() => window.open(file.url, '_blank')} style={{backgroundColor: col || 'var(--bg-card)', color: textColor, border: `1px solid ${borderColor}`}}>
         
         {/* TIÊU ĐỀ LUÔN NỔI BẬT NHẤT */}
-        <div className="flex-1 min-w-0 mb-3">
+        <div className="flex-1 min-w-0 mb-4">
             <h4 className="font-bold text-[16px] leading-[1.3] line-clamp-3" style={{color: textColor}}>
                 {file.name}
             </h4>
         </div>
         
         {/* FOOTER NÉN GỌN XUỐNG DƯỚI CÙNG (REPO, DATE, TAG, NÚT SỬA) */}
-        <div className="mt-auto pt-3 border-t flex justify-between items-center gap-2" style={{borderColor: borderColor}}>
+        <div className="mt-auto pt-3 border-t flex justify-between items-end gap-2" style={{borderColor: borderColor}}>
+            {/* Cột trái: Thông tin phụ nén chung */}
             <div className="flex flex-col gap-1.5 min-w-0 flex-1">
-                {/* Dòng 1: Kho & Ngày */}
-                <div className="flex items-center gap-2" style={{color: textMutedColor}}>
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1" style={{color: textMutedColor}}>
                     <span className="text-[9px] font-black uppercase tracking-widest flex items-center gap-1">
                         <svg className="w-2.5 h-2.5"><use href="#icon-folder"></use></svg> {file.repoName}
                     </span>
-                    <span className="text-[9px] font-mono flex items-center gap-1">
+                    <span className="text-[9px] font-mono flex items-center gap-1 opacity-80">
                         {dateFmt} {isP && <svg className="w-2 h-2 text-[#FF9500]"><use href="#icon-pin-filled"></use></svg>}
                     </span>
                 </div>
-                
-                {/* Dòng 2: Tags  */}
+                {/* HIỂN THỊ TAG */}
                 {tagsList.length > 0 && (
                    <div className="flex flex-wrap gap-1">
                        {tagsList.map(t => <span key={t} className="text-[8px] px-1.5 py-0.5 rounded uppercase font-bold" style={{backgroundColor: btnBg, color: textColor}}>{t}</span>)}
@@ -360,10 +360,10 @@ export default function App() {
                 )}
             </div>
 
-            {/* CÁC NÚT THAO TÁC (LUÔN MỞ SẴN CHO IPAD) */}
+            {/* NÚT THAO TÁC (LUÔN MỞ SẴN MỜ MỜ CHO IPAD) */}
             <div className="flex items-center gap-2 shrink-0">
                 <button onClick={(e)=>{e.stopPropagation(); togglePin(file.repoName, file.fileName);}} className="transition hover:scale-110" style={{color: isP ? '#FF9500' : textMutedColor}}><svg className="w-4 h-4"><use href={isP ? "#icon-pin-filled" : "#icon-pin"}></use></svg></button>
-                <button onClick={(e)=>{e.stopPropagation(); setActiveModal({type: 'color', data: file});}} className="hover:scale-110 transition" style={{color: textMutedColor}}><svg className="w-4 h-4"><use href="#icon-palette"></use></svg></button>
+                <button onClick={(e)=>{e.stopPropagation(); setActiveModal({type: 'color', data: file});}} className="hover:scale-110 transition opacity-40 hover:opacity-100" style={{color: textMutedColor}}><svg className="w-4 h-4"><use href="#icon-palette"></use></svg></button>
                 <button onClick={(e)=>{e.stopPropagation(); editFileContent(file.repoName, file.fileName, file.sha);}} className="text-[10px] font-black uppercase transition px-2.5 py-1.5 rounded-md flex items-center gap-1 opacity-40 hover:opacity-100 hover:scale-105" style={{backgroundColor: btnBg, color: textColor}}><svg className="w-3 h-3"><use href="#icon-edit"></use></svg>Sửa</button>
             </div>
         </div>
@@ -371,11 +371,11 @@ export default function App() {
     );
   };
 
-  // --- RENDER GIAO DIỆN CHÍNH LÕI ---
+  // --- RENDER GIAO DIỆN CHÍNH ---
   const renderViews = () => {
     if (processedFiles.length === 0) return <div className="text-center py-20 text-muted font-bold text-sm">Trống</div>;
     return (
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-8">
         {pinnedFiles.length > 0 && (
             <details open className="mb-2 outline-none">
                 <summary className="font-bold text-lg mb-4 border-b border-gray-200 dark:border-gray-800 pb-2 cursor-pointer outline-none text-[#FF9500] flex items-center gap-2">
@@ -478,48 +478,45 @@ export default function App() {
         )}
       </div>
 
-      {/* MODAL MÀU SẮC LÕI (Sửa lỗi màn hình đen) */}
+      {/* MODAL MÀU SẮC LÕI (STYLE CỨNG) */}
       {activeModal.type === 'color' && (
-        <div className="fixed inset-0 z-[999999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" style={{ backgroundColor: 'rgba(0,0,0,0.6)' }} onClick={()=>setActiveModal({type:null,data:null})}>
-            <div className="bg-white dark:bg-gray-900 p-6 rounded-2xl w-full max-w-xs shadow-2xl border border-gray-200 dark:border-gray-800" onClick={e=>e.stopPropagation()}>
-                <h4 className="font-bold mb-4 text-gray-900 dark:text-white text-center text-sm">Gắn màu cho thẻ</h4>
-                <div className="grid grid-cols-5 gap-3">
-                    {[null, '#F2F2F7', '#FFD8BF', '#FFE58F', '#D9F7BE', '#BAE7FF', '#D6E4FF', '#EFDBFF', '#FFD6E7', '#1D1D1F'].map((c, i) => (
-                        <button key={i} onClick={()=>handleSetColor(`${activeModal.data.repoName}/${activeModal.data.fileName}`, c)} className="w-10 h-10 rounded-full border border-gray-300 dark:border-gray-600 shadow-inner flex items-center justify-center transition hover:scale-110" style={{backgroundColor: c || '#F9FAFB'}}>
-                            {c === null && <span className="text-gray-500 text-[10px] font-bold">Xóa</span>}
-                        </button>
-                    ))}
-                </div>
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.75)', zIndex: 999999, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setActiveModal({type: null, data: null})}>
+          <div style={{ backgroundColor: '#ffffff', padding: '24px', borderRadius: '16px', width: '320px', maxWidth: '90%', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)' }} onClick={e => e.stopPropagation()}>
+            <h4 style={{ fontWeight: 'bold', marginBottom: '16px', color: '#000', textAlign: 'center', fontSize: '16px' }}>Gắn màu cho thẻ bài viết</h4>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '12px' }}>
+              {[null, '#F2F2F7', '#FFD8BF', '#FFE58F', '#D9F7BE', '#BAE7FF', '#D6E4FF', '#EFDBFF', '#FFD6E7', '#1D1D1F'].map((c, i) => (
+                <button key={i} onClick={()=>handleSetColor(`${activeModal.data.repoName}/${activeModal.data.fileName}`, c)} style={{ width: '40px', height: '40px', borderRadius: '50%', border: '1px solid #d1d5db', backgroundColor: c || '#f9fafb', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                  {c === null && <span style={{ fontSize: '10px', color: '#6b7280', fontWeight: 'bold' }}>Xóa</span>}
+                </button>
+              ))}
             </div>
+          </div>
         </div>
       )}
 
-      {/* MODAL XUẤT SÁCH AI LÕI (Sửa lỗi màn hình đen) */}
+      {/* MODAL XUẤT SÁCH AI LÕI (STYLE CỨNG) */}
       {isExportModalOpen && (
-        <div className="fixed inset-0 z-[999999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" style={{ backgroundColor: 'rgba(0,0,0,0.7)' }} onClick={()=>{if(!status.text) {setIsExportModalOpen(false); setExportResult(null);}}}>
-          <div className="bg-white dark:bg-gray-900 p-8 rounded-3xl w-full max-w-sm shadow-2xl border border-gray-200 dark:border-gray-800" onClick={e=>e.stopPropagation()}>
-            <h3 className="text-xl font-black mb-2 text-gray-900 dark:text-white flex items-center gap-2">🤖 XUẤT SÁCH AI</h3>
-            
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.75)', zIndex: 999999, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => { if(!status.text) {setIsExportModalOpen(false); setExportResult(null);} }}>
+          <div style={{ backgroundColor: '#ffffff', padding: '32px', borderRadius: '24px', width: '400px', maxWidth: '90%', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)' }} onClick={e => e.stopPropagation()}>
+            <h3 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '8px', color: '#000' }}>🤖 XUẤT SÁCH AI</h3>
             {!exportResult ? (
                 <>
-                  <p className="text-xs text-gray-600 dark:text-gray-400 mb-6 leading-relaxed">Tính năng này sẽ quét trực tiếp mã nguồn để gom tất cả bài viết thành 1 file .txt sạch. Hoàn hảo để dùng với NotebookLM.</p>
-                  
-                  <select value={exportTarget} onChange={(e)=>setExportTarget(e.target.value)} className="w-full p-3.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white rounded-xl text-sm font-bold mb-6 outline-none">
+                  <p style={{ fontSize: '12px', color: '#4b5563', marginBottom: '24px', lineHeight: '1.5' }}>Tính năng này sẽ quét trực tiếp mã nguồn để gom tất cả bài viết thành 1 file .txt sạch. Hoàn hảo để dùng với NotebookLM.</p>
+                  <select value={exportTarget} onChange={(e)=>setExportTarget(e.target.value)} style={{ width: '100%', padding: '12px', backgroundColor: '#f3f4f6', border: '1px solid #d1d5db', color: '#000', borderRadius: '8px', fontSize: '14px', fontWeight: 'bold', outline: 'none', marginBottom: '24px' }}>
                       <option value="all">📚 Xuất Toàn Bộ Các Kho</option>
                       {repoKeysList.map(r => <option key={r} value={r}>📁 Chỉ xuất Kho: {r}</option>)}
                   </select>
-                  
-                  <div className="flex gap-2">
-                     <button onClick={() => setIsExportModalOpen(false)} className="px-4 py-3.5 bg-gray-200 dark:bg-gray-800 text-gray-800 dark:text-gray-200 rounded-xl font-bold text-sm transition hover:opacity-80">Hủy</button>
-                     <button onClick={handleExportAI} className="flex-1 py-3.5 bg-blue-600 text-white rounded-xl font-bold text-sm shadow-lg transition hover:bg-blue-700">BẮT ĐẦU ĐÓNG GÓI</button>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                     <button onClick={() => setIsExportModalOpen(false)} style={{ padding: '12px 16px', backgroundColor: '#e5e7eb', color: '#1f2937', borderRadius: '8px', fontWeight: 'bold', border: 'none', cursor: 'pointer' }}>Hủy</button>
+                     <button onClick={handleExportAI} style={{ flex: 1, padding: '12px 16px', backgroundColor: '#2563eb', color: '#fff', borderRadius: '8px', fontWeight: 'bold', border: 'none', cursor: 'pointer' }}>BẮT ĐẦU ĐÓNG GÓI</button>
                   </div>
                 </>
             ) : (
-                <div className="text-center py-4">
-                    <div className="text-5xl mb-4 text-green-500">🎉</div>
-                    <h4 className="font-bold text-lg mb-2 text-gray-900 dark:text-white">Thành công!</h4>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">Đã gom thành công <b className="text-gray-900 dark:text-white">{exportResult.count}</b> bài viết vào 1 file.</p>
-                    <a href={exportResult.url} download={exportResult.filename} className="block w-full py-4 bg-green-500 hover:bg-green-600 text-white rounded-xl font-bold text-base shadow-xl transition hover:scale-105" onClick={() => { setTimeout(()=>{setIsExportModalOpen(false); setExportResult(null)}, 500) }}>
+                <div style={{ textAlign: 'center', padding: '16px 0' }}>
+                    <div style={{ fontSize: '48px', marginBottom: '16px', color: '#22c55e' }}>🎉</div>
+                    <h4 style={{ fontWeight: 'bold', fontSize: '18px', color: '#000', marginBottom: '8px' }}>Thành công!</h4>
+                    <p style={{ fontSize: '14px', color: '#6b7280', marginBottom: '24px' }}>Đã gom thành công <b style={{ color: '#000' }}>{exportResult.count}</b> bài viết vào 1 file.</p>
+                    <a href={exportResult.url} download={exportResult.filename} style={{ display: 'block', width: '100%', padding: '16px', backgroundColor: '#22c55e', color: '#fff', borderRadius: '12px', fontWeight: 'bold', textDecoration: 'none', cursor: 'pointer' }} onClick={() => { setTimeout(()=>{setIsExportModalOpen(false); setExportResult(null)}, 500) }}>
                         ⬇️ TẢI FILE SÁCH (.TXT)
                     </a>
                 </div>
@@ -528,8 +525,21 @@ export default function App() {
         </div>
       )}
 
-      {status.text && <div className="fixed bottom-6 left-6 z-[99999] bg-white dark:bg-gray-900 p-4 rounded-2xl shadow-2xl border-l-4 border-[#007AFF] font-bold text-xs fade-in text-gray-900 dark:text-white">{status.text}</div>}
+      {/* TOAST THÔNG BÁO */}
+      {status.text && <div style={{ position: 'fixed', bottom: '24px', left: '24px', zIndex: 999999, backgroundColor: '#ffffff', color: '#000', padding: '16px 20px', borderRadius: '12px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', borderLeft: '4px solid #007AFF', fontWeight: 'bold', fontSize: '14px' }}>{status.text}</div>}
       
+      {/* MODAL CÁC TÍNH NĂNG CHƯA HOÀN THIỆN (LINK, TAG, BULK MOVE) */}
+      {activeModal.type && activeModal.type !== 'color' && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.75)', zIndex: 999999, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={()=>setActiveModal({type: null, data: null})}>
+            <div style={{ backgroundColor: '#ffffff', padding: '24px', borderRadius: '16px', width: '320px', maxWidth: '90%' }} onClick={e => e.stopPropagation()}>
+                <h3 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '16px', color: '#000' }}>Tác vụ: {activeModal.type}</h3>
+                <p style={{ fontSize: '14px', color: '#6b7280', marginBottom: '24px' }}>Tính năng quản lý Tag/Link rời đang được React hóa trong bản cập nhật sau. Vui lòng dùng nút Sửa để thay đổi Tag.</p>
+                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                    <button onClick={() => setActiveModal({type: null, data: null})} style={{ padding: '8px 16px', backgroundColor: '#e5e7eb', color: '#000', borderRadius: '8px', fontWeight: 'bold', border: 'none', cursor: 'pointer' }}>Đóng</button>
+                </div>
+            </div>
+        </div>
+      )}
     </div>
   );
 }
