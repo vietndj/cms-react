@@ -73,24 +73,62 @@ export default function App() {
 
   // POMODORO STATES
   const [isPomoOpen, setIsPomoOpen] = useState(false);
-  const [pomoTime, setPomoTime] = useState(1500); // 1500s = 25m
+  const [pomoTime, setPomoTime] = useState(1500); 
   const [isPomoActive, setIsPomoActive] = useState(false);
   const [pomoTask, setPomoTask] = useState('');
   const [pomoWebhook, setPomoWebhook] = useState(() => localStorage.getItem('cms_pomo_webhook') || '');
   const [isWebhookSettingsOpen, setIsWebhookSettingsOpen] = useState(false);
 
-  // EDITOR STATES (Tối ưu mới)
+  // EXPORT AI NOTEBOOK STATES
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [exportTarget, setExportTarget] = useState('all');
+
+  // EDITOR STATES 
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [repo, setRepo] = useState(() => localStorage.getItem('cms_last_repo') || `${username}/${username}.github.io`);
   const [title, setTitle] = useState('');
   const [slug, setSlug] = useState('');
-  const [tags, setTags] = useState('');
+  const [tags, setTags] = useState(() => localStorage.getItem('cms_last_tags') || ''); // Tự động load Tag gần nhất
   const [content, setContent] = useState('');
   const [editorOriginal, setEditorOriginal] = useState({ repo: '', filename: '', sha: '' });
 
   const [activeModal, setActiveModal] = useState({ type: null, data: null });
   const toolsMenuRef = useRef(null);
+  const titleInputRef = useRef(null); // Ref để Focus vào Tiêu đề
+
+  // Focus Tiêu đề khi mở Editor
+  useEffect(() => {
+    if (isEditorOpen && titleInputRef.current) {
+        setTimeout(() => titleInputRef.current.focus(), 100);
+    }
+  }, [isEditorOpen]);
+
+  // Thiết lập Phím Tắt Toàn Cầu
+  useEffect(() => {
+    const handleGlobalKeyDown = (e) => {
+        const isCmd = navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? e.metaKey : e.ctrlKey;
+        
+        // Ctrl + E: Đóng/mở Editor
+        if (isCmd && e.key.toLowerCase() === 'e') {
+            e.preventDefault();
+            setIsEditorOpen(prev => !prev);
+        }
+        // Ctrl + S: Lưu bài
+        if (isCmd && e.key.toLowerCase() === 's') {
+            e.preventDefault();
+            const btnSave = document.getElementById('btn-save-article');
+            if (btnSave && !btnSave.disabled) btnSave.click();
+        }
+        // Ctrl + K: Focus ô Tìm kiếm
+        if (isCmd && e.key.toLowerCase() === 'k') {
+            e.preventDefault();
+            document.getElementById('search-input-main')?.focus();
+        }
+    };
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (e) => { if (toolsMenuRef.current && !toolsMenuRef.current.contains(e.target)) setIsToolsOpen(false); };
@@ -158,51 +196,35 @@ export default function App() {
 
   const compileAllForNotebookLM = async () => {
       if (!token) return alert("Cần nhập Token PAT!");
-      if (!confirm("🚀 XUẤT SIÊU SÁCH CHO NOTEBOOKLM (LẤY MỚI 100%)\nMất khoảng 20-30s. Bắt đầu?")) return;
-      setIsToolsOpen(false);
-      setStatus({ text: "Lấy danh sách Repo...", type: "loading" });
+      setIsExportModalOpen(false);
+      setStatus({ text: "Đang trích xuất dữ liệu...", type: "loading" });
       try {
-          const resRepos = await fetch(`https://api.github.com/users/${username}/repos?sort=updated&per_page=100`, { headers: getHeaders(token) });
-          if(!resRepos.ok) throw new Error("Lỗi API List Repos");
-          const repos = await resRepos.json();
-          let ct = `SIÊU SÁCH KIẾN THỨC: ${username.toUpperCase()}\n====================================\n\n`;
-          let tc = 0;
-          for (let rp of repos) {
-              const fsRes = await fetch(`https://api.github.com/repos/${username}/${rp.name}/contents/?t=${Date.now()}`, { headers: getHeaders(token) });
-              if(!fsRes.ok) continue;
-              const fs = await fsRes.json();
-              if (!Array.isArray(fs)) continue;
-              const hFs = fs.filter(f => f.name.endsWith('.html') && !(rp.name === `${username}.github.io` && (f.name === 'index.html' || f.name === 'fix-url.html' || f.name === 'tin.html')));
-              if (hFs.length) { ct += `\n\n[KHO: ${rp.name.toUpperCase()}]\n\n`; }
-              for (const f of hFs) {
-                  tc++;
-                  setStatus({ text: `Đang trích xuất: ${f.name}...`, type: "loading" });
-                  let sN = f.name; try { sN = decodeURIComponent(f.name); } catch(e){}
-                  const rC = await fetchText(`https://api.github.com/repos/${username}/${rp.name}/contents/${safeEnc(sN)}?t=${Date.now()}`, token);
+          let targetFiles = db.files;
+          if (exportTarget !== 'all') targetFiles = db.files.filter(f => f.repoName === exportTarget);
+          targetFiles = targetFiles.filter(f => !['index.html', 'fix-url.html', 'tin.html', 'cms_db.json', 'metadata.json'].includes(f.fileName));
+          let ct = `SIÊU SÁCH KIẾN THỨC: ${username.toUpperCase()}\n====================================\n\n`; let tc = 0;
+          const grouped = {}; targetFiles.forEach(f => { if(!grouped[f.repoName]) grouped[f.repoName] = []; grouped[f.repoName].push(f); });
+          for (let rName in grouped) {
+              ct += `\n\n[KHO: ${rName.toUpperCase()}]\n\n`;
+              for (let f of grouped[rName]) {
+                  tc++; setStatus({ text: `Đang trích xuất (${tc}/${targetFiles.length}): ${f.name}...`, type: "loading" });
+                  let sN = f.fileName; try { sN = decodeURIComponent(f.fileName); } catch(e){}
+                  const rC = await fetchText(`https://api.github.com/repos/${username}/${rName}/contents/${safeEnc(sN)}?t=${Date.now()}`, token);
                   if (rC) {
-                      const d = new DOMParser().parseFromString(rC, 'text/html');
-                      d.querySelectorAll('script,style,nav,header,footer,iframe,svg,button').forEach(x => x.remove());
-                      const ti = (db.titles && db.titles[`${rp.name}/${f.name}`]) || sN.replace('.html', '');
-                      ct += `BÀI: ${ti}\n[Nội dung]\n${(d.body.innerText || d.body.textContent || "").replace(/\n{3,}/g, '\n\n').trim()}\n------------------------\n\n`;
+                      const d = new DOMParser().parseFromString(rC, 'text/html'); d.querySelectorAll('script,style,nav,header,footer,iframe,svg,button').forEach(x => x.remove());
+                      const contentText = (d.body.innerText || d.body.textContent || "").replace(/\n{3,}/g, '\n\n').trim();
+                      const ti = db.titles[`${rName}/${f.fileName}`] || f.name;
+                      ct += `BÀI: ${ti}\n[Nội dung]\n${contentText}\n------------------------\n\n`;
                   }
-                  await new Promise(r => setTimeout(r, 50));
+                  await new Promise(r => setTimeout(r, 50)); 
               }
           }
           ct = ct.replace('====================================', `Tổng số bài: ${tc}\n====================================`);
-          setStatus({ text: "Lưu Siêu Sách lên Github...", type: "loading" });
-          const fn = `notebooklm_ALL.txt`;
-          const sS = await getFileShaSafe(`${username}/${username}.github.io`, fn, token);
-          const encodedChunked = await encodeBase64UTF8Async(ct);
-          
-          await fetch(`https://api.github.com/repos/${username}/${username}.github.io/contents/${fn}`, {
-              method: 'PUT', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-              body: JSON.stringify({ message: `Đóng gói Siêu sách`, content: encodedChunked, sha: sS || undefined })
-          });
-          
-          setStatus({ text: "✅ Đóng gói xong!", type: "success" });
-          const u = `https://${username}.github.io/${fn}`;
-          try { await navigator.clipboard.writeText(u); } catch(e) {}
-          setTimeout(() => prompt(`🎉 XONG! Link đã Copy:\n(Dán vào NotebookLM)`, u), 500);
+          setStatus({ text: "Đang tạo file tải xuống...", type: "loading" });
+          const blob = new Blob([ct], { type: 'text/plain;charset=utf-8' });
+          const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `notebooklm_${exportTarget}_${Date.now()}.txt`;
+          document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+          setStatus({ text: "✅ Tải file thành công!", type: "success" }); setTimeout(() => setStatus({ text: '', type: '' }), 3000);
       } catch (e) { setStatus({ text: `❌ Lỗi: ${e.message}`, type: "error" }); }
   };
 
@@ -212,6 +234,19 @@ export default function App() {
     let tagArr = currentTags.split(',').map(x=>x.trim()).filter(Boolean);
     if(tagArr.length && s) { let ts = tagArr.join('-').toLowerCase().replace(/\s+/g,'-'); if(!s.includes(ts)) s += '-' + ts; }
     setSlug(s);
+  };
+
+  // Tự động lấy Title khi Paste nội dung
+  const handleContentChange = (e) => {
+    const val = e.target.value;
+    setContent(val);
+    if (!title.trim() && val.includes('<title>')) {
+        const match = val.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+        if (match && match[1]) {
+            const extractedTitle = match[1].trim();
+            if (extractedTitle) autoSlugify(extractedTitle, tags);
+        }
+    }
   };
 
   const toggleTagEditor = (t) => {
@@ -259,8 +294,13 @@ export default function App() {
       const newDbState = { ...db, files: newFiles, tags: newTags, titles: newTitles };
       await syncMetaAndDB(newDbState); saveLocalDb(newDbState);
       
+      // Lưu lại Repo & Tag gần nhất
+      localStorage.setItem('cms_last_repo', `${rOwner}/${rName}`);
+      localStorage.setItem('cms_last_tags', tags);
+
       setStatus({ text: '✅ Đăng bài thành công!', type: 'success' });
-      setTitle(''); setSlug(''); setContent(''); setTags(''); setEditorOriginal({ repo:'', filename:'', sha:'' });
+      setTitle(''); setSlug(''); setContent(''); setEditorOriginal({ repo:'', filename:'', sha:'' });
+      // Cố tình không setTags('') để giữ nguyên Tag cho bài viết sau
       setTimeout(() => setStatus({ text: '', type: '' }), 4000);
     } catch (error) { setStatus({ text: `❌ Lỗi: ${error.message}`, type: 'error' }); } finally { setIsSaving(false); }
   };
@@ -349,11 +389,11 @@ export default function App() {
   };
 
   const renderTagsAndLinks = (r, f) => {
-    const tags = getFileTags(r, f); const links = getFileLinks(r, f);
+    const tagsList = getFileTags(r, f); const linksList = getFileLinks(r, f);
     return (
       <>
-        {tags.length > 0 && (<div className="flex flex-wrap gap-1.5 mb-2 empty:hidden">{tags.map(t => <span key={t} className="cms-input text-[10px] px-2.5 py-1 rounded font-bold border cms-border flex items-center gap-1 opacity-90"><svg className="w-2.5 h-2.5 opacity-60"><use href="#icon-tag"></use></svg>{t}</span>)}</div>)}
-        {links.length > 0 && (<div className="flex flex-wrap gap-1.5 mb-3 empty:hidden">{links.map((l,i) => <a key={i} href={l.url} target="_blank" rel="noreferrer" onClick={e=>e.stopPropagation()} className="bg-[#007AFF]/10 text-[var(--accent)] text-[10px] px-2 py-0.5 rounded font-bold border border-transparent hover:border-[#007AFF]/30 transition flex items-center gap-1"><svg className="w-3 h-3"><use href="#icon-link"></use></svg>{l.title}</a>)}</div>)}
+        {tagsList.length > 0 && (<div className="flex flex-wrap gap-1.5 mb-2 empty:hidden">{tagsList.map(t => <span key={t} className="cms-input text-[10px] px-2.5 py-1 rounded font-bold border cms-border flex items-center gap-1 opacity-90"><svg className="w-2.5 h-2.5 opacity-60"><use href="#icon-tag"></use></svg>{t}</span>)}</div>)}
+        {linksList.length > 0 && (<div className="flex flex-wrap gap-1.5 mb-3 empty:hidden">{linksList.map((l,i) => <a key={i} href={l.url} target="_blank" rel="noreferrer" onClick={e=>e.stopPropagation()} className="bg-[#007AFF]/10 text-[var(--accent)] text-[10px] px-2 py-0.5 rounded font-bold border border-transparent hover:border-[#007AFF]/30 transition flex items-center gap-1"><svg className="w-3 h-3"><use href="#icon-link"></use></svg>{l.title}</a>)}</div>)}
       </>
     );
   };
@@ -430,10 +470,7 @@ export default function App() {
           {renderTagsAndLinks(file.repoName, file.fileName)}
           <div className="text-xs text-muted line-clamp-2 mb-4">{file.preview || '...'}</div>
         </div>
-        <div className="flex justify-between items-center mt-auto pt-3 border-t cms-border">
-          <span className="text-[10px] opacity-60">{dateFmt}</span>
-          <div className="flex items-center gap-2"><ActionIcons file={file} isPinned={isPinned} /><button onClick={(e)=>{e.stopPropagation(); editFileContent(file.repoName, file.fileName, file.sha)}} className="cms-btn px-4 py-1.5 rounded-lg text-xs font-bold transition sm:hidden group-hover:block">Sửa</button></div>
-        </div>
+        <div className="flex justify-between items-center mt-auto pt-3 border-t cms-border"><span className="text-[10px] opacity-60">{dateFmt}</span><div className="flex items-center gap-2"><ActionIcons file={file} isPinned={isPinned} /><button onClick={(e)=>{e.stopPropagation(); editFileContent(file.repoName, file.fileName, file.sha)}} className="cms-btn px-4 py-1.5 rounded-lg text-xs font-bold transition sm:hidden group-hover:block">Sửa</button></div></div>
       </div>
     );
   };
@@ -463,7 +500,7 @@ export default function App() {
         <div className="max-w-[1600px] mx-auto px-4 md:px-6 lg:px-8 flex flex-col md:flex-row items-center gap-4">
           <h1 className="text-2xl font-bold tracking-tight text-[var(--accent)] w-full md:w-[120px] text-center md:text-left">vietndj</h1>
           <div className="flex-1 flex w-full items-center gap-2">
-            <div className="flex-1 flex items-center bg-[var(--bg-hover)] rounded-xl px-4 py-2 border border-transparent focus-within:border-[var(--accent)] transition-all"><svg className="svg-icon text-muted"><use href="#icon-search"></use></svg><input type="text" value={searchQuery} onChange={(e)=>setSearchQuery(e.target.value)} placeholder="Tìm bài viết, repo... (Ctrl K)" className="bg-transparent border-none outline-none text-sm w-full ml-3 font-bold placeholder-[var(--text-muted)]" /></div>
+            <div className="flex-1 flex items-center bg-[var(--bg-hover)] rounded-xl px-4 py-2 border border-transparent focus-within:border-[var(--accent)] transition-all"><svg className="svg-icon text-muted"><use href="#icon-search"></use></svg><input id="search-input-main" type="text" value={searchQuery} onChange={(e)=>setSearchQuery(e.target.value)} placeholder="Tìm bài viết, repo... (Ctrl K)" className="bg-transparent border-none outline-none text-sm w-full ml-3 font-bold placeholder-[var(--text-muted)]" /></div>
             <button onClick={() => setIsDeepSearch(!isDeepSearch)} className={`shrink-0 px-4 py-2 rounded-xl text-sm font-bold transition flex items-center gap-1.5 border cms-border ${isDeepSearch ? 'bg-[var(--accent)] text-white' : 'bg-transparent text-[var(--text-main)] hover:bg-[var(--bg-hover)]'}`}><svg className="w-4 h-4"><use href="#icon-grid"></use></svg> Sâu</button>
           </div>
           
@@ -471,7 +508,7 @@ export default function App() {
             <button onClick={loadDatabase} className="hidden lg:block cms-btn px-3 py-2 rounded-xl text-xs font-bold transition outline-none">↻ Tải DB Lõi</button>
             <button onClick={()=>setIsTasksOpen(!isTasksOpen)} className="cms-btn px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1 outline-none">📝 Việc</button>
             
-            {/* DROPDOWN MENU PHỤC HỒI */}
+            {/* DROPDOWN MENU */}
             <div className="relative">
               <button onClick={() => setIsToolsOpen(!isToolsOpen)} className="cms-btn px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1 outline-none">Công cụ ▾</button>
               {isToolsOpen && ( 
@@ -483,9 +520,9 @@ export default function App() {
                     <button onClick={() => changeTheme('read')} className="flex-1 py-1.5 rounded text-[11px] font-bold cms-input hover:opacity-80 transition border cms-border text-[#D35400]">Sách</button>
                   </div>
                   <hr className="cms-border my-1 border-t" />
-                  <button onClick={()=>setIsPomoOpen(!isPomoOpen)} className="text-left px-3 py-2.5 text-xs font-bold hover:bg-[var(--bg-hover)] rounded-lg transition">🍅 Pomodoro</button>
+                  <button onClick={() => { setIsPomoOpen(!isPomoOpen); setIsToolsOpen(false); }} className="text-left px-3 py-2.5 text-xs font-bold hover:bg-[var(--bg-hover)] rounded-lg transition">🍅 Pomodoro</button>
                   <button onClick={() => window.open('https://vietndj.github.io/tin.html', '_blank')} className="text-left px-3 py-2.5 text-xs font-bold hover:bg-[var(--bg-hover)] rounded-lg transition">📖 Mở Reader</button>
-                  <button onClick={compileAllForNotebookLM} className="text-left px-3 py-2.5 text-xs font-bold text-[#8E44AD] hover:bg-[var(--bg-hover)] rounded-lg transition">🤖 Xuất Sách AI</button>
+                  <button onClick={() => { setIsExportModalOpen(true); setIsToolsOpen(false); }} className="text-left px-3 py-2.5 text-xs font-bold text-[#8E44AD] hover:bg-[var(--bg-hover)] rounded-lg transition">🤖 Xuất Sách AI</button>
                   <hr className="cms-border my-1 border-t" />
                   <button onClick={() => {localStorage.removeItem("cms_auth"); setIsAuthenticated(false);}} className="text-left px-3 py-2.5 text-xs font-bold text-red-500 hover:bg-[var(--bg-hover)] rounded-lg transition">🔒 Khóa App</button>
                 </div> 
@@ -528,22 +565,34 @@ export default function App() {
           
           {/* EDITOR (Tối ưu giao diện gõ) */}
           <section className="cms-card overflow-hidden shadow-sm">
-            <button onClick={() => setIsEditorOpen(!isEditorOpen)} className="w-full px-6 py-4 flex justify-between items-center hover:bg-[var(--bg-hover)] font-semibold text-[var(--accent)] outline-none border-b cms-border"><span className="flex items-center gap-2"><svg className="svg-icon"><use href="#icon-edit"></use></svg> Soạn thảo HTML</span><span style={{ transform: isEditorOpen ? 'rotate(180deg)' : 'rotate(0deg)' }} className="transition-transform">▼</span></button>
+            <button onClick={() => setIsEditorOpen(!isEditorOpen)} className="w-full px-6 py-4 flex justify-between items-center hover:bg-[var(--bg-hover)] font-semibold text-[var(--accent)] outline-none border-b cms-border">
+                <span className="flex items-center gap-2">
+                    <svg className="svg-icon"><use href="#icon-edit"></use></svg> Soạn thảo HTML
+                    <span className="text-[10px] text-muted border border-[#EAE0D0] px-1.5 py-0.5 rounded font-mono ml-2 uppercase bg-white">Ctrl E</span>
+                </span>
+                <span style={{ transform: isEditorOpen ? 'rotate(180deg)' : 'rotate(0deg)' }} className="transition-transform">▼</span>
+            </button>
             {isEditorOpen && (
               <div className="p-6 bg-[var(--bg-card)] fade-in flex flex-col gap-5">
                 <div>
                    <label className="block text-[11px] font-bold text-muted mb-2 uppercase">📁 Lưu vào Kho</label>
                    <div className="flex flex-wrap gap-2">{repoKeysList.map(r => { const fullPath = `${username}/${r}`; const isActive = repo === fullPath; return (<button key={r} onClick={() => { setRepo(fullPath); localStorage.setItem('cms_last_repo', fullPath); }} className={`px-3 py-1.5 text-xs font-bold rounded-lg transition border ${isActive ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-md' : 'bg-[var(--bg-hover)] text-[var(--text-main)] border-transparent hover:opacity-80'}`}>{r}</button>) })}</div>
                 </div>
-                <div><input type="text" value={title} onChange={(e)=>autoSlugify(e.target.value, tags)} onKeyDown={(e) => { if(e.key === 'Enter') { e.preventDefault(); document.getElementById('html-content-editor')?.focus(); } }} className="w-full px-4 py-4 text-2xl font-black text-[var(--text-main)] bg-[var(--bg-hover)] border-2 border-transparent focus:border-[var(--accent)] rounded-xl outline-none transition-all placeholder:text-gray-400" placeholder="Nhập tiêu đề bài viết... (Enter để viết nội dung)" /></div>
+                <div>
+                   <input ref={titleInputRef} type="text" value={title} onChange={(e)=>autoSlugify(e.target.value, tags)} onKeyDown={(e) => { if(e.key === 'Enter') { e.preventDefault(); document.getElementById('html-content-editor')?.focus(); } }} className="w-full px-4 py-4 text-2xl font-black text-[var(--text-main)] bg-[var(--bg-hover)] border-2 border-transparent focus:border-[var(--accent)] rounded-xl outline-none transition-all placeholder:text-gray-400" placeholder="Nhập tiêu đề bài viết... (Enter để viết nội dung)" />
+                </div>
                 <div className="bg-[var(--bg-hover)] p-4 rounded-xl border border-transparent focus-within:border-[var(--accent)] transition-all">
                    <div className="flex items-center gap-2 mb-2"><svg className="w-4 h-4 text-muted"><use href="#icon-tag"></use></svg><input type="text" value={tags} onChange={(e)=>{setTags(e.target.value); autoSlugify(title, e.target.value);}} className="flex-1 bg-transparent text-sm font-bold text-[var(--accent)] outline-none placeholder:text-muted placeholder:font-normal" placeholder="Gõ tag mới (cách bằng dấu phẩy)..." /></div>
                    {allUniqueTags.length > 0 && (<div className="flex flex-wrap gap-1.5 pt-3 border-t border-[var(--border)]">{allUniqueTags.map(t => { const isSelected = tags.split(',').map(x=>x.trim()).includes(t); return (<button key={t} onClick={() => toggleTagEditor(t)} className={`px-2.5 py-1 text-[10px] font-bold rounded-md transition border ${isSelected ? 'bg-[var(--accent)] text-white border-[var(--accent)]' : 'bg-[var(--bg-card)] text-muted border-[var(--border)] hover:opacity-80 shadow-sm'}`}>{t}</button>) })}</div>)}
                 </div>
-                <div><textarea id="html-content-editor" rows="10" value={content} onChange={(e)=>setContent(e.target.value)} className="w-full px-4 py-4 bg-[#1D1D1F] text-[#34C759] border-none rounded-xl focus:ring-2 focus:ring-[var(--accent)] font-mono text-sm leading-relaxed outline-none shadow-inner" placeholder="Nhập mã HTML vào đây..."></textarea></div>
+                <div>
+                   <textarea id="html-content-editor" rows="10" value={content} onChange={handleContentChange} className="w-full px-4 py-4 bg-[#1D1D1F] text-[#34C759] border-none rounded-xl focus:ring-2 focus:ring-[var(--accent)] font-mono text-sm leading-relaxed outline-none shadow-inner" placeholder="Nhập mã HTML vào đây... Nếu paste HTML có <title>, hệ thống sẽ tự động bóc lấy tiêu đề."></textarea>
+                </div>
                 <details className="group border cms-border rounded-xl bg-[var(--bg-hover)]"><summary className="px-4 py-3 text-xs font-bold text-muted cursor-pointer flex items-center gap-2 outline-none hover:text-[var(--text-main)]"><span className="group-open:rotate-90 transition-transform">▶</span> Cài đặt nâng cao (Token PAT, URL Slug)</summary><div className="p-4 border-t cms-border grid grid-cols-1 md:grid-cols-2 gap-4"><div><label className="block text-[10px] font-bold text-muted mb-1 uppercase">Mã Github PAT</label><input type="password" value={token} onChange={(e)=>handleSaveToken(e.target.value)} className="w-full px-3 py-2 bg-[var(--bg-card)] border cms-border rounded-lg text-xs outline-none focus:border-[var(--accent)]" placeholder="Nhập Token GitHub..." /></div><div><label className="block text-[10px] font-bold text-muted mb-1 uppercase">Slug (URL)</label><input type="text" value={slug} onChange={(e)=>setSlug(e.target.value)} className="w-full px-3 py-2 bg-[var(--bg-card)] border cms-border rounded-lg text-xs font-mono text-[var(--accent)] outline-none focus:border-[var(--accent)]" placeholder="kien-thuc..." /></div></div></details>
                 <div className="flex pt-2 justify-between items-center">
-                   <button onClick={handleSaveArticle} disabled={isSaving} className="cms-btn-primary w-full md:w-auto px-10 py-4 rounded-xl shadow-lg text-sm disabled:opacity-50 hover:scale-[1.02] transition-transform">{isSaving ? '⏳ Đang lưu...' : '🚀 Lưu Bài Lên GitHub'}</button>
+                   <button id="btn-save-article" onClick={handleSaveArticle} disabled={isSaving} className="cms-btn-primary w-full md:w-auto px-10 py-4 rounded-xl shadow-lg text-sm disabled:opacity-50 hover:scale-[1.02] transition-transform">
+                      {isSaving ? '⏳ Đang lưu...' : '🚀 Lưu Bài Lên GitHub (Ctrl S)'}
+                   </button>
                    {editorOriginal.sha && (<button onClick={()=>setEditorOriginal({repo:'',filename:'',sha:''})} className="text-red-500 font-bold px-4 py-2 hover:bg-red-50 rounded-xl transition">✕ Hủy Sửa</button>)}
                 </div>
               </div>
@@ -609,6 +658,28 @@ export default function App() {
                   <p className="text-[10px] text-muted">WebHook này sẽ báo về điện thoại khi hết giờ.</p>
               </div>
            )}
+        </div>
+      )}
+
+      {/* MODAL XUẤT SÁCH AI MỚI */}
+      {isExportModalOpen && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[999999] flex items-center justify-center fade-in">
+          <div className="cms-card p-6 max-w-sm w-full mx-4 border cms-border shadow-2xl">
+            <h3 className="text-xl font-bold mb-2 flex items-center gap-2">🤖 Xuất Sách AI</h3>
+            <p className="text-sm text-muted mb-4">Chọn kho dữ liệu để tải về máy dưới dạng file .txt. Tối ưu định dạng cho NotebookLM.</p>
+            
+            <select value={exportTarget} onChange={(e) => setExportTarget(e.target.value)} className="w-full px-4 py-3 cms-input border cms-border rounded-xl text-sm mb-6 font-bold cursor-pointer outline-none focus:border-[var(--accent)]">
+                <option value="all">📚 Tất cả các Kho</option>
+                {repoKeysList.map(r => (
+                    <option key={r} value={r}>📁 Kho: {r}</option>
+                ))}
+            </select>
+            
+            <div className="flex justify-end gap-3 pt-4 border-t cms-border">
+                <button onClick={() => setIsExportModalOpen(false)} className="cms-btn px-5 py-2.5 rounded-xl text-sm font-bold">Hủy</button>
+                <button onClick={compileAllForNotebookLM} className="cms-btn-primary px-6 py-2.5 rounded-xl text-sm shadow-md">🚀 Xuất và Tải Về</button>
+            </div>
+          </div>
         </div>
       )}
 
