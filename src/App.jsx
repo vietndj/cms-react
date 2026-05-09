@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 
 // ==========================================
 // 1. TIỆN ÍCH GITHUB API (Self-healing)
@@ -63,7 +63,9 @@ export default function App() {
   const [isEditorOpen, setIsEditorOpen] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [token, setToken] = useState('');
-  const [repo, setRepo] = useState(`${username}/${username}.github.io`);
+  
+  // Tự động load Repo cuối cùng từ localStorage, nếu không có thì mặc định lấy vietndj.github.io
+  const [repo, setRepo] = useState(() => localStorage.getItem('cms_last_repo') || `${username}/${username}.github.io`);
   const [title, setTitle] = useState('');
   const [slug, setSlug] = useState('');
   const [tags, setTags] = useState('');
@@ -115,6 +117,19 @@ export default function App() {
     setSlug(s);
   };
 
+  // Nút bấm Tag bật/tắt
+  const toggleTag = (t) => {
+    let currentTags = tags.split(',').map(x => x.trim()).filter(Boolean);
+    if (currentTags.includes(t)) {
+        currentTags = currentTags.filter(x => x !== t); // Tắt tag
+    } else {
+        currentTags.push(t); // Bật tag
+    }
+    const newTagsStr = currentTags.join(', ');
+    setTags(newTagsStr);
+    autoSlugify(title, newTagsStr);
+  };
+
   const loadDatabase = async () => {
     if (!token || isSyncing) return;
     setIsSyncing(true);
@@ -147,17 +162,16 @@ export default function App() {
   };
 
   // ==========================================
-  // HÀM LƯU BÀI VIẾT (GHI LÊN GITHUB & ĐỒNG BỘ DB)
+  // HÀM LƯU BÀI VIẾT
   // ==========================================
   const handleSaveArticle = async () => {
-    if (!token) return alert("Vui lòng nhập Token GitHub PAT!");
-    if (!repo || !title || !slug || !content) return alert("Vui lòng điền đủ Kho, Tiêu đề, Slug và Nội dung!");
+    if (!token) return alert("Vui lòng nhập Token GitHub PAT (Ở phần Cài đặt nâng cao)!");
+    if (!repo || !title || !slug || !content) return alert("Vui lòng điền đủ Tiêu đề, Slug và Nội dung!");
 
     setIsSaving(true);
     setStatus({ text: '⏳ Đang lưu file HTML...', type: 'loading' });
 
     try {
-      // 1. Chuẩn bị File HTML
       let filename = slug.endsWith('.html') ? slug : slug + '.html';
       let rName = repo.includes('/') ? (repo.split('/')[1] || repo.split('/')[0]) : repo;
       let rOwner = repo.includes('/') ? repo.split('/')[0] : username;
@@ -166,7 +180,6 @@ export default function App() {
       const encodedContent = await encodeBase64UTF8Async(content);
       let fileSha = await getFileShaSafe(`${rOwner}/${rName}`, filename, token);
 
-      // 2. Ghi đè file HTML lên Github Repo
       const bodyHTML = { message: `Tạo/Sửa bài: ${title}`, content: encodedContent };
       if (fileSha) bodyHTML.sha = fileSha;
 
@@ -178,7 +191,6 @@ export default function App() {
       if (!resHTML.ok) throw new Error("Lỗi khi ghi file HTML lên GitHub");
       const resHTMLData = await resHTML.json();
 
-      // 3. Cập nhật State DB & Metadata
       setStatus({ text: 'Đang đồng bộ Metadata & CMS DB...', type: 'loading' });
       
       let newTags = { ...db.tags };
@@ -208,7 +220,6 @@ export default function App() {
 
       const newDbState = { ...db, files: newFiles, tags: newTags, titles: newTitles };
       
-      // 4. Ghi đè file metadata.json
       const metaContent = await encodeBase64UTF8Async(JSON.stringify({
           _version: 8, tags: newDbState.tags, links: newDbState.links, tasks: newDbState.tasks,
           pinned: newDbState.pinned, colors: newDbState.colors, customCol: newDbState.customCol, titles: newDbState.titles
@@ -219,7 +230,6 @@ export default function App() {
           body: JSON.stringify({ message: 'Sync Meta (React)', content: metaContent, sha: metaSha || undefined })
       });
 
-      // 5. Ghi đè file cms_db.json
       const dbContent = await encodeBase64UTF8Async(JSON.stringify({ allFiles: newDbState.files }));
       const dbSha = await getFileShaSafe(`${username}/${username}.github.io`, 'cms_db.json', token);
       await fetch(`https://api.github.com/repos/${username}/${username}.github.io/contents/cms_db.json`, {
@@ -227,9 +237,9 @@ export default function App() {
           body: JSON.stringify({ message: 'Sync DB (React)', content: dbContent, sha: dbSha || undefined })
       });
 
-      // Hoàn tất
       setDb(newDbState);
       setStatus({ text: '✅ Đăng bài thành công!', type: 'success' });
+      setTitle(''); setSlug(''); setContent(''); setTags(''); // Clear form
       setTimeout(() => setStatus({ text: '', type: '' }), 4000);
       
     } catch (error) {
@@ -242,13 +252,19 @@ export default function App() {
   // ==========================================
   // XỬ LÝ LỌC VÀ HIỂN THỊ DỮ LIỆU
   // ==========================================
+  const repoKeysList = useMemo(() => {
+      const keys = Object.keys(db.repos);
+      if (!keys.includes(`${username}.github.io`)) keys.unshift(`${username}.github.io`);
+      return keys;
+  }, [db.repos]);
+
   const allUniqueTags = useMemo(() => {
     const tagsSet = new Set();
     Object.values(db.tags).forEach(tagArray => tagArray.forEach(tag => tagsSet.add(tag)));
     return Array.from(tagsSet).sort();
   }, [db.tags]);
 
-  const getFileTags = (repo, file) => db.tags[`${repo}/${file}`] || [];
+  const getFileTags = (r, f) => db.tags[`${r}/${f}`] || [];
 
   const processedFiles = useMemo(() => {
     let filtered = db.files.filter(f => {
@@ -296,7 +312,7 @@ export default function App() {
   }
 
   const renderCard = (file, isRecent = false) => {
-    const tags = getFileTags(file.repoName, file.fileName);
+    const tagsList = getFileTags(file.repoName, file.fileName);
     if (isRecent) {
       return (
         <div key={file.sha} className="cms-card p-3 min-w-[240px] max-w-[240px] flex flex-col group hover:border-[var(--accent)] transition cursor-pointer border cms-border" onClick={() => window.open(file.url, '_blank')}>
@@ -314,9 +330,9 @@ export default function App() {
         <div className="pl-2">
           <div className="text-[10px] text-muted flex items-center gap-1 mb-2 font-bold uppercase tracking-wide"><svg className="w-3 h-3"><use href="#icon-folder"></use></svg> {file.repoName}</div>
           <a href={file.url} target="_blank" rel="noreferrer" className="font-bold text-[15px] hover:text-[var(--accent)] mb-2 line-clamp-2">{file.name}</a>
-          {tags.length > 0 && (
+          {tagsList.length > 0 && (
             <div className="flex flex-wrap gap-1 mb-2">
-              {tags.map(t => <span key={t} className="cms-input text-[10px] px-2 py-0.5 rounded font-bold border cms-border flex items-center gap-1 opacity-90"><svg className="w-2.5 h-2.5 opacity-60"><use href="#icon-tag"></use></svg>{t}</span>)}
+              {tagsList.map(t => <span key={t} className="cms-input text-[10px] px-2 py-0.5 rounded font-bold border cms-border flex items-center gap-1 opacity-90"><svg className="w-2.5 h-2.5 opacity-60"><use href="#icon-tag"></use></svg>{t}</span>)}
             </div>
           )}
           <div className="text-xs text-muted line-clamp-2 mb-4">{file.preview || '...'}</div>
@@ -339,9 +355,6 @@ export default function App() {
             <svg className="svg-icon text-muted"><use href="#icon-search"></use></svg>
             <input type="text" value={searchQuery} onChange={(e)=>setSearchQuery(e.target.value)} placeholder="Tìm bài viết, repo... (Ctrl K)" className="bg-transparent border-none outline-none text-sm w-full ml-3 font-bold placeholder-[var(--text-muted)]" />
           </div>
-          <button onClick={() => setIsDeepSearch(!isDeepSearch)} className={`shrink-0 px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border ${isDeepSearch ? 'bg-[var(--accent)] text-white border-transparent' : 'cms-btn border-[var(--border)]'}`}>
-            <svg className="w-4 h-4"><use href="#icon-grid"></use></svg> <span className="hidden sm:inline-block">Sâu</span>
-          </button>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <button onClick={() => {localStorage.removeItem("cms_auth"); setIsAuthenticated(false)}} className="cms-btn px-3 py-2 rounded-xl text-xs font-bold text-red-500">🔒 Khóa App</button>
@@ -381,7 +394,9 @@ export default function App() {
       
       <main className="flex-1 w-full max-w-[1600px] mx-auto px-4 md:px-6 lg:px-8 pb-20">
         
-        {/* KHỐI SOẠN THẢO HTML (Đã được khôi phục) */}
+        {/* ========================================= */}
+        {/* KHỐI SOẠN THẢO HTML (UX ĐƯỢC TỐI ƯU MỚI)  */}
+        {/* ========================================= */}
         <section className="cms-card overflow-hidden mb-8 shadow-sm">
           <button onClick={() => setIsEditorOpen(!isEditorOpen)} className="w-full px-6 py-4 flex justify-between items-center hover:bg-[var(--bg-hover)] font-semibold text-[var(--accent)] outline-none border-b cms-border">
             <span className="flex items-center gap-2"><svg className="svg-icon"><use href="#icon-edit"></use></svg> Soạn thảo HTML</span>
@@ -389,49 +404,115 @@ export default function App() {
           </button>
 
           {isEditorOpen && (
-            <div className="p-6 bg-[var(--bg-card)] fade-in">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                 <div>
-                    <label className="block text-[11px] font-bold text-muted mb-1.5 uppercase">Mã Github PAT</label>
-                    <input type="password" value={token} onChange={(e)=>handleSaveToken(e.target.value)} className="w-full px-4 py-2.5 cms-input rounded-xl text-sm" placeholder="Nhập Token GitHub..." />
-                 </div>
-                 <div>
-                    <label className="block text-[11px] font-bold text-muted mb-1.5 uppercase">Kho (Repo)</label>
-                    <input type="text" value={repo} onChange={(e)=>setRepo(e.target.value)} className="w-full px-4 py-2.5 cms-input rounded-xl text-sm font-bold text-[var(--accent)]" />
+            <div className="p-6 bg-[var(--bg-card)] fade-in flex flex-col gap-5">
+              
+              {/* 1. CHỌN KHO (Nhấn nhanh dạng nút, nhớ lịch sử) */}
+              <div>
+                 <label className="block text-[11px] font-bold text-muted mb-2 uppercase">📁 Lưu vào Kho</label>
+                 <div className="flex flex-wrap gap-2">
+                    {repoKeysList.map(r => {
+                       const fullPath = `${username}/${r}`;
+                       const isActive = repo === fullPath;
+                       return (
+                          <button
+                             key={r}
+                             onClick={() => { setRepo(fullPath); localStorage.setItem('cms_last_repo', fullPath); }}
+                             className={`px-3 py-1.5 text-xs font-bold rounded-lg transition border ${isActive ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-md' : 'bg-[var(--bg-hover)] text-[var(--text-main)] border-transparent hover:opacity-80'}`}
+                          >
+                             {r}
+                          </button>
+                       )
+                    })}
                  </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                 <div className="md:col-span-2">
-                    <label className="block text-[11px] font-bold text-muted mb-1.5 uppercase">Tiêu đề bài viết</label>
-                    <input type="text" value={title} onChange={(e)=>autoSlugify(e.target.value, tags)} placeholder="Vd: Kiến thức..." className="w-full px-4 py-2.5 cms-input rounded-xl text-sm font-bold" />
+              {/* 2. TIÊU ĐỀ (To, Rõ ràng, Enter để xuống dòng) */}
+              <div>
+                 <input
+                    type="text"
+                    value={title}
+                    onChange={(e)=>autoSlugify(e.target.value, tags)}
+                    onKeyDown={(e) => { 
+                        if(e.key === 'Enter') { 
+                            e.preventDefault(); 
+                            document.getElementById('html-content-editor')?.focus(); 
+                        } 
+                    }}
+                    className="w-full px-4 py-4 text-2xl font-black text-[var(--text-main)] bg-[var(--bg-hover)] border-2 border-transparent focus:border-[var(--accent)] rounded-xl outline-none transition-all placeholder:text-gray-400"
+                    placeholder="Nhập tiêu đề bài viết... (Enter để viết nội dung)"
+                 />
+              </div>
+
+              {/* 3. NHÃN (Bấm nhanh các Tag cũ + Gõ thêm tag mới) */}
+              <div className="bg-[var(--bg-hover)] p-4 rounded-xl border border-transparent focus-within:border-[var(--accent)] transition-all">
+                 <div className="flex items-center gap-2 mb-2">
+                     <svg className="w-4 h-4 text-muted"><use href="#icon-tag"></use></svg>
+                     <input
+                         type="text"
+                         value={tags}
+                         onChange={(e)=>{setTags(e.target.value); autoSlugify(title, e.target.value);}}
+                         className="flex-1 bg-transparent text-sm font-bold text-[var(--accent)] outline-none placeholder:text-muted placeholder:font-normal"
+                         placeholder="Gõ tag mới (cách bằng dấu phẩy)..."
+                     />
                  </div>
-                 <div>
-                    <label className="block text-[11px] font-bold text-muted mb-1.5 uppercase">Slug (URL)</label>
-                    <input type="text" value={slug} onChange={(e)=>setSlug(e.target.value)} placeholder="kien-thuc..." className="w-full px-4 py-2.5 cms-input rounded-xl text-sm font-mono text-[var(--accent)]" />
+                 {/* Khung hiển thị Tag có sẵn để bấm */}
+                 {allUniqueTags.length > 0 && (
+                     <div className="flex flex-wrap gap-1.5 pt-3 border-t border-[var(--border)]">
+                        {allUniqueTags.map(t => {
+                            const isSelected = tags.split(',').map(x=>x.trim()).includes(t);
+                            return (
+                                <button
+                                   key={t}
+                                   onClick={() => toggleTag(t)}
+                                   className={`px-2.5 py-1 text-[10px] font-bold rounded-md transition border ${isSelected ? 'bg-[var(--accent)] text-white border-[var(--accent)]' : 'bg-[var(--bg-card)] text-muted border-[var(--border)] hover:opacity-80 shadow-sm'}`}
+                                >
+                                  {t}
+                                </button>
+                            )
+                        })}
+                     </div>
+                 )}
+              </div>
+
+              {/* 4. NỘI DUNG HTML */}
+              <div>
+                 <textarea
+                    id="html-content-editor"
+                    rows="10"
+                    value={content}
+                    onChange={(e)=>setContent(e.target.value)}
+                    className="w-full px-4 py-4 bg-[#1D1D1F] text-[#34C759] border-none rounded-xl focus:ring-2 focus:ring-[var(--accent)] font-mono text-sm leading-relaxed outline-none shadow-inner"
+                    placeholder="Nhập mã HTML vào đây..."
+                 ></textarea>
+              </div>
+
+              {/* 5. CÀI ĐẶT NÂNG CAO (PAT, SLUG) - Đã được gộp vào Menu Accordion ẩn */}
+              <details className="group border cms-border rounded-xl bg-[var(--bg-hover)]">
+                 <summary className="px-4 py-3 text-xs font-bold text-muted cursor-pointer flex items-center gap-2 outline-none hover:text-[var(--text-main)]">
+                    <span className="group-open:rotate-90 transition-transform">▶</span> Cài đặt nâng cao (Token PAT, URL Slug)
+                 </summary>
+                 <div className="p-4 border-t cms-border grid grid-cols-1 md:grid-cols-2 gap-4">
+                     <div>
+                        <label className="block text-[10px] font-bold text-muted mb-1 uppercase">Mã Github PAT</label>
+                        <input type="password" value={token} onChange={(e)=>handleSaveToken(e.target.value)} className="w-full px-3 py-2 bg-[var(--bg-card)] border cms-border rounded-lg text-xs outline-none focus:border-[var(--accent)]" placeholder="Nhập Token GitHub..." />
+                     </div>
+                     <div>
+                        <label className="block text-[10px] font-bold text-muted mb-1 uppercase">Slug (URL)</label>
+                        <input type="text" value={slug} onChange={(e)=>setSlug(e.target.value)} className="w-full px-3 py-2 bg-[var(--bg-card)] border cms-border rounded-lg text-xs font-mono text-[var(--accent)] outline-none focus:border-[var(--accent)]" placeholder="kien-thuc..." />
+                     </div>
                  </div>
-              </div>
+              </details>
 
-              <div className="mb-4">
-                 <label className="block text-[11px] font-bold text-muted mb-1.5 uppercase flex items-center gap-1">
-                   <svg className="w-3 h-3"><use href="#icon-tag"></use></svg> Nhãn (Tags)
-                 </label>
-                 <input type="text" value={tags} onChange={(e)=>{setTags(e.target.value); autoSlugify(title, e.target.value);}} className="w-full px-4 py-2.5 cms-input rounded-xl text-sm font-bold text-[var(--accent)]" placeholder="Gõ tag (cách bằng dấu phẩy)..." />
-              </div>
-
-              <div className="mb-5">
-                 <label className="block text-[11px] font-bold text-muted mb-1.5 uppercase">Nội dung HTML</label>
-                 <textarea rows="12" value={content} onChange={(e)=>setContent(e.target.value)} className="w-full px-4 py-3 bg-[#1D1D1F] text-[#34C759] border-none rounded-xl focus:ring-2 focus:ring-[var(--accent)] font-mono text-xs leading-relaxed outline-none" placeholder="Nhập mã HTML vào đây..."></textarea>
-              </div>
-
-              <div className="flex flex-wrap gap-3 items-center">
-                 <button onClick={handleSaveArticle} disabled={isSaving} className="cms-btn-primary px-8 py-3 rounded-xl shadow-md disabled:opacity-50">
-                    {isSaving ? '⏳ Đang lưu...' : 'Lưu Bài Lên GitHub'}
+              {/* 6. NÚT LƯU BÀI */}
+              <div className="flex pt-2">
+                 <button onClick={handleSaveArticle} disabled={isSaving} className="cms-btn-primary w-full md:w-auto px-10 py-4 rounded-xl shadow-lg text-sm disabled:opacity-50 hover:scale-[1.02] transition-transform">
+                    {isSaving ? '⏳ Đang lưu...' : '🚀 Lưu Bài Lên GitHub'}
                  </button>
               </div>
             </div>
           )}
         </section>
+        {/* ========================================= */}
 
         {recentFiles.length > 0 && (
           <details open className="mb-8">
