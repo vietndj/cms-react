@@ -26,6 +26,7 @@ const getFileShaSafe = async (repoPath, file, token) => {
 const SVGIcons = () => (
   <svg style={{ display: 'none' }}>
     <symbol id="icon-tag" viewBox="0 0 24 24"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></symbol>
+    <symbol id="icon-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></symbol>
     <symbol id="icon-edit" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></symbol>
     <symbol id="icon-folder" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></symbol>
     <symbol id="icon-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></symbol>
@@ -57,7 +58,7 @@ export default function App() {
 
   const [activeColorPickerCard, setActiveColorPickerCard] = useState(null); 
 
-  // EXPORT AI & TASK PROGRESS (Non-blocking)
+  // EXPORT AI & TASK PROGRESS
   const [isExportSectionOpen, setIsExportSectionOpen] = useState(false);
   const [exportTarget, setExportTarget] = useState('all');
   const [exportJob, setExportJob] = useState({ isRunning: false, total: 0, current: 0, currentFile: '', resultUrl: null, filename: '' });
@@ -66,9 +67,14 @@ export default function App() {
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [repo, setRepo] = useState(() => localStorage.getItem('cms_last_repo') || `${username}/${username}.github.io`);
+  
   const [title, setTitle] = useState('');
   const [slug, setSlug] = useState('');
+  const [isSlugEdited, setIsSlugEdited] = useState(false); // Trạng thái kiểm soát việc tự tạo slug
+  
   const [tags, setTags] = useState(() => localStorage.getItem('cms_last_tags') || ''); 
+  const [uploadLinks, setUploadLinks] = useState([]); // State quản lý danh sách Link tham khảo
+  
   const [content, setContent] = useState('');
   const [editorOriginal, setEditorOriginal] = useState({ repo: '', filename: '', sha: '' });
 
@@ -139,65 +145,85 @@ export default function App() {
       setActiveColorPickerCard(null); 
   };
 
-  // --- XUẤT SÁCH AI (CHẠY NGẦM KHÔNG BLOCK UI) ---
   const handleExportAI = async () => {
       if (!token) return alert("Cần Token PAT!");
       let targets = db.files.filter(f => (exportTarget === 'all' || f.repoName === exportTarget) && !['index.html', 'tin.html', 'cms_db.json', 'metadata.json'].includes(f.fileName));
-      
       if (targets.length === 0) return alert("Không có bài viết nào để xuất!");
-
-      // 1. Kích hoạt Widget Tiến trình & Đóng Panel xuất cho đỡ vướng
-      setExportJob({ isRunning: true, total: targets.length, current: 0, currentFile: 'Đang chuẩn bị...', resultUrl: null, filename: '' });
       setIsExportSectionOpen(false);
+      setExportJob({ isRunning: true, total: targets.length, current: 0, currentFile: 'Đang khởi động tiến trình...', resultUrl: null, filename: '' });
+      await new Promise(resolve => setTimeout(resolve, 100));
 
       try {
           let ct = `SIÊU SÁCH KIẾN THỨC: ${username.toUpperCase()}\n===========================\n\n`;
-          
           for (let i = 0; i < targets.length; i++) {
               const f = targets[i];
-              // 2. Cập nhật state tiến trình
               setExportJob(prev => ({ ...prev, current: i + 1, currentFile: f.name }));
-              
+              await new Promise(resolve => setTimeout(resolve, 50)); 
               let rC = await fetchText(`https://api.github.com/repos/${username}/${f.repoName}/contents/${safeEnc(f.fileName)}?t=${Date.now()}`, token);
-              
               if (rC) {
                   const d = new DOMParser().parseFromString(rC, 'text/html');
                   d.querySelectorAll('script,style,button,nav').forEach(x => x.remove());
                   const textContent = (d.body.innerText || d.body.textContent || "").replace(/\n{3,}/g, '\n\n').trim();
-                  ct += `BÀI: ${db.titles[\`${f.repoName}/${f.fileName}\`] || f.name}\n${textContent}\n\n------------------------\n\n`;
+                  ct += `BÀI: ${db.titles[`${f.repoName}/${f.fileName}`] || f.name}\n${textContent}\n\n------------------------\n\n`;
               }
-              // 3. QUAN TRỌNG: Nhường luồng cho trình duyệt vẽ UI, không bị đơ app
-              await new Promise(r => setTimeout(r, 50)); 
           }
-          
           const blob = new Blob([ct], { type: 'text/plain;charset=utf-8' });
-          setExportJob(prev => ({ 
-              ...prev, 
-              isRunning: false, 
-              resultUrl: URL.createObjectURL(blob), 
-              filename: `notebooklm_${exportTarget}_${Date.now()}.txt` 
-          }));
+          setExportJob(prev => ({ ...prev, isRunning: false, resultUrl: URL.createObjectURL(blob), filename: `notebooklm_${exportTarget}_${Date.now()}.txt` }));
       } catch (e) { 
           setExportJob(prev => ({ ...prev, isRunning: false }));
-          setStatus({ text: "❌ Lỗi xuất file", type: "error" }); 
+          setStatus({ text: "❌ Lỗi xuất file trong lúc chạy", type: "error" }); 
       }
   };
 
-  const autoSlugify = (val, currentTags) => {
-    setTitle(val);
+  // --- LOGIC TITLE & SLUG (ĐÃ FIX) ---
+  const generateSlug = (val, currentTags) => {
     let s = val.toLowerCase().replace(/[áàảạãăắằẳẵặâấầẩẫậ]/gi,'a').replace(/[éèẻẽẹêếềểễệ]/gi,'e').replace(/[iíìỉĩị]/gi,'i').replace(/[óòỏõọôốồổỗộơớờởỡợ]/gi,'o').replace(/[úùủũụưứừửữự]/gi,'u').replace(/[ýỳỷỹỵ]/gi,'y').replace(/đ/gi,'d').replace(/\s+/g,'-').replace(/[^\w\-]+/g,'').replace(/\-\-+/g,'-').replace(/^-+|-+$/g,'');
     let tagArr = currentTags.split(',').map(x=>x.trim()).filter(Boolean);
     if(tagArr.length && s) { let ts = tagArr.join('-').toLowerCase().replace(/\s+/g,'-'); if(!s.includes(ts)) s += '-' + ts; }
-    setSlug(s);
+    return s;
+  };
+
+  const handleTitleChange = (e) => {
+    const val = e.target.value;
+    setTitle(val);
+    if (!isSlugEdited) { // Nếu user chưa can thiệp bằng tay, tự sinh slug
+        setSlug(generateSlug(val, tags));
+    }
+  };
+
+  const handleSlugChange = (e) => {
+    setSlug(e.target.value);
+    setIsSlugEdited(true); // Đánh dấu User đã tự tay sửa Slug
   };
 
   const handleContentChange = (e) => {
     const val = e.target.value; setContent(val);
     if (!title.trim() && val.includes('<title>')) {
         const match = val.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
-        if (match && match[1]) autoSlugify(match[1].trim(), tags);
+        if (match && match[1]) {
+            const extractedTitle = match[1].trim();
+            setTitle(extractedTitle);
+            if (!isSlugEdited) setSlug(generateSlug(extractedTitle, tags));
+        }
     }
   };
+
+  // --- QUẢN LÝ LINK (ADD, UPDATE, REMOVE) ---
+  const handleUpdateLink = (index, field, value) => {
+      const newLinks = [...uploadLinks];
+      newLinks[index][field] = value;
+      setUploadLinks(newLinks);
+  };
+
+  const handleRemoveLink = (index) => {
+      const newLinks = uploadLinks.filter((_, i) => i !== index);
+      setUploadLinks(newLinks);
+  };
+
+  const handleAddLink = () => {
+      setUploadLinks([...uploadLinks, { title: `Link ${uploadLinks.length + 1}`, url: '' }]);
+  };
+
 
   const handleSaveArticle = async () => {
     if (!token || !repo || !title || !slug || !content) return alert("Thiếu dữ liệu (Kho, Tiêu đề, Slug, Nội dung)!");
@@ -218,27 +244,34 @@ export default function App() {
       if (editorOriginal.filename && (editorOriginal.filename !== filename || editorOriginal.repo !== `${rOwner}/${rName}`) && editorOriginal.sha) {
         await fetch(`https://api.github.com/repos/${editorOriginal.repo}/contents/${safeEnc(editorOriginal.filename)}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ message: `Xóa file cũ`, sha: editorOriginal.sha }) });
         const oldKey = `${editorOriginal.repo.split('/')[1]||editorOriginal.repo.split('/')[0]}/${editorOriginal.filename}`;
-        delete db.tags[oldKey]; delete db.titles[oldKey]; delete db.colors[oldKey];
+        delete db.tags[oldKey]; delete db.titles[oldKey]; delete db.colors[oldKey]; delete db.links[oldKey];
         db.pinned = db.pinned.filter(x => x !== oldKey);
       }
 
       setStatus({ text: 'Đang đồng bộ Metadata & CMS DB...', type: 'loading' });
+      
       let newTags = { ...db.tags }; let tagArr = tags.split(',').map(x => x.trim()).filter(Boolean);
       if (tagArr.length) newTags[fileKey] = tagArr; else delete newTags[fileKey];
+      
       let newTitles = { ...db.titles }; newTitles[fileKey] = title;
+
+      // Xử lý lưu Link
+      let newLinksDb = { ...db.links };
+      let validLinks = uploadLinks.filter(l => l.title.trim() && l.url.trim());
+      if (validLinks.length) newLinksDb[fileKey] = validLinks; else delete newLinksDb[fileKey];
       
       let newFiles = [...db.files].filter(f => f.sha !== (resHTMLData.content?.sha || fileSha));
       const dDate = new Date();
       newFiles.unshift({ repoName: rName, name: title, fileName: filename, sha: resHTMLData.content?.sha || fileSha, url: `https://${rOwner}.github.io/${rName === `${rOwner}.github.io` ? '' : rName + '/'}${filename}`, timestamp: dDate.getTime(), fullDate: dDate.toLocaleString('vi-VN') });
 
-      const newState = { ...db, files: newFiles, tags: newTags, titles: newTitles };
+      const newState = { ...db, files: newFiles, tags: newTags, titles: newTitles, links: newLinksDb };
       await syncMetaAndDB(newState); saveLocalDb(newState);
       
       localStorage.setItem('cms_last_repo', `${rOwner}/${rName}`);
       localStorage.setItem('cms_last_tags', tags);
 
       setStatus({ text: '✅ Đăng bài thành công!', type: 'success' });
-      setTitle(''); setSlug(''); setContent(''); setEditorOriginal({ repo:'', filename:'', sha:'' });
+      setTitle(''); setSlug(''); setContent(''); setUploadLinks([]); setIsSlugEdited(false); setEditorOriginal({ repo:'', filename:'', sha:'' });
       setTimeout(() => setStatus({ text: '', type: '' }), 4000);
     } catch (error) { setStatus({ text: `❌ Lỗi lưu bài`, type: 'error' }); } finally { setIsSaving(false); }
   };
@@ -251,8 +284,15 @@ export default function App() {
       if(res) {
         setContent(res);
         const rp = rName === username || rName === `${username}.github.io` ? `${username}/${username}.github.io` : `${username}/${rName}`;
-        setRepo(rp); setTitle(db.titles[`${rName}/${f}`] || f.replace('.html','')); setSlug(f.replace('.html',''));
-        setTags((db.tags[`${rName}/${f}`] || []).join(', '));
+        const fileKey = `${rName}/${f}`;
+        
+        setRepo(rp); 
+        setTitle(db.titles[fileKey] || f.replace('.html','')); 
+        setSlug(f.replace('.html','')); 
+        setIsSlugEdited(true); // Edit bài cũ thì coi như Slug đã được fix cứng
+        setTags((db.tags[fileKey] || []).join(', '));
+        setUploadLinks(db.links[fileKey] ? JSON.parse(JSON.stringify(db.links[fileKey])) : []); // Nạp links cũ
+
         setEditorOriginal({ repo: rp, filename: f, sha: sha });
         setStatus({ text: '✅ Đã nạp thành công!', type: 'success' }); setTimeout(() => setStatus({ text: '', type: '' }), 2000);
       } else throw new Error("Không tìm thấy file");
@@ -268,6 +308,7 @@ export default function App() {
   const repoKeysList = useMemo(() => { const keys = Object.keys(db.repos || {}); if (!keys.includes(`${username}.github.io`)) keys.unshift(`${username}.github.io`); return keys; }, [db.repos]);
   const allUniqueTags = useMemo(() => { const s = new Set(); Object.values(db.tags).forEach(a => a.forEach(t => s.add(t))); return Array.from(s).sort(); }, [db.tags]);
   const getFileTags = (r, f) => db.tags[`${r}/${f}`] || [];
+  const getFileLinks = (r, f) => db.links[`${r}/${f}`] || []; // Hàm lấy link của file
 
   const processedFiles = useMemo(() => {
     let f = db.files.filter(f => (activeRepo === 'all' || f.repoName === activeRepo) && (activeTag === 'all' || getFileTags(f.repoName, f.fileName).includes(activeTag)) && (!searchQuery || f.name.toLowerCase().includes(searchQuery.toLowerCase())));
@@ -299,6 +340,7 @@ export default function App() {
     const btnBg = col ? (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)') : 'var(--bg-hover)';
 
     const tagsList = getFileTags(file.repoName, file.fileName);
+    const linksList = getFileLinks(file.repoName, file.fileName);
     const dateFmt = file.fullDate?.split(' ')[0] || '';
 
     if (isRecent) {
@@ -321,6 +363,17 @@ export default function App() {
         <div className="flex-1 min-w-0 mb-4">
             <h4 className="font-bold text-[16px] leading-[1.3] line-clamp-3" style={{color: textColor}}>{file.name}</h4>
         </div>
+
+        {/* HIỂN THỊ LINK THAM KHẢO TRÊN THẺ NẾU CÓ */}
+        {linksList.length > 0 && (
+            <div className="flex flex-col gap-1 mb-3">
+                {linksList.map((lnk, idx) => (
+                    <a key={idx} href={lnk.url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="text-[10px] font-bold py-1 px-2 rounded-lg flex items-center gap-1.5 hover:opacity-80 transition truncate" style={{backgroundColor: btnBg, color: 'var(--accent)'}}>
+                        <svg className="w-3 h-3"><use href="#icon-link"></use></svg> {lnk.title}
+                    </a>
+                ))}
+            </div>
+        )}
         
         <div className="mt-auto pt-3 border-t flex justify-between items-end gap-2" style={{borderColor: borderColor}}>
             <div className="flex flex-col gap-1.5 min-w-0 flex-1">
@@ -433,7 +486,7 @@ export default function App() {
       <div className="flex flex-col lg:flex-row gap-6 px-4 md:px-6 lg:px-8 max-w-[1600px] mx-auto items-start w-full relative pb-20 mt-6">
         <main className="flex-1 w-full min-w-0 flex flex-col gap-8">
 
-          {/* INLINE PANEL: XUẤT SÁCH AI (KHỞI CHẠY) */}
+          {/* INLINE PANEL: XUẤT SÁCH AI */}
           {isExportSectionOpen && (
             <section className="cms-card p-6 border cms-border fade-in">
               <div className="flex justify-between items-center mb-4">
@@ -453,7 +506,7 @@ export default function App() {
             </section>
           )}
           
-          {/* EDITOR */}
+          {/* EDITOR (ĐÃ FIX THÊM Ô SLUG VÀ LINK) */}
           <section className="cms-card overflow-hidden border border-[var(--border)]">
             <button onClick={() => {setIsEditorOpen(!isEditorOpen); setIsExportSectionOpen(false);}} className="w-full px-6 py-3 flex justify-between items-center bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] font-bold text-[var(--accent)] outline-none">
                 <span className="flex items-center gap-2">
@@ -472,9 +525,44 @@ export default function App() {
                     placeholder="Mở soạn thảo (Ctrl E) -> Dán HTML (Ctrl V) -> Lưu (Ctrl S)... Tiêu đề tự bóc từ thẻ <title>..."
                 ></textarea>
                 
+                {/* HÀNG 1: TIÊU ĐỀ & SLUG (Đã Fix) */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <input type="text" value={title} onChange={(e)=>setTitle(e.target.value)} className="px-4 py-3 bg-[var(--bg-hover)] rounded-xl text-sm font-bold outline-none text-[var(--text-main)] border cms-border placeholder-[var(--text-muted)]" placeholder="Tiêu đề (có thể sửa sau)" />
-                    <input type="text" value={tags} onChange={(e)=>setTags(e.target.value)} className="px-4 py-3 bg-[var(--bg-hover)] rounded-xl text-sm font-bold text-[var(--accent)] outline-none border cms-border placeholder-[var(--text-muted)]" placeholder="Nhãn (cách bằng dấu phẩy)..." />
+                    <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] font-bold uppercase text-[var(--text-muted)] ml-1">Tiêu đề</label>
+                        <input type="text" value={title} onChange={handleTitleChange} className="px-4 py-3 bg-[var(--bg-hover)] rounded-xl text-sm font-bold outline-none text-[var(--text-main)] border cms-border placeholder-[var(--text-muted)]" placeholder="Tiêu đề bài viết..." />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] font-bold uppercase text-[var(--text-muted)] ml-1">Slug (URL)</label>
+                        <input type="text" value={slug} onChange={handleSlugChange} className="px-4 py-3 bg-[var(--bg-hover)] rounded-xl text-sm font-bold font-mono outline-none text-[var(--accent)] border cms-border placeholder-[var(--text-muted)]" placeholder="slug-cua-bai-viet..." />
+                    </div>
+                </div>
+
+                {/* HÀNG 2: TAGS & LINKS (Đã Thêm) */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] font-bold uppercase text-[var(--text-muted)] ml-1">Nhãn (Tags)</label>
+                        <input type="text" value={tags} onChange={(e)=>{setTags(e.target.value); if(!isSlugEdited) setSlug(generateSlug(title, e.target.value));}} className="px-4 py-3 bg-[var(--bg-hover)] rounded-xl text-sm font-bold text-[var(--text-main)] outline-none border cms-border placeholder-[var(--text-muted)]" placeholder="AI, React, Note..." />
+                    </div>
+                    
+                    <div className="flex flex-col gap-1.5 p-3 rounded-xl border cms-border bg-[var(--bg-body)]">
+                        <div className="flex justify-between items-center mb-1">
+                            <label className="text-[10px] font-bold uppercase text-[var(--text-muted)] ml-1 flex items-center gap-1"><svg className="w-3 h-3"><use href="#icon-link"></use></svg> Link tham khảo</label>
+                            <button onClick={handleAddLink} className="text-[10px] font-bold text-[var(--accent)] bg-[var(--bg-hover)] px-2 py-1 rounded border cms-border">+ Thêm Link</button>
+                        </div>
+                        {uploadLinks.length === 0 ? (
+                             <div className="text-xs text-[var(--text-muted)] italic text-center py-2 opacity-70">Chưa có link đính kèm</div>
+                        ) : (
+                            <div className="flex flex-col gap-2 max-h-32 overflow-y-auto pr-1">
+                                {uploadLinks.map((link, idx) => (
+                                    <div key={idx} className="flex items-center gap-2 bg-[var(--bg-card)] border cms-border p-1.5 rounded-lg">
+                                        <input type="text" value={link.title} onChange={e => handleUpdateLink(idx, 'title', e.target.value)} placeholder="Tên Link" className="w-1/3 bg-transparent text-xs font-bold outline-none text-[var(--text-main)] px-1" />
+                                        <input type="text" value={link.url} onChange={e => handleUpdateLink(idx, 'url', e.target.value)} placeholder="https://..." className="flex-1 bg-transparent text-xs outline-none text-[var(--text-muted)] px-1 border-l cms-border" />
+                                        <button onClick={() => handleRemoveLink(idx)} className="text-red-500 font-bold px-2 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition">✕</button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
                 </div>
                 
                 <div className="flex justify-between items-center pt-2">
@@ -507,9 +595,7 @@ export default function App() {
         )}
       </div>
 
-      {/* ======================================================== */}
-      {/* WIDGET TIẾN TRÌNH CHẠY NGẦM (GÓC DƯỚI PHẢI) */}
-      {/* ======================================================== */}
+      {/* WIDGET TIẾN TRÌNH CHẠY NGẦM */}
       {(exportJob.isRunning || exportJob.resultUrl) && (
           <div className="fixed bottom-24 right-6 z-[999999] w-[280px] cms-card p-4 shadow-2xl border cms-border fade-in">
               {exportJob.isRunning ? (
@@ -520,7 +606,7 @@ export default function App() {
                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--accent)] opacity-75"></span>
                                 <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[var(--accent)]"></span>
                               </span>
-                              Đang đóng gói Sách...
+                              Đang đóng gói...
                           </span>
                           <span className="text-[10px] font-bold text-[var(--text-muted)] bg-[var(--bg-hover)] px-2 py-0.5 rounded-md">
                               {exportJob.current} / {exportJob.total}
