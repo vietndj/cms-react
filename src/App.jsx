@@ -10,6 +10,18 @@ const encodeBase64UTF8Async = async (str) => { const bytes = new TextEncoder().e
 const getHeaders = (token) => token ? { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github.v3+json' } : { 'Accept': 'application/vnd.github.v3+json' };
 const getContrastYIQ = hex => { if(!hex)return '#1D1D1F'; hex=hex.replace("#",""); const yiq=((parseInt(hex.substr(0,2),16)*299)+(parseInt(hex.substr(2,2),16)*587)+(parseInt(hex.substr(4,2),16)*114))/1000; return (yiq>=128)?'#1D1D1F':'#FFFFFF'; };
 
+// Hàm tạo Gradient động cho Grid View
+const getGradient = (str) => {
+  const colors = [
+    'from-blue-500 to-indigo-500', 'from-emerald-400 to-teal-500', 'from-amber-400 to-orange-500',
+    'from-rose-400 to-red-500', 'from-fuchsia-500 to-purple-600', 'from-cyan-400 to-blue-500',
+    'from-violet-500 to-fuchsia-500', 'from-lime-400 to-emerald-500', 'from-pink-400 to-rose-500'
+  ];
+  let hash = 0;
+  if (str) { for(let i=0; i<str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash); }
+  return colors[Math.abs(hash) % colors.length];
+};
+
 const fetchRawJSON = async (repoPath, file, token) => {
   try { const res = await fetch(`https://api.github.com/repos/${repoPath}/contents/${safeEnc(file)}?t=${Date.now()}`, { headers: { ...getHeaders(token), 'Accept': 'application/vnd.github.v3.raw' } }); if (res.ok) return await res.json(); } catch(e) {}
   try { const r2 = await fetch(`https://${repoPath.split('/')[0]}.github.io/${file}?t=${Date.now()}`); if(r2.ok) return await r2.json(); } catch(e){} return null;
@@ -21,10 +33,7 @@ const getFileShaSafe = async (repoPath, file, token) => {
 };
 
 const parsePreview = (html) => {
-  try {
-    const doc = new DOMParser().parseFromString(html, 'text/html');
-    return (doc.body.textContent || "").replace(/\s+/g,' ').trim().substring(0, 150) + '...';
-  } catch(e) { return "..."; }
+  try { const doc = new DOMParser().parseFromString(html, 'text/html'); return (doc.body.textContent || "").replace(/\s+/g,' ').trim().substring(0, 150) + '...'; } catch(e) { return "..."; }
 };
 
 // ==========================================
@@ -52,17 +61,14 @@ const SVGIcons = () => (
 // 3. MAIN APP
 // ==========================================
 export default function App() {
-  // --- AUTH ---
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [pin, setPin] = useState('');
   const [token, setToken] = useState('');
   
-  // --- DATABASE ---
   const [db, setDb] = useState({ files: [], repos: {}, tags: {}, pinned: [], links: {}, colors: {}, titles: {}, tasks: [], customCol: [] });
   const [status, setStatus] = useState({ text: '', type: '' });
   const [isSyncing, setIsSyncing] = useState(false);
   
-  // --- UI STATES ---
   const [searchQuery, setSearchQuery] = useState('');
   const [isDeepSearch, setIsDeepSearch] = useState(false);
   const [currentView, setCurrentView] = useState('list');
@@ -71,14 +77,12 @@ export default function App() {
   const [activeTag, setActiveTag] = useState('all');
   const [tableSort, setTableSort] = useState({ by: 'date', dir: 'desc' });
   
-  // --- WIDGET STATES ---
   const [isTasksOpen, setIsTasksOpen] = useState(false);
   const [isPomoOpen, setIsPomoOpen] = useState(false);
   const [isToolsOpen, setIsToolsOpen] = useState(false);
   const [nativeTaskInput, setNativeTaskInput] = useState('');
   const [bulkSet, setBulkSet] = useState(new Set());
 
-  // --- EDITOR STATES ---
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [repo, setRepo] = useState(() => localStorage.getItem('cms_last_repo') || `${username}/${username}.github.io`);
@@ -88,14 +92,12 @@ export default function App() {
   const [content, setContent] = useState('');
   const [editorOriginal, setEditorOriginal] = useState({ repo: '', filename: '', sha: '' });
 
-  // --- MODALS ---
   const [activeModal, setActiveModal] = useState({ type: null, data: null });
   const toolsMenuRef = useRef(null);
 
   useEffect(() => {
     const handleClickOutside = (e) => { if (toolsMenuRef.current && !toolsMenuRef.current.contains(e.target)) setIsToolsOpen(false); };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('mousedown', handleClickOutside); return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   useEffect(() => {
@@ -109,7 +111,6 @@ export default function App() {
   const handleLogin = () => { if (pin.trim() === SECRET_PIN) { localStorage.setItem("cms_auth", "granted"); setIsAuthenticated(true); } else alert("Mã PIN sai."); };
   const handleSaveToken = (val) => { setToken(val); try { localStorage.setItem('github_pat', val); } catch(err){} };
   const changeTheme = (theme) => { document.documentElement.setAttribute('data-theme', theme); localStorage.setItem('cms_theme', theme); setIsToolsOpen(false); };
-  
   const saveLocalDb = (newDb) => { try { localStorage.setItem('cms_repo_data', JSON.stringify(newDb)); setDb(newDb); } catch(e) { setDb(newDb); } };
 
   // ==========================================
@@ -170,7 +171,6 @@ export default function App() {
       if (!resHTML.ok) throw new Error("Lỗi khi ghi HTML");
       const resHTMLData = await resHTML.json();
 
-      // Xóa file cũ nếu đổi tên/chuyển repo
       if (editorOriginal.filename && (editorOriginal.filename !== filename || editorOriginal.repo !== `${rOwner}/${rName}`) && editorOriginal.sha) {
         await fetch(`https://api.github.com/repos/${editorOriginal.repo}/contents/${safeEnc(editorOriginal.filename)}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ message: `Xóa file cũ`, sha: editorOriginal.sha }) });
         const oldKey = `${editorOriginal.repo.split('/')[1]||editorOriginal.repo.split('/')[0]}/${editorOriginal.filename}`;
@@ -181,20 +181,17 @@ export default function App() {
       setStatus({ text: 'Đang đồng bộ Metadata & CMS DB...', type: 'loading' });
       let newTags = { ...db.tags }; let tagArr = tags.split(',').map(x => x.trim()).filter(Boolean);
       if (tagArr.length) newTags[fileKey] = tagArr; else delete newTags[fileKey];
-      
       let newTitles = { ...db.titles }; newTitles[fileKey] = title;
       
       let newFiles = [...db.files];
       if (editorOriginal.sha) newFiles = newFiles.filter(x => x.sha !== editorOriginal.sha);
       let fileIndex = newFiles.findIndex(f => f.sha === (resHTMLData.content?.sha || fileSha));
-      
       const dDate = new Date();
       const newFileObj = { repoName: rName, name: title, fileName: filename, sha: resHTMLData.content?.sha || fileSha, url: `https://${rOwner}.github.io/${rName === `${rOwner}.github.io` ? '' : rName + '/'}${filename}`, timestamp: dDate.getTime(), fullDate: dDate.toLocaleString('vi-VN'), preview: parsePreview(content) };
       if (fileIndex !== -1) newFiles[fileIndex] = newFileObj; else newFiles.unshift(newFileObj);
 
       const newDbState = { ...db, files: newFiles, tags: newTags, titles: newTitles };
-      await syncMetaAndDB(newDbState);
-      saveLocalDb(newDbState);
+      await syncMetaAndDB(newDbState); saveLocalDb(newDbState);
       
       setStatus({ text: '✅ Đăng bài thành công!', type: 'success' });
       setTitle(''); setSlug(''); setContent(''); setTags(''); setEditorOriginal({ repo:'', filename:'', sha:'' });
@@ -261,23 +258,38 @@ export default function App() {
   // ==========================================
   // RENDER HELPERS
   // ==========================================
-  const ActionIcons = ({ file, isPinned }) => (
-    <div className="flex gap-0.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition duration-300">
-      <button onClick={(e)=>{e.stopPropagation(); togglePin(file.repoName, file.fileName);}} className={`icon-btn ${isPinned ? 'text-[#FF9500]' : ''}`}><svg className="svg-icon"><use href={isPinned ? "#icon-pin-filled" : "#icon-pin"}></use></svg></button>
-      <button onClick={(e)=>{e.stopPropagation(); setActiveModal({type: 'color', data: file});}} className="icon-btn"><svg className="svg-icon"><use href="#icon-palette"></use></svg></button>
-      <button onClick={(e)=>{e.stopPropagation(); setActiveModal({type: 'tag', data: file});}} className="icon-btn"><svg className="svg-icon"><use href="#icon-tag"></use></svg></button>
-      <button onClick={(e)=>{e.stopPropagation(); setActiveModal({type: 'link', data: file});}} className="icon-btn text-[var(--accent)]"><svg className="svg-icon"><use href="#icon-link"></use></svg></button>
-      <button onClick={(e)=>{e.stopPropagation(); setActiveModal({type: 'move', data: file});}} className="icon-btn"><svg className="svg-icon"><use href="#icon-move"></use></svg></button>
-      <button onClick={(e)=>{e.stopPropagation(); editFileContent(file.repoName, file.fileName, file.sha);}} className="icon-btn text-[var(--accent)] cms-input ml-1"><svg className="svg-icon"><use href="#icon-edit"></use></svg></button>
-    </div>
-  );
+  
+  // Nút hành động dùng chung
+  const ActionIcons = ({ file, isPinned, isFeed }) => {
+    if (isFeed) {
+      return (
+        <div className="flex flex-wrap gap-2 ml-auto">
+          <button onClick={(e)=>{e.stopPropagation(); editFileContent(file.repoName, file.fileName, file.sha);}} className="cms-btn-primary px-5 py-2.5 rounded-xl text-sm font-bold shadow-sm flex items-center gap-1 hover:opacity-90 transition"><svg className="w-4 h-4"><use href="#icon-edit"></use></svg> Sửa bài</button>
+          <button onClick={(e)=>{e.stopPropagation(); togglePin(file.repoName, file.fileName);}} className={`cms-btn px-4 py-2.5 rounded-xl text-sm font-bold flex items-center gap-1.5 ${isPinned ? 'text-[#FF9500]' : ''}`}><svg className="w-4 h-4"><use href={isPinned ? "#icon-pin-filled" : "#icon-pin"}></use></svg> Ghim</button>
+          <button onClick={(e)=>{e.stopPropagation(); setActiveModal({type: 'color', data: file});}} className="cms-btn px-4 py-2.5 rounded-xl text-sm font-bold flex items-center gap-1.5"><svg className="w-4 h-4"><use href="#icon-palette"></use></svg> Màu</button>
+          <button onClick={(e)=>{e.stopPropagation(); setActiveModal({type: 'tag', data: file});}} className="cms-btn px-4 py-2.5 rounded-xl text-sm font-bold flex items-center gap-1.5"><svg className="w-4 h-4"><use href="#icon-tag"></use></svg> Nhãn</button>
+          <button onClick={(e)=>{e.stopPropagation(); setActiveModal({type: 'link', data: file});}} className="cms-btn px-4 py-2.5 rounded-xl text-sm font-bold flex items-center gap-1.5 text-[var(--accent)]"><svg className="w-4 h-4"><use href="#icon-link"></use></svg> Link</button>
+        </div>
+      );
+    }
+    return (
+      <div className="flex gap-0.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition duration-300">
+        <button onClick={(e)=>{e.stopPropagation(); togglePin(file.repoName, file.fileName);}} className={`icon-btn ${isPinned ? 'text-[#FF9500]' : ''}`}><svg className="svg-icon"><use href={isPinned ? "#icon-pin-filled" : "#icon-pin"}></use></svg></button>
+        <button onClick={(e)=>{e.stopPropagation(); setActiveModal({type: 'color', data: file});}} className="icon-btn"><svg className="svg-icon"><use href="#icon-palette"></use></svg></button>
+        <button onClick={(e)=>{e.stopPropagation(); setActiveModal({type: 'tag', data: file});}} className="icon-btn"><svg className="svg-icon"><use href="#icon-tag"></use></svg></button>
+        <button onClick={(e)=>{e.stopPropagation(); setActiveModal({type: 'link', data: file});}} className="icon-btn text-[var(--accent)]"><svg className="svg-icon"><use href="#icon-link"></use></svg></button>
+        <button onClick={(e)=>{e.stopPropagation(); setActiveModal({type: 'move', data: file});}} className="icon-btn"><svg className="svg-icon"><use href="#icon-move"></use></svg></button>
+        <button onClick={(e)=>{e.stopPropagation(); editFileContent(file.repoName, file.fileName, file.sha);}} className="icon-btn text-[var(--accent)] cms-input ml-1"><svg className="svg-icon"><use href="#icon-edit"></use></svg></button>
+      </div>
+    );
+  };
 
   const renderTagsAndLinks = (r, f) => {
     const tags = getFileTags(r, f); const links = getFileLinks(r, f);
     return (
       <>
-        {tags.length > 0 && (<div className="flex flex-wrap gap-1 mb-2 empty:hidden">{tags.map(t => <span key={t} className="cms-input text-[10px] px-2 py-0.5 rounded font-bold border cms-border flex items-center gap-1 opacity-90"><svg className="w-2.5 h-2.5 opacity-60"><use href="#icon-tag"></use></svg>{t}</span>)}</div>)}
-        {links.length > 0 && (<div className="flex flex-wrap gap-1 mb-3 empty:hidden">{links.map((l,i) => <a key={i} href={l.url} target="_blank" rel="noreferrer" onClick={e=>e.stopPropagation()} className="bg-[#007AFF]/10 text-[var(--accent)] text-[10px] px-2 py-0.5 rounded font-bold border border-transparent hover:border-[#007AFF]/30 transition flex items-center gap-1"><svg className="w-3 h-3"><use href="#icon-link"></use></svg>{l.title}</a>)}</div>)}
+        {tags.length > 0 && (<div className="flex flex-wrap gap-1.5 mb-2 empty:hidden">{tags.map(t => <span key={t} className="cms-input text-[10px] px-2.5 py-1 rounded font-bold border cms-border flex items-center gap-1 opacity-90"><svg className="w-2.5 h-2.5 opacity-60"><use href="#icon-tag"></use></svg>{t}</span>)}</div>)}
+        {links.length > 0 && (<div className="flex flex-wrap gap-1.5 mb-3 empty:hidden">{links.map((l,i) => <a key={i} href={l.url} target="_blank" rel="noreferrer" onClick={e=>e.stopPropagation()} className="bg-[#007AFF]/10 text-[var(--accent)] text-[10px] px-2 py-0.5 rounded font-bold border border-transparent hover:border-[#007AFF]/30 transition flex items-center gap-1"><svg className="w-3 h-3"><use href="#icon-link"></use></svg>{l.title}</a>)}</div>)}
       </>
     );
   };
@@ -294,23 +306,52 @@ export default function App() {
         <div key={file.sha} className="cms-card p-3 min-w-[240px] max-w-[240px] flex flex-col group hover:border-[var(--accent)] transition cursor-pointer border cms-border" onClick={() => window.open(file.url, '_blank')}>
           <div className="text-[10px] text-muted mb-1 flex items-center gap-1"><svg className="w-3 h-3"><use href="#icon-folder"></use></svg>{file.repoName}</div>
           <h4 className="font-bold text-sm line-clamp-2 mb-2 group-hover:text-[var(--accent)] transition">{file.name}</h4>
-          <div className="flex justify-between items-center mt-auto border-t cms-border pt-2"><span className="text-[10px] opacity-70">{dateFmt}</span><button onClick={(e)=>{e.stopPropagation(); editFileContent(file.repoName, file.fileName, file.sha)}} className="text-[10px] bg-[var(--bg-hover)] text-[var(--accent)] px-2 py-1 rounded font-bold hover:opacity-80 transition">Sửa</button></div>
+          <div className="flex justify-between items-center mt-auto border-t cms-border pt-2"><span className="text-[10px] opacity-70">{dateFmt}</span><button onClick={(e)=>{e.stopPropagation(); editFileContent(file.repoName, file.fileName, file.sha)}} className="text-[10px] bg-[var(--bg-hover)] text-[var(--accent)] px-3 py-1 rounded font-bold hover:opacity-80 transition">Sửa</button></div>
         </div>
     );
 
-    if (viewType === 'grid') return (
+    // GIAO DIỆN FEED (Chuẩn theo ảnh của bạn)
+    if (viewType === 'feed') return (
+        <article key={file.sha} className="cms-card p-8 flex flex-col relative mb-8 border cms-border" style={stl}>
+          <input type="checkbox" checked={isChecked} onChange={(e) => toggleFileSelection(file.repoName, file.fileName, file.sha, e)} className="absolute top-8 left-8 w-4 h-4 z-10 cursor-pointer accent-[#007AFF]" />
+          <div className="flex items-center gap-3 mb-4 pl-10">
+             <div className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-xl cms-input border cms-border"><svg className="w-5 h-5"><use href="#icon-folder"></use></svg></div>
+             <div><p className="text-sm font-bold cursor-pointer hover:underline opacity-80" onClick={()=>setActiveRepo(file.repoName)}>{file.repoName}</p><p className="text-[11px] font-semibold opacity-70 mt-0.5">{dateFmt}</p></div>
+          </div>
+          <h2 className="text-3xl font-bold mb-4 pl-10"><a href={file.url} target="_blank" rel="noreferrer" className="hover:underline opacity-90">{file.name}</a></h2>
+          <div className="pl-10">{renderTagsAndLinks(file.repoName, file.fileName)}</div>
+          
+          <div className="w-full h-64 cms-input mt-4 mb-6 rounded-xl flex items-center justify-center overflow-hidden border cms-border bg-gray-100">
+             <div className="opacity-40 font-bold text-xl px-4 text-center">{file.name}</div>
+          </div>
+          
+          <div className="text-[16px] leading-relaxed mb-8 opacity-90" dangerouslySetInnerHTML={{__html: (file.preview||'')}}></div>
+          <div className="flex flex-wrap gap-2 pt-5 border-t cms-border mt-auto items-center">
+             <a href={file.url} target="_blank" rel="noreferrer" className="cms-btn px-6 py-2.5 rounded-xl text-sm font-bold shadow-sm bg-[var(--bg-card)]">Đọc bài</a>
+             <ActionIcons file={file} isPinned={isPinned} isFeed={true} />
+          </div>
+        </article>
+    );
+
+    // GIAO DIỆN GRID (Thumbnails Gradient)
+    if (viewType === 'grid') {
+      const gradClass = getGradient(file.sha || file.name);
+      return (
         <div key={file.sha} className="cms-card flex flex-col relative overflow-hidden group hover:scale-[1.02] transition border cms-border" style={stl}>
           <input type="checkbox" checked={isChecked} onChange={(e) => toggleFileSelection(file.repoName, file.fileName, file.sha, e)} className="absolute top-3 left-3 w-4 h-4 z-10 cursor-pointer accent-[#007AFF] opacity-0 group-hover:opacity-100 transition" />
-          <div className="h-28 cms-input flex items-center justify-center border-b cms-border overflow-hidden opacity-50 font-bold text-center p-4 text-sm" dangerouslySetInnerHTML={{__html: file.coverHTML || file.name}}></div>
+          <div className={`h-28 flex items-center justify-center border-b cms-border overflow-hidden opacity-90 font-bold text-center p-4 text-sm text-white bg-gradient-to-br ${gradClass}`}>
+             {file.name}
+          </div>
           <div className="p-5 flex flex-col flex-1">
             <span className="text-[10px] uppercase font-bold text-muted mb-2 flex items-center gap-1"><svg className="w-3 h-3"><use href="#icon-folder"></use></svg> {file.repoName}</span>
-            <a href={file.url} target="_blank" rel="noreferrer" className="font-bold text-lg mb-2 line-clamp-2 hover:underline">{file.name}</a>
+            <a href={file.url} target="_blank" rel="noreferrer" className="font-bold text-lg mb-3 line-clamp-2 hover:underline">{file.name}</a>
             {renderTagsAndLinks(file.repoName, file.fileName)}
-            <div className="text-sm opacity-70 line-clamp-4 flex-1 mb-4" dangerouslySetInnerHTML={{__html: (file.tocHTML||'') + (file.preview||'')}}></div>
+            <div className="text-sm opacity-70 line-clamp-4 flex-1 mb-4" dangerouslySetInnerHTML={{__html: (file.preview||'')}}></div>
             <div className="flex justify-between items-center pt-3 border-t cms-border"><span className="text-[10px] opacity-60">{dateFmt}</span><ActionIcons file={file} isPinned={isPinned} /></div>
           </div>
         </div>
-    );
+      );
+    }
 
     if (viewType === 'kanban') return (
         <div key={file.sha} className="cms-card p-4 flex flex-col relative group hover:scale-[1.01] transition border cms-border mb-3" style={stl}>
@@ -320,8 +361,9 @@ export default function App() {
         </div>
     );
 
+    // GIAO DIỆN TABLE (Hover hiện nút)
     if (viewType === 'table') return (
-        <tr key={file.sha} className={`border-b cms-border hover:bg-[var(--bg-hover)] transition ${isDark ? 'text-white' : ''}`} style={stl}>
+        <tr key={file.sha} className={`group border-b cms-border hover:bg-[var(--bg-hover)] transition ${isDark ? 'text-white' : ''}`} style={stl}>
           <td className="p-3 text-center"><input type="checkbox" checked={isChecked} onChange={(e) => toggleFileSelection(file.repoName, file.fileName, file.sha, e)} className="accent-[#007AFF] w-4 h-4 cursor-pointer" /></td>
           <td className="p-3"><a href={file.url} target="_blank" rel="noreferrer" className="font-bold hover:text-[var(--accent)] text-[15px] block mb-1">{file.name}</a>{renderTagsAndLinks(file.repoName, file.fileName)}</td>
           <td className="p-3 text-xs opacity-70 line-clamp-2 max-w-[200px] leading-relaxed">{file.preview||''}</td>
@@ -330,6 +372,7 @@ export default function App() {
         </tr>
     );
 
+    // GIAO DIỆN LIST (Mặc định)
     return (
       <div key={file.sha} className="cms-card p-4 flex flex-col relative group hover:scale-[1.01] transition border cms-border" style={stl}>
         <input type="checkbox" checked={isChecked} onChange={(e) => toggleFileSelection(file.repoName, file.fileName, file.sha, e)} className="absolute top-5 left-4 w-4 h-4 z-10 cursor-pointer accent-[#007AFF] opacity-0 group-hover:opacity-100 transition" />
@@ -339,13 +382,21 @@ export default function App() {
           {renderTagsAndLinks(file.repoName, file.fileName)}
           <div className="text-xs text-muted line-clamp-2 mb-4">{file.preview || '...'}</div>
         </div>
-        <div className="flex justify-between items-center mt-auto pt-3 border-t cms-border"><span className="text-[10px] opacity-60">{dateFmt}</span><ActionIcons file={file} isPinned={isPinned} /></div>
+        <div className="flex justify-between items-center mt-auto pt-3 border-t cms-border">
+          <span className="text-[10px] opacity-60">{dateFmt}</span>
+          <div className="flex items-center gap-2">
+             <ActionIcons file={file} isPinned={isPinned} />
+             <button onClick={(e)=>{e.stopPropagation(); editFileContent(file.repoName, file.fileName, file.sha)}} className="cms-btn px-4 py-1.5 rounded-lg text-xs font-bold transition sm:hidden group-hover:block">Sửa</button>
+          </div>
+        </div>
       </div>
     );
   };
 
   const renderViews = () => {
     if (processedFiles.length === 0) return <div className="text-center py-20 text-muted font-bold text-sm">Trống</div>;
+    
+    if (currentView === 'feed') return <div className="flex flex-col max-w-4xl mx-auto w-full">{pinnedFiles.length > 0 && <h3 className="font-bold mb-4 text-[#FF9500] text-xl border-b cms-border pb-2">📌 Đã ghim</h3>}{pinnedFiles.map(f => renderCard(f, 'feed'))}{unpinnedFiles.length > 0 && <h3 className="font-bold mt-4 mb-4 text-xl border-b cms-border pb-2">Khác</h3>}{unpinnedFiles.map(f => renderCard(f, 'feed'))}</div>;
     
     if (currentView === 'grid') return <div className="flex flex-col gap-6">{pinnedFiles.length > 0 && <><h3 className="font-bold mb-2 text-[#FF9500] text-lg border-b cms-border pb-2">📌 Đã ghim</h3><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">{pinnedFiles.map(f => renderCard(f, 'grid'))}</div></>}{unpinnedFiles.length > 0 && <><h3 className="font-bold mt-4 mb-2 text-lg border-b cms-border pb-2">Khác</h3><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">{unpinnedFiles.map(f => renderCard(f, 'grid'))}</div></>}</div>;
 
@@ -442,7 +493,7 @@ export default function App() {
           {renderViews()}
         </main>
 
-        {/* SIDEBAR NHIỆM VỤ (TASKS) */}
+        {/* CỘT SIDEBAR TASK */}
         {isTasksOpen && (
           <aside className="w-full lg:w-[320px] shrink-0 sticky top-[150px] h-[calc(100vh-160px)] fade-in">
              <div className="cms-card p-4 flex flex-col h-full shadow-sm">
