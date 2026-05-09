@@ -37,6 +37,23 @@ const SVGIcons = () => (
 );
 
 // ==========================================
+// Hàm hỗ trợ tự động bốc Repo & Tag gần nhất
+// ==========================================
+const getLastContextFromDB = (currentDb) => {
+    const files = currentDb.files || [];
+    const tagsDb = currentDb.tags || {};
+    // Tìm bài viết gần nhất KHÔNG thuộc trang chủ
+    const latestNormal = files.find(f => f.repoName !== `${username}.github.io`);
+    if (latestNormal) {
+        return {
+            repo: `${username}/${latestNormal.repoName}`,
+            tags: (tagsDb[`${latestNormal.repoName}/${latestNormal.fileName}`] || []).join(', ')
+        };
+    }
+    return { repo: `${username}/${username}.github.io`, tags: '' };
+};
+
+// ==========================================
 // 3. MAIN APP
 // ==========================================
 export default function App() {
@@ -58,18 +75,17 @@ export default function App() {
 
   const [activeColorPickerCard, setActiveColorPickerCard] = useState(null); 
 
-  // EXPORT AI PROGRESS (Chạy ngầm ở Widget)
+  // EXPORT AI PROGRESS (Sử dụng Widget có cờ 'show' để không bao giờ bị mất)
   const [isExportSectionOpen, setIsExportSectionOpen] = useState(false);
   const [exportTarget, setExportTarget] = useState('all');
-  const [exportProgress, setExportProgress] = useState({ isRunning: false, total: 0, current: 0, currentFile: '', resultUrl: null, filename: '' });
+  const [exportJob, setExportJob] = useState({ show: false, isRunning: false, total: 0, current: 0, currentFile: '', resultUrl: null, filename: '', error: '' });
 
   // EDITOR STATES 
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   
-  // Khởi tạo Repo & Tags từ giá trị nhớ cuối cùng
-  const [repo, setRepo] = useState(() => localStorage.getItem('cms_last_repo') || `${username}/${username}.github.io`);
-  const [tags, setTags] = useState(() => localStorage.getItem('cms_last_tags') || ''); 
+  const [repo, setRepo] = useState(`${username}/${username}.github.io`);
+  const [tags, setTags] = useState(''); 
   
   const [title, setTitle] = useState('');
   const [slug, setSlug] = useState('');
@@ -119,7 +135,16 @@ export default function App() {
       const dbData = await fetchRawJSON(`${username}/${username}.github.io`, 'cms_db.json', token);
       if (dbData && dbData.allFiles) {
         const reposMap = {}; dbData.allFiles.forEach(f => { if(!reposMap[f.repoName]) reposMap[f.repoName] = []; reposMap[f.repoName].push(f); });
-        saveLocalDb({ files: dbData.allFiles, repos: reposMap, tags: meta?.tags || {}, pinned: meta?.pinned || [], links: meta?.links || {}, colors: meta?.colors || {}, titles: meta?.titles || {}, tasks: meta?.tasks || [], customCol: meta?.customCol || [] });
+        const loadedDb = { files: dbData.allFiles, repos: reposMap, tags: meta?.tags || {}, pinned: meta?.pinned || [], links: meta?.links || {}, colors: meta?.colors || {}, titles: meta?.titles || {}, tasks: meta?.tasks || [], customCol: meta?.customCol || [] };
+        saveLocalDb(loadedDb);
+        
+        // TỰ ĐỘNG GẮN TAG/REPO NẾU EDITOR ĐANG TRỐNG
+        if (!title && !content && !editorOriginal.sha) {
+            const ctx = getLastContextFromDB(loadedDb);
+            setRepo(ctx.repo);
+            setTags(ctx.tags);
+        }
+
         setStatus({ text: '✅ Đã đồng bộ!', type: 'success' }); setTimeout(() => setStatus({ text: '', type: '' }), 3000);
       }
     } catch (e) { setStatus({ text: `❌ Lỗi DB: ${e.message}`, type: 'error' }); } finally { setIsSyncing(false); }
@@ -145,24 +170,26 @@ export default function App() {
       setActiveColorPickerCard(null); 
   };
 
-  // --- XUẤT SÁCH AI (CHẠY NGẦM BẰNG WIDGET) ---
+  // --- XUẤT SÁCH AI (KHÔNG BAO GIỜ BỊ MẤT WIDGET) ---
   const handleExportAI = async () => {
       if (!token) return alert("Cần Token PAT!");
       let targets = db.files.filter(f => (exportTarget === 'all' || f.repoName === exportTarget) && !['index.html', 'tin.html', 'cms_db.json', 'metadata.json'].includes(f.fileName));
       if (targets.length === 0) return alert("Không có bài viết nào để xuất!");
 
-      // 1. Kích hoạt Widget trôi nổi, gập Panel Export lại cho rảnh tay soạn thảo
-      setIsExportSectionOpen(false);
-      setExportProgress({ isRunning: true, total: targets.length, current: 0, currentFile: 'Đang chuẩn bị...', resultUrl: null, filename: '' });
-      await new Promise(resolve => setTimeout(resolve, 50));
+      setIsExportSectionOpen(false); // Gập thanh cài đặt lại để rảnh tay soạn thảo
+      // Kích hoạt Widget trôi nổi cứng
+      setExportJob({ show: true, isRunning: true, total: targets.length, current: 0, currentFile: 'Đang khởi động...', resultUrl: null, filename: '', error: '' });
+
+      // Ép trình duyệt nghỉ 100ms để kịp vẽ Widget lên màn hình
+      await new Promise(resolve => setTimeout(resolve, 100));
 
       try {
           let ct = `SIÊU SÁCH KIẾN THỨC: ${username.toUpperCase()}\n===========================\n\n`;
           for (let i = 0; i < targets.length; i++) {
               const f = targets[i];
-              setExportProgress(prev => ({ ...prev, current: i + 1, currentFile: f.name }));
+              setExportJob(prev => ({ ...prev, current: i + 1, currentFile: f.name }));
               
-              // Giãn cách vòng lặp 50ms để React vẽ Widget và tiếp nhận phím gõ Editor mượt mà
+              // Nghỉ 50ms mỗi bài để bạn vẫn có thể gõ phím mượt mà trong lúc nó quét
               await new Promise(resolve => setTimeout(resolve, 50)); 
               
               let rC = await fetchText(`https://api.github.com/repos/${username}/${f.repoName}/contents/${safeEnc(f.fileName)}?t=${Date.now()}`, token);
@@ -174,10 +201,9 @@ export default function App() {
               }
           }
           const blob = new Blob([ct], { type: 'text/plain;charset=utf-8' });
-          setExportProgress(prev => ({ ...prev, isRunning: false, resultUrl: URL.createObjectURL(blob), filename: `notebooklm_${exportTarget}_${Date.now()}.txt` }));
+          setExportJob(prev => ({ ...prev, isRunning: false, resultUrl: URL.createObjectURL(blob), filename: `notebooklm_${exportTarget}_${Date.now()}.txt` }));
       } catch (e) { 
-          setExportProgress(prev => ({ ...prev, isRunning: false }));
-          setStatus({ text: "❌ Lỗi xuất file trong lúc chạy", type: "error" }); 
+          setExportJob(prev => ({ ...prev, isRunning: false, error: e.message }));
       }
   };
 
@@ -224,7 +250,6 @@ export default function App() {
     }
   };
 
-  // --- QUẢN LÝ LINK ---
   const handleUpdateLink = (index, field, value) => {
       const newLinks = [...uploadLinks];
       newLinks[index][field] = value;
@@ -233,17 +258,19 @@ export default function App() {
   const handleRemoveLink = (index) => setUploadLinks(uploadLinks.filter((_, i) => i !== index));
   const handleAddLink = () => setUploadLinks([...uploadLinks, { title: `Link ${uploadLinks.length + 1}`, url: '' }]);
 
-  // --- HỦY SỬA BÀI CŨ (Reset về viết bài mới, TỰ ĐỘNG KHÔI PHỤC TAG & REPO GẦN NHẤT) ---
-  const cancelEdit = () => {
+  // Khôi phục Editor về trạng thái rỗng, tự kéo Repo và Tag của bài viết gần nhất
+  const resetEditorToDefault = () => {
     setTitle('');
     setSlug('');
     setContent('');
     setUploadLinks([]);
     setIsSlugEdited(false);
     setEditorOriginal({ repo: '', filename: '', sha: '' });
-    // Khôi phục lại bộ Tag và Repo của bài đăng gần nhất
-    setRepo(localStorage.getItem('cms_last_repo') || `${username}/${username}.github.io`);
-    setTags(localStorage.getItem('cms_last_tags') || '');
+    
+    // Tự động kéo tag và repo mới nhất
+    const ctx = getLastContextFromDB(db);
+    setRepo(ctx.repo);
+    setTags(ctx.tags);
   };
 
   const handleSaveArticle = async () => {
@@ -286,14 +313,10 @@ export default function App() {
 
       const newState = { ...db, files: newFiles, tags: newTags, titles: newTitles, links: newLinksDb };
       await syncMetaAndDB(newState); saveLocalDb(newState);
-      
-      // LƯU LẠI VẾT CHO LẦN ĐĂNG KẾ TIẾP
-      localStorage.setItem('cms_last_repo', `${rOwner}/${rName}`);
-      localStorage.setItem('cms_last_tags', tags);
 
       setStatus({ text: '✅ Đăng bài thành công!', type: 'success' });
       
-      // Xóa nội dung bài viết nhưng CỐ TÌNH GIỮ LẠI Tags và Repo cho bài tiếp theo
+      // Xóa form NHƯNG giữ nguyên repo và tags để tiện viết tiếp
       setTitle(''); 
       setSlug(''); 
       setContent(''); 
@@ -527,14 +550,14 @@ export default function App() {
                       <option value="all">📚 Xuất Toàn Bộ Các Kho</option>
                       {repoKeysList.map(r => <option key={r} value={r}>📁 Chỉ xuất Kho: {r}</option>)}
                   </select>
-                  <button onClick={handleExportAI} disabled={exportProgress.isRunning} className="w-full md:w-auto px-8 py-3 bg-[var(--accent)] text-white rounded-xl font-bold hover:opacity-90 transition shadow-md whitespace-nowrap disabled:opacity-50">
-                      {exportProgress.isRunning ? '⏳ ĐANG CHẠY NGẦM...' : '🚀 BẮT ĐẦU ĐÓNG GÓI'}
+                  <button onClick={handleExportAI} disabled={exportJob.isRunning} className="w-full md:w-auto px-8 py-3 bg-[var(--accent)] text-white rounded-xl font-bold hover:opacity-90 transition shadow-md whitespace-nowrap disabled:opacity-50">
+                      {exportJob.isRunning ? '⏳ ĐANG CHẠY NGẦM...' : '🚀 BẮT ĐẦU ĐÓNG GÓI'}
                   </button>
               </div>
             </section>
           )}
           
-          {/* EDITOR (Soạn Thảo & Cập Nhật Sticky Tags/Repo) */}
+          {/* EDITOR */}
           <section className="cms-card overflow-hidden border border-[var(--border)]">
             <button onClick={() => {setIsEditorOpen(!isEditorOpen); setIsExportSectionOpen(false);}} className="w-full px-6 py-3 flex justify-between items-center bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] font-bold text-[var(--accent)] outline-none">
                 <span className="flex items-center gap-2">
@@ -616,7 +639,7 @@ export default function App() {
                    <button id="btn-save-article" onClick={handleSaveArticle} disabled={isSaving} className="bg-[var(--accent)] text-white px-8 py-3.5 rounded-xl font-bold shadow-lg text-sm transition hover:scale-105 disabled:opacity-50 border border-transparent">
                       {isSaving?'⏳ Đang lưu...':'🚀 LƯU BÀI LÊN GITHUB (Ctrl S)'}
                    </button>
-                   {editorOriginal.sha && <button onClick={cancelEdit} className="text-red-500 text-xs font-bold px-4 py-2 hover:bg-[var(--bg-hover)] rounded-lg transition">✕ HỦY SỬA (VIẾT BÀI MỚI)</button>}
+                   {editorOriginal.sha && <button onClick={resetEditorToDefault} className="text-red-500 text-xs font-bold px-4 py-2 hover:bg-[var(--bg-hover)] rounded-lg transition">✕ HỦY SỬA (VIẾT BÀI MỚI)</button>}
                 </div>
               </div>
             )}
@@ -643,36 +666,35 @@ export default function App() {
       </div>
 
       {/* WIDGET TIẾN TRÌNH CHẠY NGẦM GÓC DƯỚI PHẢI */}
-      {(exportProgress.isRunning || exportProgress.resultUrl) && (
+      {exportJob.show && (
           <div className="fixed bottom-24 right-6 z-[999999] w-[280px] cms-card p-4 shadow-2xl border cms-border fade-in">
               <div className="flex justify-between items-center mb-3">
                   <span className="text-xs font-bold text-[var(--text-main)] flex items-center gap-2">
-                      {exportProgress.isRunning && (
+                      {exportJob.isRunning && (
                           <span className="relative flex h-2.5 w-2.5">
                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--accent)] opacity-75"></span>
                             <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[var(--accent)]"></span>
                           </span>
                       )}
-                      {exportProgress.isRunning ? 'Đang đóng gói...' : '🎉 Đóng gói xong!'}
+                      {exportJob.isRunning ? 'Đang đóng gói...' : (exportJob.error ? '❌ Lỗi' : '🎉 Đóng gói xong!')}
                   </span>
-                  {exportProgress.isRunning ? (
-                      <span className="text-[10px] font-bold text-[var(--text-muted)] bg-[var(--bg-hover)] px-2 py-0.5 rounded-md">
-                          {exportProgress.current} / {exportProgress.total}
-                      </span>
-                  ) : (
-                      <button onClick={() => setExportProgress({isRunning: false, total: 0, current: 0, currentFile: '', resultUrl: null, filename: ''})} className="text-[var(--text-muted)] hover:text-red-500 font-bold px-1">✕</button>
-                  )}
+                  <button onClick={() => setExportJob({show: false, isRunning: false, total: 0, current: 0, currentFile: '', resultUrl: null, filename: '', error: ''})} className="text-[var(--text-muted)] hover:text-red-500 font-bold px-1">✕</button>
               </div>
               
-              {exportProgress.isRunning ? (
+              {exportJob.isRunning ? (
                   <>
-                      <div className="w-full bg-[var(--bg-hover)] rounded-full h-1.5 mb-2 overflow-hidden border cms-border">
-                          <div className="bg-[var(--accent)] h-1.5 rounded-full transition-all duration-300" style={{ width: `${(exportProgress.current / exportProgress.total) * 100}%` }}></div>
+                      <div className="flex justify-between text-[10px] text-[var(--text-muted)] mb-1">
+                          <span className="truncate pr-2">{exportJob.currentFile}</span>
+                          <span>{exportJob.current} / {exportJob.total}</span>
                       </div>
-                      <p className="text-[10px] text-[var(--text-muted)] truncate" title={exportProgress.currentFile}>{exportProgress.currentFile}</p>
+                      <div className="w-full bg-[var(--bg-hover)] rounded-full h-1.5 mb-1 overflow-hidden border cms-border">
+                          <div className="bg-[var(--accent)] h-1.5 rounded-full transition-all duration-300" style={{ width: `${(exportJob.current / exportJob.total) * 100}%` }}></div>
+                      </div>
                   </>
+              ) : exportJob.error ? (
+                  <p className="text-xs text-red-500 mt-2 font-medium">{exportJob.error}</p>
               ) : (
-                  <a href={exportProgress.resultUrl} download={exportProgress.filename} className="block text-center w-full py-2.5 bg-green-500 text-white rounded-lg text-xs font-bold shadow-md hover:opacity-90 transition hover:scale-105" onClick={() => setTimeout(() => setExportProgress({isRunning: false, total: 0, current: 0, currentFile: '', resultUrl: null, filename: ''}), 1000)}>
+                  <a href={exportJob.resultUrl} download={exportJob.filename} className="block text-center mt-2 w-full py-2.5 bg-green-500 text-white rounded-lg text-xs font-bold shadow-md hover:opacity-90 transition hover:scale-105" onClick={() => setTimeout(() => setExportJob({show: false, isRunning: false, total: 0, current: 0, currentFile: '', resultUrl: null, filename: '', error: ''}), 1000)}>
                       ⬇️ TẢI XUỐNG (.TXT)
                   </a>
               )}
