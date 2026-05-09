@@ -8,8 +8,6 @@ const SECRET_PIN = "0070";
 const safeEnc = (fn) => { try { fn = decodeURIComponent(fn); } catch(e){} return encodeURIComponent(fn); };
 const encodeBase64UTF8Async = async (str) => { const bytes = new TextEncoder().encode(str); let binary = ''; for (let i = 0; i < bytes.byteLength; i += 16384) binary += String.fromCharCode.apply(null, bytes.subarray(i, i + 16384)); return btoa(binary); };
 const getHeaders = (token) => token ? { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github.v3+json' } : { 'Accept': 'application/vnd.github.v3+json' };
-const getContrastYIQ = hex => { if(!hex)return '#1D1D1F'; hex=hex.replace("#",""); const yiq=((parseInt(hex.substr(0,2),16)*299)+(parseInt(hex.substr(2,2),16)*587)+(parseInt(hex.substr(4,2),16)*114))/1000; return (yiq>=128)?'#1D1D1F':'#FFFFFF'; };
-const getGradient = (str) => { const colors = ['from-blue-500 to-indigo-500', 'from-emerald-400 to-teal-500', 'from-amber-400 to-orange-500', 'from-rose-400 to-red-500', 'from-fuchsia-500 to-purple-600', 'from-cyan-400 to-blue-500', 'from-violet-500 to-fuchsia-500', 'from-lime-400 to-emerald-500', 'from-pink-400 to-rose-500']; let hash = 0; if (str) { for(let i=0; i<str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash); } return colors[Math.abs(hash) % colors.length]; };
 
 const fetchRawJSON = async (repoPath, file, token) => {
   try { const res = await fetch(`https://api.github.com/repos/${repoPath}/contents/${safeEnc(file)}?t=${Date.now()}`, { headers: { ...getHeaders(token), 'Accept': 'application/vnd.github.v3.raw' } }); if (res.ok) return await res.json(); } catch(e) {}
@@ -28,6 +26,7 @@ const SVGIcons = () => (
   <svg style={{ display: 'none' }}>
     <symbol id="icon-tag" viewBox="0 0 24 24"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></symbol>
     <symbol id="icon-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></symbol>
+    <symbol id="icon-move" viewBox="0 0 24 24"><polyline points="5 9 2 12 5 15"></polyline><polyline points="9 5 12 2 15 5"></polyline><polyline points="19 9 22 12 19 15"></polyline><polyline points="9 19 12 22 15 19"></polyline><line x1="2" y1="12" x2="22" y2="12"></line><line x1="12" y1="2" x2="12" y2="22"></line></symbol>
     <symbol id="icon-edit" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></symbol>
     <symbol id="icon-folder" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></symbol>
     <symbol id="icon-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></symbol>
@@ -50,12 +49,8 @@ export default function App() {
   const [isSyncing, setIsSyncing] = useState(false);
   
   const [searchQuery, setSearchQuery] = useState('');
-  const [isDeepSearch, setIsDeepSearch] = useState(false);
-  const [currentView, setCurrentView] = useState('list');
-  const [sortOrder, setSortOrder] = useState('desc');
   const [activeRepo, setActiveRepo] = useState('all');
   const [activeTag, setActiveTag] = useState('all');
-  const [tableSort, setTableSort] = useState({ by: 'date', dir: 'desc' });
   
   const [isTasksOpen, setIsTasksOpen] = useState(false);
   const [isToolsOpen, setIsToolsOpen] = useState(false);
@@ -80,16 +75,16 @@ export default function App() {
   const [editorOriginal, setEditorOriginal] = useState({ repo: '', filename: '', sha: '' });
 
   const toolsMenuRef = useRef(null);
-  const editorInputRef = useRef(null); // Focus vào mã HTML
+  const editorInputRef = useRef(null); 
 
-  // Tự động focus vào ô NHẬP HTML khi bật Editor (Yêu cầu mới)
+  // Focus ô NHẬP HTML khi mở Editor
   useEffect(() => {
     if (isEditorOpen && editorInputRef.current) {
-        setTimeout(() => editorInputRef.current.focus(), 150);
+        setTimeout(() => editorInputRef.current.focus(), 100);
     }
   }, [isEditorOpen]);
 
-  // Thiết lập Phím Tắt Toàn Cầu
+  // Phím Tắt Toàn Cầu
   useEffect(() => {
     const handleGlobalKeyDown = (e) => {
         const isCmd = navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? e.metaKey : e.ctrlKey;
@@ -98,6 +93,9 @@ export default function App() {
         }
         if (isCmd && e.key.toLowerCase() === 's') {
             e.preventDefault(); const btnSave = document.getElementById('btn-save-article'); if (btnSave && !btnSave.disabled) btnSave.click();
+        }
+        if (isCmd && e.key.toLowerCase() === 'k') {
+            e.preventDefault(); document.getElementById('search-input-main')?.focus();
         }
     };
     window.addEventListener('keydown', handleGlobalKeyDown); return () => window.removeEventListener('keydown', handleGlobalKeyDown);
@@ -116,6 +114,24 @@ export default function App() {
 
   useEffect(() => { if (isAuthenticated && token && db.files.length === 0) loadDatabase(); }, [isAuthenticated, token]);
 
+  // Pomodoro Timer Logic
+  useEffect(() => {
+    let interval = null;
+    if (isPomoActive) {
+      interval = setInterval(() => {
+        setPomoTime((prevTime) => {
+          if (prevTime <= 1) {
+            clearInterval(interval); setIsPomoActive(false);
+            setTimeout(() => { alert("Hết giờ Pomodoro!"); try { new Audio('https://vietndj.github.io/1.mp3').play(); } catch(e){} }, 100);
+            return 1500; 
+          }
+          return prevTime - 1;
+        });
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [isPomoActive]);
+
   const handleLogin = () => { if (pin.trim() === SECRET_PIN) { localStorage.setItem("cms_auth", "granted"); setIsAuthenticated(true); } else alert("Mã PIN sai."); };
   const handleSaveToken = (val) => { setToken(val); try { localStorage.setItem('github_pat', val); } catch(err){} };
   const changeTheme = (theme) => { document.documentElement.setAttribute('data-theme', theme); localStorage.setItem('cms_theme', theme); setIsToolsOpen(false); };
@@ -126,7 +142,7 @@ export default function App() {
   // ==========================================
   const loadDatabase = async () => {
     if (!token || isSyncing) return;
-    setIsSyncing(true); setStatus({ text: 'Đang tải Database...', type: 'loading' });
+    setIsSyncing(true); setStatus({ text: 'Đang tải Database lõi...', type: 'loading' });
     try {
       const meta = await fetchRawJSON(`${username}/${username}.github.io`, 'metadata.json', token);
       const dbData = await fetchRawJSON(`${username}/${username}.github.io`, 'cms_db.json', token);
@@ -135,7 +151,7 @@ export default function App() {
         saveLocalDb({ files: dbData.allFiles, repos: reposMap, tags: meta?.tags || {}, pinned: meta?.pinned || [], links: meta?.links || {}, colors: meta?.colors || {}, titles: meta?.titles || {}, tasks: meta?.tasks || [], customCol: meta?.customCol || [] });
         setStatus({ text: '✅ Đã đồng bộ!', type: 'success' }); setTimeout(() => setStatus({ text: '', type: '' }), 3000);
       }
-    } catch (e) { setStatus({ text: `❌ Lỗi: ${e.message}`, type: 'error' }); } finally { setIsSyncing(false); }
+    } catch (e) { setStatus({ text: `❌ Lỗi DB: ${e.message}`, type: 'error' }); } finally { setIsSyncing(false); }
   };
 
   const syncMetaAndDB = async (dbState) => {
@@ -146,6 +162,48 @@ export default function App() {
       const dbContent = await encodeBase64UTF8Async(JSON.stringify({ allFiles: dbState.files }));
       const dbSha = await getFileShaSafe(`${username}/${username}.github.io`, 'cms_db.json', token);
       await fetch(`https://api.github.com/repos/${username}/${username}.github.io/contents/cms_db.json`, { method: 'PUT', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ message: 'Sync DB', content: dbContent, sha: dbSha || undefined }) });
+  };
+
+  const compileAllForNotebookLM = async () => {
+      if (!token) return alert("Cần nhập Token PAT!");
+      setIsExportModalOpen(false);
+      setStatus({ text: "Bắt đầu trích xuất...", type: "loading" });
+      try {
+          let targetFiles = db.files;
+          if (exportTarget !== 'all') targetFiles = db.files.filter(f => f.repoName === exportTarget);
+          targetFiles = targetFiles.filter(f => !['index.html', 'fix-url.html', 'tin.html', 'cms_db.json', 'metadata.json'].includes(f.fileName));
+          
+          let ct = `SIÊU SÁCH KIẾN THỨC: ${username.toUpperCase()}\n====================================\n\n`; let tc = 0;
+          const grouped = {}; targetFiles.forEach(f => { if(!grouped[f.repoName]) grouped[f.repoName] = []; grouped[f.repoName].push(f); });
+          
+          for (let rName in grouped) {
+              ct += `\n\n[KHO: ${rName.toUpperCase()}]\n\n`;
+              for (let f of grouped[rName]) {
+                  tc++; 
+                  if (tc % 3 === 0 || tc === targetFiles.length) setStatus({ text: `Đang trích xuất (${tc}/${targetFiles.length})...`, type: "loading" });
+                  
+                  let sN = f.fileName; try { sN = decodeURIComponent(f.fileName); } catch(e){}
+                  let rC = null;
+                  try { const res = await fetch(`${f.url}?t=${Date.now()}`); if (res.ok) rC = await res.text(); } catch(e) {}
+                  if (!rC) rC = await fetchText(`https://api.github.com/repos/${username}/${rName}/contents/${safeEnc(sN)}?t=${Date.now()}`, token);
+
+                  if (rC) {
+                      const d = new DOMParser().parseFromString(rC, 'text/html'); d.querySelectorAll('script,style,nav,header,footer,iframe,svg,button').forEach(x => x.remove());
+                      const contentText = (d.body.innerText || d.body.textContent || "").replace(/\n{3,}/g, '\n\n').trim();
+                      const ti = db.titles[`${rName}/${f.fileName}`] || f.name;
+                      ct += `BÀI: ${ti}\n[Nội dung]\n${contentText}\n------------------------\n\n`;
+                  }
+                  await new Promise(r => setTimeout(r, 20)); 
+              }
+          }
+          ct = ct.replace('====================================', `Tổng số bài: ${tc}\n====================================`);
+          
+          const blob = new Blob([ct], { type: 'text/plain;charset=utf-8' });
+          const url = URL.createObjectURL(blob); 
+          
+          setExportResult({ url: url, filename: `notebooklm_${exportTarget}_${Date.now()}.txt`, count: tc });
+          setStatus({ text: "✅ Hoàn tất!", type: "success" }); setTimeout(() => setStatus({ text: '', type: '' }), 3000);
+      } catch (e) { setStatus({ text: `❌ Lỗi: ${e.message}`, type: "error" }); }
   };
 
   const autoSlugify = (val, currentTags) => {
@@ -164,10 +222,16 @@ export default function App() {
     }
   };
 
+  const toggleTagEditor = (t) => {
+    let currentTags = tags.split(',').map(x => x.trim()).filter(Boolean);
+    if (currentTags.includes(t)) currentTags = currentTags.filter(x => x !== t); else currentTags.push(t); 
+    const newTagsStr = currentTags.join(', '); setTags(newTagsStr); autoSlugify(title, newTagsStr);
+  };
+
   const handleSaveArticle = async () => {
-    if (!token) return alert("Cần Token PAT!");
-    if (!repo || !title || !slug || !content) return alert("Thiếu dữ liệu!");
-    setIsSaving(true); setStatus({ text: '⏳ Đang lưu...', type: 'loading' });
+    if (!token) return alert("Vui lòng nhập Token GitHub PAT (Ở phần Cài đặt nâng cao)!");
+    if (!repo || !title || !slug || !content) return alert("Thiếu dữ liệu (Kho, Tiêu đề, Slug, Nội dung)!");
+    setIsSaving(true); setStatus({ text: '⏳ Đang lưu file HTML...', type: 'loading' });
     try {
       let filename = slug.endsWith('.html') ? slug : slug + '.html';
       let rName = repo.includes('/') ? (repo.split('/')[1] || repo.split('/')[0]) : repo;
@@ -184,10 +248,11 @@ export default function App() {
       if (editorOriginal.filename && (editorOriginal.filename !== filename || editorOriginal.repo !== `${rOwner}/${rName}`) && editorOriginal.sha) {
         await fetch(`https://api.github.com/repos/${editorOriginal.repo}/contents/${safeEnc(editorOriginal.filename)}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ message: `Xóa file cũ`, sha: editorOriginal.sha }) });
         const oldKey = `${editorOriginal.repo.split('/')[1]||editorOriginal.repo.split('/')[0]}/${editorOriginal.filename}`;
-        delete db.tags[oldKey]; delete db.links[oldKey]; delete db.colors[oldKey]; delete db.titles[oldKey];
+        delete db.tags[oldKey]; delete db.titles[oldKey];
         db.pinned = db.pinned.filter(x => x !== oldKey);
       }
 
+      setStatus({ text: 'Đang đồng bộ Metadata & CMS DB...', type: 'loading' });
       let newTags = { ...db.tags }; let tagArr = tags.split(',').map(x => x.trim()).filter(Boolean);
       if (tagArr.length) newTags[fileKey] = tagArr; else delete newTags[fileKey];
       let newTitles = { ...db.titles }; newTitles[fileKey] = title;
@@ -205,12 +270,37 @@ export default function App() {
       localStorage.setItem('cms_last_repo', `${rOwner}/${rName}`);
       localStorage.setItem('cms_last_tags', tags);
 
-      setStatus({ text: '✅ Đăng thành công!', type: 'success' });
+      setStatus({ text: '✅ Đăng bài thành công!', type: 'success' });
       setTitle(''); setSlug(''); setContent(''); setEditorOriginal({ repo:'', filename:'', sha:'' });
-      setTimeout(() => setStatus({ text: '', type: '' }), 3000);
+      setTimeout(() => setStatus({ text: '', type: '' }), 4000);
     } catch (error) { setStatus({ text: `❌ Lỗi: ${error.message}`, type: 'error' }); } finally { setIsSaving(false); }
   };
 
+  const editFileContent = async (rName, f, sha) => {
+    if(!token) return alert("Cần Token ở mục Cài đặt nâng cao!"); setIsEditorOpen(true); window.scrollTo({top:0,behavior:'smooth'});
+    setStatus({ text: 'Đang nạp file...', type: 'loading' });
+    try {
+      const res = await fetchText(`https://api.github.com/repos/${username}/${rName}/contents/${safeEnc(f)}?t=${Date.now()}`, token);
+      if(res) {
+        setContent(res);
+        const rp = rName === username || rName === `${username}.github.io` ? `${username}/${username}.github.io` : `${username}/${rName}`;
+        setRepo(rp); setTitle(db.titles[`${rName}/${f}`] || f.replace('.html','')); setSlug(f.replace('.html',''));
+        setTags((db.tags[`${rName}/${f}`] || []).join(', '));
+        setEditorOriginal({ repo: rp, filename: f, sha: sha });
+        setStatus({ text: '✅ Đã nạp thành công!', type: 'success' }); setTimeout(() => setStatus({ text: '', type: '' }), 2000);
+      } else throw new Error("Không tìm thấy file");
+    } catch(e) { setStatus({ text: `❌ Lỗi: ${e.message}`, type: 'error' }); }
+  };
+
+  const togglePin = async (r, f) => {
+    if(!token) return; const k = `${r}/${f}`; let newPinned = [...db.pinned];
+    if(newPinned.includes(k)) newPinned = newPinned.filter(x => x !== k); else newPinned.push(k);
+    const newDb = { ...db, pinned: newPinned }; saveLocalDb(newDb); syncMetaAndDB(newDb);
+  };
+
+  // ==========================================
+  // DATA FILTERING & SORTING
+  // ==========================================
   const repoKeysList = useMemo(() => { const keys = Object.keys(db.repos || {}); if (!keys.includes(`${username}.github.io`)) keys.unshift(`${username}.github.io`); return keys; }, [db.repos]);
   const allUniqueTags = useMemo(() => { const tagsSet = new Set(); Object.values(db.tags).forEach(arr => arr.forEach(t => tagsSet.add(t))); return Array.from(tagsSet).sort(); }, [db.tags]);
   const getFileTags = (r, f) => db.tags[`${r}/${f}`] || [];
@@ -223,51 +313,102 @@ export default function App() {
       const matchSearch = !sq || (f.name || "").toLowerCase().includes(sq) || (f.repoName || "").toLowerCase().includes(sq);
       return matchRepo && matchTag && matchSearch;
     });
-    filtered.sort((a, b) => sortOrder === 'desc' ? (b.timestamp || 0) - (a.timestamp || 0) : (a.timestamp || 0) - (b.timestamp || 0));
+    filtered.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)); // Luôn Mới nhất trước
     return filtered;
-  }, [db.files, activeRepo, activeTag, searchQuery, sortOrder, db.tags]);
+  }, [db.files, activeRepo, activeTag, searchQuery, db.tags]);
+
+  const recentFiles = useMemo(() => { if (activeTag !== 'all' || activeRepo !== 'all' || searchQuery.trim() !== '') return []; return [...db.files].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)).slice(0, 8); }, [db.files, activeRepo, activeTag, searchQuery]);
+  const pinnedFiles = useMemo(() => processedFiles.filter(f => db.pinned.includes(`${f.repoName}/${f.fileName}`)), [processedFiles, db.pinned]);
+  const unpinnedFiles = useMemo(() => processedFiles.filter(f => !db.pinned.includes(`${f.repoName}/${f.fileName}`)), [processedFiles, db.pinned]);
+  
+  // Sắp xếp các Repo có bài viết mới cập nhật lên đầu
+  const groupedFilesByRepo = useMemo(() => { 
+    const groups = {}; 
+    unpinnedFiles.forEach(f => { if (!groups[f.repoName]) groups[f.repoName] = []; groups[f.repoName].push(f); }); 
+    
+    const sortedRepoNames = Object.keys(groups).sort((a, b) => {
+        const maxA = Math.max(...groups[a].map(f => f.timestamp || 0));
+        const maxB = Math.max(...groups[b].map(f => f.timestamp || 0));
+        return maxB - maxA;
+    });
+
+    const sortedGroups = {};
+    sortedRepoNames.forEach(r => sortedGroups[r] = groups[r]);
+    return sortedGroups; 
+  }, [unpinnedFiles]);
 
   // ==========================================
-  // RENDER CARD (TỐI ƯU CHI TIẾT THEO YÊU CẦU)
+  // RENDER THẺ BÀI VIẾT TỐI GIẢN
   // ==========================================
-  const renderCard = (file) => {
+  const renderCard = (file, isRecent = false) => {
     const isPinned = db.pinned.includes(`${file.repoName}/${file.fileName}`);
-    const col = db.colors[`${file.repoName}/${file.fileName}`];
-    const isDark = col && getContrastYIQ(col) === '#FFFFFF';
-    const stl = col ? { backgroundColor: col, borderColor: 'transparent', color: isDark ? '#FFF' : '#1D1D1F' } : {};
+    const dateFmt = file.fullDate ? file.fullDate.split(' ')[0] : '';
+    const tagsList = getFileTags(file.repoName, file.fileName);
 
+    if (isRecent) {
+      return (
+        <div key={file.sha} className="cms-card p-4 min-w-[240px] max-w-[240px] flex flex-col group transition border cms-border hover:border-[var(--accent)] bg-[var(--bg-card)] cursor-pointer" onClick={() => window.open(file.url, '_blank')}>
+          <div className="text-[10px] text-muted mb-1.5 flex items-center gap-1 uppercase font-bold tracking-tight opacity-70"><svg className="w-3 h-3"><use href="#icon-folder"></use></svg>{file.repoName}</div>
+          <h4 className="font-bold text-sm leading-snug line-clamp-2 mb-2 group-hover:text-[var(--accent)] transition text-[var(--text-main)]">{file.name}</h4>
+          <div className="flex justify-between items-center mt-auto border-t cms-border-faint pt-2">
+             <span className="text-[10px] opacity-60 font-mono text-muted">{dateFmt}</span>
+             <button onClick={(e)=>{e.stopPropagation(); editFileContent(file.repoName, file.fileName, file.sha)}} className="text-[10px] text-[var(--accent)] px-2 py-1 rounded font-bold opacity-60 hover:opacity-100 transition">Sửa</button>
+          </div>
+        </div>
+      );
+    }
+
+    // MAIN CARD (Không có Checkbox, Focus Tiêu đề, Mật độ cao)
     return (
-      <div key={file.sha} className="cms-card p-3 flex flex-col relative group transition border cms-border hover:border-[var(--accent)]" style={stl}>
-        <div className="flex justify-between items-start gap-3">
-          <div className="flex-1 min-w-0">
-            <div className="text-[9px] text-muted uppercase font-bold tracking-tight opacity-70 mb-0.5 flex items-center gap-1">
-              <svg className="w-2.5 h-2.5"><use href="#icon-folder"></use></svg>{file.repoName}
+      <div key={file.sha} className="cms-card p-4 flex flex-col relative group transition border cms-border hover:border-[var(--accent)] bg-[var(--bg-card)]">
+        <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1.5 text-[10px] text-muted font-bold uppercase tracking-widest mb-1.5 opacity-60">
+                <svg className="w-3 h-3"><use href="#icon-folder"></use></svg> {file.repoName}
             </div>
-            <a href={file.url} target="_blank" rel="noreferrer" className="font-bold text-[14px] leading-tight hover:underline line-clamp-2 block">
+            <a href={file.url} target="_blank" rel="noreferrer" className="block font-bold text-base text-[var(--text-main)] leading-snug mb-2 hover:text-[var(--accent)] line-clamp-3">
                 {file.name}
             </a>
-            {/* Render nhãn rất nhỏ để tiết kiệm chỗ */}
-            <div className="flex flex-wrap gap-1 mt-1">
-               {getFileTags(file.repoName, file.fileName).map(t => <span key={t} className="text-[9px] px-1.5 py-0.5 rounded-md bg-black/5 dark:bg-white/5 opacity-60 font-bold border border-black/5">{t}</span>)}
-            </div>
-          </div>
-          
-          {/* NÚT EDIT LUÔN HIỂN THỊ - MỜ (CHO IPAD) */}
-          <button 
-            onClick={(e)=>{e.stopPropagation(); editFileContent(file.repoName, file.fileName, file.sha);}} 
-            className="shrink-0 cms-input px-3 py-1.5 rounded-lg text-[10px] font-black opacity-40 hover:opacity-100 transition uppercase border cms-border bg-white dark:bg-gray-800"
-          >
-            Sửa
-          </button>
+            {tagsList.length > 0 && (
+               <div className="flex flex-wrap gap-1 mb-2">
+                   {tagsList.map(t => <span key={t} className="text-[9px] px-1.5 py-0.5 rounded bg-[var(--bg-hover)] text-muted font-medium border cms-border">{t}</span>)}
+               </div>
+            )}
         </div>
         
-        <div className="flex justify-between items-center mt-2 pt-2 border-t cms-border-faint opacity-50">
-            <span className="text-[9px] font-mono">{file.fullDate ? file.fullDate.split(' ')[0] : ''}</span>
-            <div className="flex gap-1">
-                <button onClick={(e)=>{e.stopPropagation(); togglePin(file.repoName, file.fileName);}} className={isPinned ? 'text-[#FF9500]' : ''}><svg className="w-3.5 h-3.5"><use href={isPinned ? "#icon-pin-filled" : "#icon-pin"}></use></svg></button>
-                <button onClick={(e)=>{e.stopPropagation(); setActiveModal({type: 'tag', data: file});}}><svg className="w-3.5 h-3.5"><use href="#icon-tag"></use></svg></button>
+        <div className="flex justify-between items-center mt-3 pt-3 border-t cms-border-faint">
+            <span className="text-[10px] text-muted font-mono opacity-60 flex items-center gap-2">
+                {dateFmt} {isPinned && <svg className="w-2.5 h-2.5 text-[#FF9500]"><use href="#icon-pin-filled"></use></svg>}
+            </span>
+            <div className="flex items-center gap-3">
+                <button onClick={(e)=>{e.stopPropagation(); togglePin(file.repoName, file.fileName);}} className="opacity-40 hover:opacity-100 transition text-muted"><svg className="w-3.5 h-3.5"><use href={isPinned ? "#icon-pin-filled" : "#icon-pin"}></use></svg></button>
+                <button onClick={(e)=>{e.stopPropagation(); editFileContent(file.repoName, file.fileName, file.sha);}} className="text-[11px] font-bold text-[var(--accent)] opacity-60 hover:opacity-100 transition flex items-center gap-1"><svg className="w-3 h-3"><use href="#icon-edit"></use></svg> Sửa</button>
             </div>
         </div>
+      </div>
+    );
+  };
+
+  const renderViews = () => {
+    if (processedFiles.length === 0) return <div className="text-center py-20 text-muted font-bold text-sm">Trống</div>;
+    return (
+      <div className="flex flex-col gap-8">
+        {pinnedFiles.length > 0 && (
+            <details open className="mb-2">
+                <summary className="font-bold text-lg mb-4 border-b cms-border pb-2 cursor-pointer outline-none text-[#FF9500] flex items-center gap-2">
+                    <svg className="w-5 h-5"><use href="#icon-pin-filled"></use></svg> 📌 Đã ghim <span className="text-xs px-2 py-0.5 rounded-full border cms-border text-[var(--text-main)] ml-2">{pinnedFiles.length}</span>
+                </summary>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">{pinnedFiles.map(f => renderCard(f))}</div>
+            </details>
+        )}
+        
+        {Object.keys(groupedFilesByRepo).map(r => (
+            <details key={r} open className="mb-2">
+                <summary className="font-bold text-lg mb-4 border-b cms-border pb-2 cursor-pointer outline-none flex items-center gap-2">
+                    <svg className="w-5 h-5 opacity-70"><use href="#icon-folder"></use></svg> {r} <span className="text-xs px-2 py-0.5 rounded-full border cms-border text-muted ml-2">{groupedFilesByRepo[r].length}</span>
+                </summary>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">{groupedFilesByRepo[r].map(f => renderCard(f))}</div>
+            </details>
+        ))}
       </div>
     );
   };
@@ -294,8 +435,9 @@ export default function App() {
                     <button onClick={() => changeTheme('light')} className="flex-1 py-1.5 rounded text-[11px] font-bold cms-input border cms-border">Sáng</button>
                     <button onClick={() => changeTheme('dark')} className="flex-1 py-1.5 rounded text-[11px] font-bold cms-input border cms-border">Tối</button>
                   </div>
-                  <button onClick={() => setIsPomoOpen(!isPomoOpen)} className="text-left px-3 py-2.5 text-xs font-bold hover:bg-[var(--bg-hover)] rounded-lg">🍅 Pomodoro</button>
+                  <button onClick={() => { setIsPomoOpen(!isPomoOpen); setIsToolsOpen(false); }} className="text-left px-3 py-2.5 text-xs font-bold hover:bg-[var(--bg-hover)] rounded-lg">🍅 Pomodoro</button>
                   <button onClick={() => window.open('https://vietndj.github.io/tin.html', '_blank')} className="text-left px-3 py-2.5 text-xs font-bold hover:bg-[var(--bg-hover)] rounded-lg">📖 Mở Reader</button>
+                  <button onClick={() => { setIsExportModalOpen(true); setIsToolsOpen(false); }} className="text-left px-3 py-2.5 text-xs font-bold text-[#8E44AD] hover:bg-[var(--bg-hover)] rounded-lg transition">🤖 Xuất Sách AI</button>
                   <hr className="cms-border my-1 border-t" />
                   <button onClick={() => {localStorage.removeItem("cms_auth"); setIsAuthenticated(false);}} className="text-left px-3 py-2.5 text-xs font-bold text-red-500 hover:bg-[var(--bg-hover)] rounded-lg">🔒 Khóa App</button>
                 </div> 
@@ -320,20 +462,19 @@ export default function App() {
       <div className="flex flex-col lg:flex-row gap-6 px-4 md:px-6 lg:px-8 max-w-[1600px] mx-auto items-start w-full relative pb-20">
         <main className="flex-1 w-full min-w-0 flex flex-col gap-6">
           
-          {/* EDITOR TỐI ƯU UX TỘT ĐỘ */}
+          {/* EDITOR */}
           <section className="cms-card overflow-hidden shadow-sm">
             <button onClick={() => setIsEditorOpen(!isEditorOpen)} className="w-full px-6 py-3 flex justify-between items-center hover:bg-[var(--bg-hover)] font-semibold text-[var(--accent)] outline-none border-b cms-border">
                 <span className="flex items-center gap-2">
                     <svg className="svg-icon"><use href="#icon-edit"></use></svg> Soạn thảo HTML <span className="text-[10px] text-muted border px-1.5 py-0.5 rounded font-mono ml-2 uppercase bg-white dark:bg-gray-800">Ctrl E</span>
                 </span>
-                <span>▼</span>
+                <span style={{ transform: isEditorOpen ? 'rotate(180deg)' : 'rotate(0deg)' }} className="transition-transform">▼</span>
             </button>
             {isEditorOpen && (
               <div className="p-5 bg-[var(--bg-card)] fade-in flex flex-col gap-4">
                 <div className="flex flex-wrap gap-2">
                     {repoKeysList.map(r => { const fullPath = `${username}/${r}`; const isActive = repo === fullPath; return (<button key={r} onClick={() => { setRepo(fullPath); }} className={`px-3 py-1.5 text-[10px] font-bold rounded-lg transition border ${isActive ? 'bg-[var(--accent)] text-white' : 'bg-[var(--bg-hover)] text-muted'}`}>{r}</button>) })}
                 </div>
-                {/* TEXTAREA LÀ NƠI FOCUS ĐẦU TIÊN (Ctrl E -> Paste luôn) */}
                 <textarea 
                     ref={editorInputRef}
                     id="html-content-editor" rows="12" 
@@ -355,13 +496,12 @@ export default function App() {
             )}
           </section>
 
-          {/* MAIN GRID - HIỂN THỊ CHẶT CHẼ */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-             {processedFiles.map(f => renderCard(f))}
-          </div>
+          {recentFiles.length > 0 && (<div className="mb-6"><h3 className="font-bold text-sm mb-3 flex items-center gap-2 text-muted uppercase tracking-wider px-2"><svg className="w-4 h-4"><use href="#icon-timer"></use></svg> Vừa thao tác</h3><div className="flex overflow-x-auto gap-4 pb-4 scrollbar-hide px-2">{recentFiles.map(f => renderCard(f, true))}</div></div>)}
+          
+          {/* MAIN VIEWS */}
+          {renderViews()}
         </main>
 
-        {/* SIDEBAR TASK */}
         {isTasksOpen && (
           <aside className="w-full lg:w-[300px] shrink-0 sticky top-[120px] h-[calc(100vh-140px)] fade-in">
              <div className="cms-card p-4 flex flex-col h-full">
@@ -374,6 +514,60 @@ export default function App() {
           </aside>
         )}
       </div>
+
+      {/* POMODORO */}
+      {isPomoOpen && (
+        <div className="fixed bottom-6 right-6 w-72 cms-card z-[100] p-4 shadow-2xl border cms-border fade-in">
+           <div className="flex justify-between items-center font-bold text-sm mb-4 border-b cms-border pb-2">
+              <span><svg className="w-4 h-4 inline pb-0.5 text-[#FF9500]"><use href="#icon-timer"></use></svg> Pomodoro</span>
+              <span onClick={()=>setIsPomoOpen(false)} className="cursor-pointer text-red-500 font-bold">✕</span>
+           </div>
+           <div className="flex gap-2 mb-4">
+              <button onClick={() => setPomoTime(1500)} className="flex-1 cms-btn-primary py-1.5 rounded-lg text-xs font-bold">25 Phút</button>
+              <button onClick={() => setPomoTime(300)} className="flex-1 cms-input border cms-border py-1.5 rounded-lg text-xs font-bold text-muted">5 Phút</button>
+           </div>
+           <div className="text-4xl font-black text-center mb-4 font-mono text-[var(--accent)]">
+              {Math.floor(pomoTime / 60).toString().padStart(2, '0')}:{(pomoTime % 60).toString().padStart(2, '0')}
+           </div>
+           <div className="flex gap-2">
+              <button onClick={() => setIsPomoActive(!isPomoActive)} className={`flex-1 py-2 rounded-xl text-xs font-bold transition ${isPomoActive ? 'bg-[#FF9500] text-white' : 'cms-btn-primary'}`}>
+                {isPomoActive ? 'DỪNG LẠI' : 'BẮT ĐẦU'}
+              </button>
+              <button onClick={() => { setIsPomoActive(false); setPomoTime(1500); }} className="px-4 py-2 cms-input border cms-border rounded-xl text-xs font-bold transition hover:opacity-80">Reset</button>
+           </div>
+        </div>
+      )}
+
+      {/* MODAL XUẤT SÁCH AI */}
+      {isExportModalOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[999999] flex items-center justify-center fade-in" onClick={() => { setIsExportModalOpen(false); setExportResult(null); }}>
+          <div className="p-6 max-w-sm w-full mx-4 border cms-border shadow-2xl rounded-2xl bg-[var(--bg-card)] dark:bg-[#1D1D1F]" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-xl font-bold mb-2 flex items-center gap-2 text-[var(--text-main)]">🤖 Xuất Sách AI</h3>
+            {!exportResult ? (
+                <>
+                  <p className="text-sm text-muted mb-4">Chọn kho dữ liệu để tải về máy dưới dạng file .txt. Tối ưu định dạng cho NotebookLM.</p>
+                  <select value={exportTarget} onChange={(e) => setExportTarget(e.target.value)} className="w-full px-4 py-3 cms-input bg-[var(--bg-hover)] border cms-border rounded-xl text-sm mb-6 font-bold cursor-pointer outline-none text-[var(--text-main)]">
+                      <option value="all">📚 Tất cả các Kho</option>
+                      {repoKeysList.map(r => ( <option key={r} value={r}>📁 Kho: {r}</option> ))}
+                  </select>
+                  <div className="flex justify-end gap-3 pt-4 border-t cms-border">
+                      <button onClick={() => setIsExportModalOpen(false)} className="px-5 py-2.5 rounded-xl text-sm font-bold bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300 transition hover:opacity-80">Hủy</button>
+                      <button onClick={compileAllForNotebookLM} className="px-6 py-2.5 rounded-xl text-sm font-bold shadow-md bg-[#007AFF] text-white transition hover:bg-blue-600">🚀 Bắt Đầu Quét</button>
+                  </div>
+                </>
+            ) : (
+                <div className="py-6 text-center">
+                    <div className="text-4xl mb-2">🎉</div>
+                    <h4 className="font-bold text-lg text-green-500 mb-1">Thành công!</h4>
+                    <p className="text-sm text-muted mb-6">Đã gom thành công <b>{exportResult.count}</b> bài viết thành 1 file duy nhất.</p>
+                    <a href={exportResult.url} download={exportResult.filename} className="block w-full px-6 py-4 rounded-xl text-base font-bold shadow-xl bg-gradient-to-r from-green-500 to-emerald-600 text-white transition hover:scale-105" onClick={() => { setTimeout(()=>{setIsExportModalOpen(false); setExportResult(null)}, 1000) }}>
+                        ⬇️ Tải File Sách (.txt)
+                    </a>
+                </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {status.text && (<div className="fixed bottom-6 left-6 z-[9999] cms-card px-4 py-2 rounded-xl shadow-lg text-sm font-bold border-l-4 border-l-[var(--accent)] fade-in bg-[var(--bg-card)]">{status.text}</div>)}
     </div>
