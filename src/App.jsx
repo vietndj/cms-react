@@ -9,18 +9,7 @@ const safeEnc = (fn) => { try { fn = decodeURIComponent(fn); } catch(e){} return
 const encodeBase64UTF8Async = async (str) => { const bytes = new TextEncoder().encode(str); let binary = ''; for (let i = 0; i < bytes.byteLength; i += 16384) binary += String.fromCharCode.apply(null, bytes.subarray(i, i + 16384)); return btoa(binary); };
 const getHeaders = (token) => token ? { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github.v3+json' } : { 'Accept': 'application/vnd.github.v3+json' };
 const getContrastYIQ = hex => { if(!hex)return '#1D1D1F'; hex=hex.replace("#",""); const yiq=((parseInt(hex.substr(0,2),16)*299)+(parseInt(hex.substr(2,2),16)*587)+(parseInt(hex.substr(4,2),16)*114))/1000; return (yiq>=128)?'#1D1D1F':'#FFFFFF'; };
-
-// Hàm tạo Gradient động cho Grid View
-const getGradient = (str) => {
-  const colors = [
-    'from-blue-500 to-indigo-500', 'from-emerald-400 to-teal-500', 'from-amber-400 to-orange-500',
-    'from-rose-400 to-red-500', 'from-fuchsia-500 to-purple-600', 'from-cyan-400 to-blue-500',
-    'from-violet-500 to-fuchsia-500', 'from-lime-400 to-emerald-500', 'from-pink-400 to-rose-500'
-  ];
-  let hash = 0;
-  if (str) { for(let i=0; i<str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash); }
-  return colors[Math.abs(hash) % colors.length];
-};
+const getGradient = (str) => { const colors = ['from-blue-500 to-indigo-500', 'from-emerald-400 to-teal-500', 'from-amber-400 to-orange-500', 'from-rose-400 to-red-500', 'from-fuchsia-500 to-purple-600', 'from-cyan-400 to-blue-500', 'from-violet-500 to-fuchsia-500', 'from-lime-400 to-emerald-500', 'from-pink-400 to-rose-500']; let hash = 0; if (str) { for(let i=0; i<str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash); } return colors[Math.abs(hash) % colors.length]; };
 
 const fetchRawJSON = async (repoPath, file, token) => {
   try { const res = await fetch(`https://api.github.com/repos/${repoPath}/contents/${safeEnc(file)}?t=${Date.now()}`, { headers: { ...getHeaders(token), 'Accept': 'application/vnd.github.v3.raw' } }); if (res.ok) return await res.json(); } catch(e) {}
@@ -78,11 +67,19 @@ export default function App() {
   const [tableSort, setTableSort] = useState({ by: 'date', dir: 'desc' });
   
   const [isTasksOpen, setIsTasksOpen] = useState(false);
-  const [isPomoOpen, setIsPomoOpen] = useState(false);
   const [isToolsOpen, setIsToolsOpen] = useState(false);
   const [nativeTaskInput, setNativeTaskInput] = useState('');
   const [bulkSet, setBulkSet] = useState(new Set());
 
+  // POMODORO STATES
+  const [isPomoOpen, setIsPomoOpen] = useState(false);
+  const [pomoTime, setPomoTime] = useState(1500); // 1500s = 25m
+  const [isPomoActive, setIsPomoActive] = useState(false);
+  const [pomoTask, setPomoTask] = useState('');
+  const [pomoWebhook, setPomoWebhook] = useState(() => localStorage.getItem('cms_pomo_webhook') || '');
+  const [isWebhookSettingsOpen, setIsWebhookSettingsOpen] = useState(false);
+
+  // EDITOR STATES (Tối ưu mới)
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [repo, setRepo] = useState(() => localStorage.getItem('cms_last_repo') || `${username}/${username}.github.io`);
@@ -106,7 +103,26 @@ export default function App() {
     try { const localDb = JSON.parse(localStorage.getItem('cms_repo_data')); if (localDb && localDb.files) setDb(localDb); } catch(e){}
   }, []);
 
-  useEffect(() => { if (isAuthenticated && token) loadDatabase(); }, [isAuthenticated, token]);
+  useEffect(() => { if (isAuthenticated && token && db.files.length === 0) loadDatabase(); }, [isAuthenticated, token]);
+
+  // Pomodoro Timer Logic
+  useEffect(() => {
+    let interval = null;
+    if (isPomoActive && pomoTime > 0) {
+      interval = setInterval(() => { setPomoTime(p => p - 1); }, 1000);
+    } else if (isPomoActive && pomoTime <= 0) {
+      setIsPomoActive(false);
+      alert("Hết giờ Pomodoro!");
+      try { new Audio('https://vietndj.github.io/1.mp3').play(); } catch(e){}
+      if (pomoWebhook) {
+        fetch(pomoWebhook.startsWith('http') ? pomoWebhook : `https://ntfy.sh/${pomoWebhook}`, {
+          method: 'POST', body: `Hoàn thành: ${pomoTask || 'Phiên làm việc'}`, headers: { 'Title': '🍅 CMS Pomo', 'Tags': 'alarm_clock' }
+        }).catch(e => console.log('Ntfy error', e));
+      }
+      setPomoTime(1500);
+    }
+    return () => clearInterval(interval);
+  }, [isPomoActive, pomoTime, pomoWebhook, pomoTask]);
 
   const handleLogin = () => { if (pin.trim() === SECRET_PIN) { localStorage.setItem("cms_auth", "granted"); setIsAuthenticated(true); } else alert("Mã PIN sai."); };
   const handleSaveToken = (val) => { setToken(val); try { localStorage.setItem('github_pat', val); } catch(err){} };
@@ -138,6 +154,56 @@ export default function App() {
       const dbContent = await encodeBase64UTF8Async(JSON.stringify({ allFiles: dbState.files }));
       const dbSha = await getFileShaSafe(`${username}/${username}.github.io`, 'cms_db.json', token);
       await fetch(`https://api.github.com/repos/${username}/${username}.github.io/contents/cms_db.json`, { method: 'PUT', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ message: 'Sync DB', content: dbContent, sha: dbSha || undefined }) });
+  };
+
+  const compileAllForNotebookLM = async () => {
+      if (!token) return alert("Cần nhập Token PAT!");
+      if (!confirm("🚀 XUẤT SIÊU SÁCH CHO NOTEBOOKLM (LẤY MỚI 100%)\nMất khoảng 20-30s. Bắt đầu?")) return;
+      setIsToolsOpen(false);
+      setStatus({ text: "Lấy danh sách Repo...", type: "loading" });
+      try {
+          const resRepos = await fetch(`https://api.github.com/users/${username}/repos?sort=updated&per_page=100`, { headers: getHeaders(token) });
+          if(!resRepos.ok) throw new Error("Lỗi API List Repos");
+          const repos = await resRepos.json();
+          let ct = `SIÊU SÁCH KIẾN THỨC: ${username.toUpperCase()}\n====================================\n\n`;
+          let tc = 0;
+          for (let rp of repos) {
+              const fsRes = await fetch(`https://api.github.com/repos/${username}/${rp.name}/contents/?t=${Date.now()}`, { headers: getHeaders(token) });
+              if(!fsRes.ok) continue;
+              const fs = await fsRes.json();
+              if (!Array.isArray(fs)) continue;
+              const hFs = fs.filter(f => f.name.endsWith('.html') && !(rp.name === `${username}.github.io` && (f.name === 'index.html' || f.name === 'fix-url.html' || f.name === 'tin.html')));
+              if (hFs.length) { ct += `\n\n[KHO: ${rp.name.toUpperCase()}]\n\n`; }
+              for (const f of hFs) {
+                  tc++;
+                  setStatus({ text: `Đang trích xuất: ${f.name}...`, type: "loading" });
+                  let sN = f.name; try { sN = decodeURIComponent(f.name); } catch(e){}
+                  const rC = await fetchText(`https://api.github.com/repos/${username}/${rp.name}/contents/${safeEnc(sN)}?t=${Date.now()}`, token);
+                  if (rC) {
+                      const d = new DOMParser().parseFromString(rC, 'text/html');
+                      d.querySelectorAll('script,style,nav,header,footer,iframe,svg,button').forEach(x => x.remove());
+                      const ti = (db.titles && db.titles[`${rp.name}/${f.name}`]) || sN.replace('.html', '');
+                      ct += `BÀI: ${ti}\n[Nội dung]\n${(d.body.innerText || d.body.textContent || "").replace(/\n{3,}/g, '\n\n').trim()}\n------------------------\n\n`;
+                  }
+                  await new Promise(r => setTimeout(r, 50));
+              }
+          }
+          ct = ct.replace('====================================', `Tổng số bài: ${tc}\n====================================`);
+          setStatus({ text: "Lưu Siêu Sách lên Github...", type: "loading" });
+          const fn = `notebooklm_ALL.txt`;
+          const sS = await getFileShaSafe(`${username}/${username}.github.io`, fn, token);
+          const encodedChunked = await encodeBase64UTF8Async(ct);
+          
+          await fetch(`https://api.github.com/repos/${username}/${username}.github.io/contents/${fn}`, {
+              method: 'PUT', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ message: `Đóng gói Siêu sách`, content: encodedChunked, sha: sS || undefined })
+          });
+          
+          setStatus({ text: "✅ Đóng gói xong!", type: "success" });
+          const u = `https://${username}.github.io/${fn}`;
+          try { await navigator.clipboard.writeText(u); } catch(e) {}
+          setTimeout(() => prompt(`🎉 XONG! Link đã Copy:\n(Dán vào NotebookLM)`, u), 500);
+      } catch (e) { setStatus({ text: `❌ Lỗi: ${e.message}`, type: "error" }); }
   };
 
   const autoSlugify = (val, currentTags) => {
@@ -258,8 +324,6 @@ export default function App() {
   // ==========================================
   // RENDER HELPERS
   // ==========================================
-  
-  // Nút hành động dùng chung
   const ActionIcons = ({ file, isPinned, isFeed }) => {
     if (isFeed) {
       return (
@@ -310,38 +374,24 @@ export default function App() {
         </div>
     );
 
-    // GIAO DIỆN FEED (Chuẩn theo ảnh của bạn)
     if (viewType === 'feed') return (
         <article key={file.sha} className="cms-card p-8 flex flex-col relative mb-8 border cms-border" style={stl}>
           <input type="checkbox" checked={isChecked} onChange={(e) => toggleFileSelection(file.repoName, file.fileName, file.sha, e)} className="absolute top-8 left-8 w-4 h-4 z-10 cursor-pointer accent-[#007AFF]" />
-          <div className="flex items-center gap-3 mb-4 pl-10">
-             <div className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-xl cms-input border cms-border"><svg className="w-5 h-5"><use href="#icon-folder"></use></svg></div>
-             <div><p className="text-sm font-bold cursor-pointer hover:underline opacity-80" onClick={()=>setActiveRepo(file.repoName)}>{file.repoName}</p><p className="text-[11px] font-semibold opacity-70 mt-0.5">{dateFmt}</p></div>
-          </div>
+          <div className="flex items-center gap-3 mb-4 pl-10"><div className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-xl cms-input border cms-border"><svg className="w-5 h-5"><use href="#icon-folder"></use></svg></div><div><p className="text-sm font-bold cursor-pointer hover:underline opacity-80" onClick={()=>setActiveRepo(file.repoName)}>{file.repoName}</p><p className="text-[11px] font-semibold opacity-70 mt-0.5">{dateFmt}</p></div></div>
           <h2 className="text-3xl font-bold mb-4 pl-10"><a href={file.url} target="_blank" rel="noreferrer" className="hover:underline opacity-90">{file.name}</a></h2>
           <div className="pl-10">{renderTagsAndLinks(file.repoName, file.fileName)}</div>
-          
-          <div className="w-full h-64 cms-input mt-4 mb-6 rounded-xl flex items-center justify-center overflow-hidden border cms-border bg-gray-100">
-             <div className="opacity-40 font-bold text-xl px-4 text-center">{file.name}</div>
-          </div>
-          
+          <div className="w-full h-64 cms-input mt-4 mb-6 rounded-xl flex items-center justify-center overflow-hidden border cms-border bg-gray-100"><div className="opacity-40 font-bold text-xl px-4 text-center" dangerouslySetInnerHTML={{__html: file.coverHTML || file.name}}></div></div>
           <div className="text-[16px] leading-relaxed mb-8 opacity-90" dangerouslySetInnerHTML={{__html: (file.preview||'')}}></div>
-          <div className="flex flex-wrap gap-2 pt-5 border-t cms-border mt-auto items-center">
-             <a href={file.url} target="_blank" rel="noreferrer" className="cms-btn px-6 py-2.5 rounded-xl text-sm font-bold shadow-sm bg-[var(--bg-card)]">Đọc bài</a>
-             <ActionIcons file={file} isPinned={isPinned} isFeed={true} />
-          </div>
+          <div className="flex flex-wrap gap-2 pt-5 border-t cms-border mt-auto items-center"><a href={file.url} target="_blank" rel="noreferrer" className="cms-btn px-6 py-2.5 rounded-xl text-sm font-bold shadow-sm bg-[var(--bg-card)]">Đọc bài</a><ActionIcons file={file} isPinned={isPinned} isFeed={true} /></div>
         </article>
     );
 
-    // GIAO DIỆN GRID (Thumbnails Gradient)
     if (viewType === 'grid') {
       const gradClass = getGradient(file.sha || file.name);
       return (
         <div key={file.sha} className="cms-card flex flex-col relative overflow-hidden group hover:scale-[1.02] transition border cms-border" style={stl}>
           <input type="checkbox" checked={isChecked} onChange={(e) => toggleFileSelection(file.repoName, file.fileName, file.sha, e)} className="absolute top-3 left-3 w-4 h-4 z-10 cursor-pointer accent-[#007AFF] opacity-0 group-hover:opacity-100 transition" />
-          <div className={`h-28 flex items-center justify-center border-b cms-border overflow-hidden opacity-90 font-bold text-center p-4 text-sm text-white bg-gradient-to-br ${gradClass}`}>
-             {file.name}
-          </div>
+          <div className={`h-28 flex items-center justify-center border-b cms-border overflow-hidden opacity-90 font-bold text-center p-4 text-sm text-white bg-gradient-to-br ${gradClass}`}>{file.name}</div>
           <div className="p-5 flex flex-col flex-1">
             <span className="text-[10px] uppercase font-bold text-muted mb-2 flex items-center gap-1"><svg className="w-3 h-3"><use href="#icon-folder"></use></svg> {file.repoName}</span>
             <a href={file.url} target="_blank" rel="noreferrer" className="font-bold text-lg mb-3 line-clamp-2 hover:underline">{file.name}</a>
@@ -361,7 +411,6 @@ export default function App() {
         </div>
     );
 
-    // GIAO DIỆN TABLE (Hover hiện nút)
     if (viewType === 'table') return (
         <tr key={file.sha} className={`group border-b cms-border hover:bg-[var(--bg-hover)] transition ${isDark ? 'text-white' : ''}`} style={stl}>
           <td className="p-3 text-center"><input type="checkbox" checked={isChecked} onChange={(e) => toggleFileSelection(file.repoName, file.fileName, file.sha, e)} className="accent-[#007AFF] w-4 h-4 cursor-pointer" /></td>
@@ -372,7 +421,6 @@ export default function App() {
         </tr>
     );
 
-    // GIAO DIỆN LIST (Mặc định)
     return (
       <div key={file.sha} className="cms-card p-4 flex flex-col relative group hover:scale-[1.01] transition border cms-border" style={stl}>
         <input type="checkbox" checked={isChecked} onChange={(e) => toggleFileSelection(file.repoName, file.fileName, file.sha, e)} className="absolute top-5 left-4 w-4 h-4 z-10 cursor-pointer accent-[#007AFF] opacity-0 group-hover:opacity-100 transition" />
@@ -384,10 +432,7 @@ export default function App() {
         </div>
         <div className="flex justify-between items-center mt-auto pt-3 border-t cms-border">
           <span className="text-[10px] opacity-60">{dateFmt}</span>
-          <div className="flex items-center gap-2">
-             <ActionIcons file={file} isPinned={isPinned} />
-             <button onClick={(e)=>{e.stopPropagation(); editFileContent(file.repoName, file.fileName, file.sha)}} className="cms-btn px-4 py-1.5 rounded-lg text-xs font-bold transition sm:hidden group-hover:block">Sửa</button>
-          </div>
+          <div className="flex items-center gap-2"><ActionIcons file={file} isPinned={isPinned} /><button onClick={(e)=>{e.stopPropagation(); editFileContent(file.repoName, file.fileName, file.sha)}} className="cms-btn px-4 py-1.5 rounded-lg text-xs font-bold transition sm:hidden group-hover:block">Sửa</button></div>
         </div>
       </div>
     );
@@ -421,14 +466,33 @@ export default function App() {
             <div className="flex-1 flex items-center bg-[var(--bg-hover)] rounded-xl px-4 py-2 border border-transparent focus-within:border-[var(--accent)] transition-all"><svg className="svg-icon text-muted"><use href="#icon-search"></use></svg><input type="text" value={searchQuery} onChange={(e)=>setSearchQuery(e.target.value)} placeholder="Tìm bài viết, repo... (Ctrl K)" className="bg-transparent border-none outline-none text-sm w-full ml-3 font-bold placeholder-[var(--text-muted)]" /></div>
             <button onClick={() => setIsDeepSearch(!isDeepSearch)} className={`shrink-0 px-4 py-2 rounded-xl text-sm font-bold transition flex items-center gap-1.5 border cms-border ${isDeepSearch ? 'bg-[var(--accent)] text-white' : 'bg-transparent text-[var(--text-main)] hover:bg-[var(--bg-hover)]'}`}><svg className="w-4 h-4"><use href="#icon-grid"></use></svg> Sâu</button>
           </div>
+          
           <div className="flex items-center gap-2 shrink-0 relative w-full md:w-auto justify-center" ref={toolsMenuRef}>
             <button onClick={loadDatabase} className="hidden lg:block cms-btn px-3 py-2 rounded-xl text-xs font-bold transition outline-none">↻ Tải DB Lõi</button>
             <button onClick={()=>setIsTasksOpen(!isTasksOpen)} className="cms-btn px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1 outline-none">📝 Việc</button>
+            
+            {/* DROPDOWN MENU PHỤC HỒI */}
             <div className="relative">
               <button onClick={() => setIsToolsOpen(!isToolsOpen)} className="cms-btn px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1 outline-none">Công cụ ▾</button>
-              {isToolsOpen && ( <div className="absolute right-0 top-full mt-2 w-56 cms-card shadow-2xl flex flex-col p-2 z-[100] border cms-border fade-in"><div className="px-2 py-1 text-[10px] uppercase text-muted font-bold tracking-wider mb-1">Giao diện</div><div className="flex gap-1 px-1 mb-3"><button onClick={() => changeTheme('light')} className="flex-1 py-1.5 rounded text-[11px] font-bold cms-input hover:opacity-80 transition border cms-border">Sáng</button><button onClick={() => changeTheme('dark')} className="flex-1 py-1.5 rounded text-[11px] font-bold cms-input hover:opacity-80 transition border cms-border">Tối</button><button onClick={() => changeTheme('read')} className="flex-1 py-1.5 rounded text-[11px] font-bold cms-input hover:opacity-80 transition border cms-border text-[#D35400]">Sách</button></div><hr className="cms-border my-1 border-t" /><button onClick={()=>setIsPomoOpen(!isPomoOpen)} className="text-left px-3 py-2.5 text-xs font-bold hover:bg-[var(--bg-hover)] rounded-lg transition">🍅 Pomodoro</button><button onClick={() => {localStorage.removeItem("cms_auth"); setIsAuthenticated(false);}} className="text-left px-3 py-2.5 text-xs font-bold text-red-500 hover:bg-[var(--bg-hover)] rounded-lg transition">🔒 Khóa App</button></div> )}
+              {isToolsOpen && ( 
+                <div className="absolute right-0 top-full mt-2 w-56 cms-card shadow-2xl flex flex-col p-2 z-[100] border cms-border fade-in">
+                  <div className="px-2 py-1 text-[10px] uppercase text-muted font-bold tracking-wider mb-1">Giao diện</div>
+                  <div className="flex gap-1 px-1 mb-3">
+                    <button onClick={() => changeTheme('light')} className="flex-1 py-1.5 rounded text-[11px] font-bold cms-input hover:opacity-80 transition border cms-border">Sáng</button>
+                    <button onClick={() => changeTheme('dark')} className="flex-1 py-1.5 rounded text-[11px] font-bold cms-input hover:opacity-80 transition border cms-border">Tối</button>
+                    <button onClick={() => changeTheme('read')} className="flex-1 py-1.5 rounded text-[11px] font-bold cms-input hover:opacity-80 transition border cms-border text-[#D35400]">Sách</button>
+                  </div>
+                  <hr className="cms-border my-1 border-t" />
+                  <button onClick={()=>setIsPomoOpen(!isPomoOpen)} className="text-left px-3 py-2.5 text-xs font-bold hover:bg-[var(--bg-hover)] rounded-lg transition">🍅 Pomodoro</button>
+                  <button onClick={() => window.open('https://vietndj.github.io/tin.html', '_blank')} className="text-left px-3 py-2.5 text-xs font-bold hover:bg-[var(--bg-hover)] rounded-lg transition">📖 Mở Reader</button>
+                  <button onClick={compileAllForNotebookLM} className="text-left px-3 py-2.5 text-xs font-bold text-[#8E44AD] hover:bg-[var(--bg-hover)] rounded-lg transition">🤖 Xuất Sách AI</button>
+                  <hr className="cms-border my-1 border-t" />
+                  <button onClick={() => {localStorage.removeItem("cms_auth"); setIsAuthenticated(false);}} className="text-left px-3 py-2.5 text-xs font-bold text-red-500 hover:bg-[var(--bg-hover)] rounded-lg transition">🔒 Khóa App</button>
+                </div> 
+              )}
             </div>
           </div>
+
         </div>
       </div>
 
@@ -509,7 +573,45 @@ export default function App() {
 
       {/* CÁC WIDGET & MODAL PHỤ */}
       {bulkSet.size > 0 && (<div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-[100] cms-card px-6 py-3 rounded-full shadow-2xl flex items-center gap-4 fade-in"><span className="text-sm font-bold whitespace-nowrap"><span className="text-[var(--accent)] text-base">{bulkSet.size}</span> chọn</span><div className="h-4 w-px bg-[var(--border)]"></div><button onClick={() => setActiveModal({type: 'bulkMove'})} className="text-sm font-bold text-[var(--accent)] hover:opacity-80">Chuyển Repo</button><button onClick={() => setBulkSet(new Set())} className="text-sm font-bold text-muted hover:text-red-500 ml-2">Hủy</button></div>)}
-      {isPomoOpen && (<div className="fixed bottom-6 right-6 w-72 cms-card z-[100] p-4 shadow-2xl border cms-border fade-in"><div className="flex justify-between items-center font-bold text-sm mb-4 border-b cms-border pb-2"><span><svg className="w-4 h-4 inline pb-0.5 text-[#FF9500]"><use href="#icon-timer"></use></svg> Pomodoro</span><span onClick={()=>setIsPomoOpen(false)} className="cursor-pointer text-red-500 font-bold">✕</span></div><div className="text-4xl font-black text-center mb-4 font-mono text-[var(--accent)]">25:00</div><button className="w-full cms-btn-primary py-2 rounded-xl text-xs font-bold">BẮT ĐẦU</button></div>)}
+      
+      {/* POMODORO KHÔI PHỤC */}
+      {isPomoOpen && (
+        <div className="fixed bottom-6 right-6 w-72 cms-card z-[100] p-4 shadow-2xl border cms-border fade-in">
+           <div className="flex justify-between items-center font-bold text-sm mb-4 border-b cms-border pb-2">
+              <span><svg className="w-4 h-4 inline pb-0.5 text-[#FF9500]"><use href="#icon-timer"></use></svg> Pomodoro</span>
+              <div>
+                 <span onClick={() => setIsWebhookSettingsOpen(!isWebhookSettingsOpen)} className="cursor-pointer mr-3 text-muted hover:text-[var(--accent)]">⚙️</span>
+                 <span onClick={()=>setIsPomoOpen(false)} className="cursor-pointer text-red-500 font-bold">✕</span>
+              </div>
+           </div>
+           
+           <div className="flex gap-2 mb-4">
+              <button onClick={() => setPomoTime(1500)} className="flex-1 cms-btn-primary py-1.5 rounded-lg text-xs font-bold">25 Phút</button>
+              <button onClick={() => setPomoTime(300)} className="flex-1 cms-input border cms-border py-1.5 rounded-lg text-xs font-bold text-muted">5 Phút</button>
+           </div>
+
+           <div className="text-4xl font-black text-center mb-4 font-mono text-[var(--accent)]">
+              {Math.floor(pomoTime / 60).toString().padStart(2, '0')}:{(pomoTime % 60).toString().padStart(2, '0')}
+           </div>
+           
+           <input type="text" value={pomoTask} onChange={(e) => setPomoTask(e.target.value)} className="w-full cms-input border cms-border px-3 py-2 rounded-lg text-sm mb-4" placeholder="Bạn đang làm gì?" />
+           
+           <div className="flex gap-2">
+              <button onClick={() => setIsPomoActive(!isPomoActive)} className={`flex-1 py-2 rounded-xl text-xs font-bold transition ${isPomoActive ? 'bg-[#FF9500] text-white' : 'cms-btn-primary'}`}>
+                {isPomoActive ? 'DỪNG LẠI' : 'BẮT ĐẦU'}
+              </button>
+              <button onClick={() => { setIsPomoActive(false); setPomoTime(1500); }} className="px-4 py-2 cms-input border cms-border rounded-xl text-xs font-bold transition hover:opacity-80">Reset</button>
+           </div>
+
+           {isWebhookSettingsOpen && (
+              <div className="mt-4 pt-3 border-t cms-border">
+                  <input type="text" value={pomoWebhook} onChange={(e) => {setPomoWebhook(e.target.value); localStorage.setItem('cms_pomo_webhook', e.target.value)}} placeholder="Ntfy Topic (VD: vietndj)" className="w-full cms-input border cms-border px-3 py-2 text-xs mb-2 rounded-lg" />
+                  <p className="text-[10px] text-muted">WebHook này sẽ báo về điện thoại khi hết giờ.</p>
+              </div>
+           )}
+        </div>
+      )}
+
       {status.text && (<div className="fixed bottom-6 left-6 z-[9999] cms-card px-4 py-2 rounded-xl shadow-lg flex items-center gap-2 text-sm font-bold border-l-4 border-l-[var(--accent)] fade-in bg-[var(--bg-card)]">{status.text}</div>)}
       {activeModal.type && (<div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[999999] flex items-center justify-center fade-in"><div className="cms-card p-6 max-w-sm w-full mx-4 border cms-border"><h3 className="text-xl font-bold mb-4 capitalize">Tác vụ: {activeModal.type}</h3><p className="text-sm text-muted mb-6">Tính năng này đang được React hóa trong bản cập nhật sau.</p><div className="flex justify-end gap-3"><button onClick={() => setActiveModal({type: null, data: null})} className="cms-btn px-5 py-2 rounded-lg text-sm font-bold">Đóng</button></div></div></div>)}
 
