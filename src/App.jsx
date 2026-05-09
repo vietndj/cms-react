@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 
 // ==========================================
-// 1. TIỆN ÍCH GITHUB API (Self-healing)
+// TIỆN ÍCH GITHUB API (Self-healing)
 // ==========================================
 const username = 'vietndj';
 const safeEnc = (fn) => { try { fn = decodeURIComponent(fn); } catch(e){} return encodeURIComponent(fn); };
@@ -40,7 +40,7 @@ const parsePreview = (html) => {
 };
 
 // ==========================================
-// 2. ICON SVG COMPONENT
+// ICON SVG COMPONENT
 // ==========================================
 const SVGIcons = () => (
   <svg style={{ display: 'none' }}>
@@ -55,12 +55,10 @@ const SVGIcons = () => (
 );
 
 export default function App() {
-  // --- STATE AUTH ---
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [pin, setPin] = useState('');
   
-  // --- STATE EDITOR ---
-  const [isEditorOpen, setIsEditorOpen] = useState(true);
+  const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [token, setToken] = useState('');
   const [repo, setRepo] = useState(() => localStorage.getItem('cms_last_repo') || `${username}/${username}.github.io`);
@@ -69,10 +67,10 @@ export default function App() {
   const [tags, setTags] = useState('');
   const [content, setContent] = useState('');
   
-  // --- STATE DATABASE & BỘ LỌC ---
   const [db, setDb] = useState({ files: [], repos: {}, tags: {}, pinned: [], links: {}, colors: {}, titles: {}, tasks: [], customCol: [] });
   const [status, setStatus] = useState({ text: '', type: '' });
   const [isSyncing, setIsSyncing] = useState(false);
+  
   const [searchQuery, setSearchQuery] = useState('');
   const [isDeepSearch, setIsDeepSearch] = useState(false);
   const [currentView, setCurrentView] = useState('list');
@@ -80,22 +78,17 @@ export default function App() {
   const [activeRepo, setActiveRepo] = useState('all');
   const [activeTag, setActiveTag] = useState('all');
 
-  // --- STATE UI HEADER (MENU CÔNG CỤ) ---
   const [isToolsOpen, setIsToolsOpen] = useState(false);
   const toolsMenuRef = useRef(null);
 
-  // Đóng menu khi bấm ra ngoài
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (toolsMenuRef.current && !toolsMenuRef.current.contains(event.target)) {
-        setIsToolsOpen(false);
-      }
+      if (toolsMenuRef.current && !toolsMenuRef.current.contains(event.target)) setIsToolsOpen(false);
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Khởi tạo
   useEffect(() => {
     if (localStorage.getItem("cms_auth") === "granted") setIsAuthenticated(true);
     const savedToken = localStorage.getItem('github_pat');
@@ -121,7 +114,7 @@ export default function App() {
   const changeTheme = (theme) => {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('cms_theme', theme);
-    setIsToolsOpen(false); // Đóng menu sau khi chọn theme
+    setIsToolsOpen(false); 
   };
 
   const autoSlugify = (val, currentTags) => {
@@ -137,11 +130,8 @@ export default function App() {
 
   const toggleTag = (t) => {
     let currentTags = tags.split(',').map(x => x.trim()).filter(Boolean);
-    if (currentTags.includes(t)) {
-        currentTags = currentTags.filter(x => x !== t); 
-    } else {
-        currentTags.push(t); 
-    }
+    if (currentTags.includes(t)) currentTags = currentTags.filter(x => x !== t); 
+    else currentTags.push(t); 
     const newTagsStr = currentTags.join(', ');
     setTags(newTagsStr);
     autoSlugify(title, newTagsStr);
@@ -161,15 +151,8 @@ export default function App() {
           reposMap[f.repoName].push(f);
         });
         setDb({
-          files: dbData.allFiles,
-          repos: reposMap,
-          tags: meta?.tags || {},
-          pinned: meta?.pinned || [],
-          links: meta?.links || {},
-          colors: meta?.colors || {},
-          titles: meta?.titles || {},
-          tasks: meta?.tasks || [],
-          customCol: meta?.customCol || []
+          files: dbData.allFiles, repos: reposMap, tags: meta?.tags || {}, pinned: meta?.pinned || [],
+          links: meta?.links || {}, colors: meta?.colors || {}, titles: meta?.titles || {}, tasks: meta?.tasks || [], customCol: meta?.customCol || []
         });
         setStatus({ text: '✅ Đã đồng bộ Database!', type: 'success' });
         setTimeout(() => setStatus({ text: '', type: '' }), 3000);
@@ -198,16 +181,14 @@ export default function App() {
       const resHTML = await fetch(`https://api.github.com/repos/${rOwner}/${rName}/contents/${safeEnc(filename)}`, {
           method: 'PUT', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(bodyHTML)
       });
-      if (!resHTML.ok) throw new Error("Lỗi khi ghi file HTML lên GitHub");
+      if (!resHTML.ok) throw new Error("Lỗi khi ghi HTML");
       const resHTMLData = await resHTML.json();
 
       setStatus({ text: 'Đang đồng bộ Metadata & CMS DB...', type: 'loading' });
       let newTags = { ...db.tags };
       let tagArr = tags.split(',').map(x => x.trim()).filter(Boolean);
       if (tagArr.length) newTags[fileKey] = tagArr; else delete newTags[fileKey];
-
-      let newTitles = { ...db.titles };
-      newTitles[fileKey] = title;
+      let newTitles = { ...db.titles }; newTitles[fileKey] = title;
 
       let newFiles = [...db.files];
       let fileIndex = newFiles.findIndex(f => f.sha === fileSha || (f.repoName === rName && f.fileName === filename));
@@ -229,13 +210,13 @@ export default function App() {
       }, null, 2));
       const metaSha = await getFileShaSafe(`${username}/${username}.github.io`, 'metadata.json', token);
       await fetch(`https://api.github.com/repos/${username}/${username}.github.io/contents/metadata.json`, {
-          method: 'PUT', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ message: 'Sync Meta (React)', content: metaContent, sha: metaSha || undefined })
+          method: 'PUT', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ message: 'Sync Meta', content: metaContent, sha: metaSha || undefined })
       });
 
       const dbContent = await encodeBase64UTF8Async(JSON.stringify({ allFiles: newDbState.files }));
       const dbSha = await getFileShaSafe(`${username}/${username}.github.io`, 'cms_db.json', token);
       await fetch(`https://api.github.com/repos/${username}/${username}.github.io/contents/cms_db.json`, {
-          method: 'PUT', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ message: 'Sync DB (React)', content: dbContent, sha: dbSha || undefined })
+          method: 'PUT', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ message: 'Sync DB', content: dbContent, sha: dbSha || undefined })
       });
 
       setDb(newDbState);
@@ -265,6 +246,7 @@ export default function App() {
       const matchRepo = activeRepo === 'all' || f.repoName === activeRepo;
       const matchTag = activeTag === 'all' || getFileTags(f.repoName, f.fileName).includes(activeTag);
       const sq = searchQuery.toLowerCase();
+      // Logic Tìm kiếm sâu vẫn hoạt động ngầm ở đây:
       const matchSearch = !sq || (f.name || "").toLowerCase().includes(sq) || (f.repoName || "").toLowerCase().includes(sq) || (isDeepSearch && (f.preview || "").toLowerCase().includes(sq));
       return matchRepo && matchTag && matchSearch;
     });
@@ -319,21 +301,43 @@ export default function App() {
         </div>
       );
     }
-    return (
-      <div key={file.sha} className="cms-card p-4 flex flex-col relative group hover:scale-[1.01] transition border cms-border">
-        <div className="pl-2">
-          <div className="text-[10px] text-muted flex items-center gap-1 mb-2 font-bold uppercase tracking-wide"><svg className="w-3 h-3"><use href="#icon-folder"></use></svg> {file.repoName}</div>
-          <a href={file.url} target="_blank" rel="noreferrer" className="font-bold text-[15px] hover:text-[var(--accent)] mb-2 line-clamp-2">{file.name}</a>
-          {tagsList.length > 0 && (
-            <div className="flex flex-wrap gap-1 mb-2">
-              {tagsList.map(t => <span key={t} className="cms-input text-[10px] px-2 py-0.5 rounded font-bold border cms-border flex items-center gap-1 opacity-90"><svg className="w-2.5 h-2.5 opacity-60"><use href="#icon-tag"></use></svg>{t}</span>)}
+    
+    // Giao diện List View
+    if (currentView === 'list') {
+      return (
+        <div key={file.sha} className="cms-card p-4 flex flex-col relative group hover:scale-[1.01] transition border cms-border">
+          <input type="checkbox" className="absolute top-5 left-4 w-4 h-4 z-10 cursor-pointer accent-[var(--accent)]" />
+          <div className="pl-6">
+            <a href={file.url} target="_blank" rel="noreferrer" className="font-bold text-[15px] hover:text-[var(--accent)] hover:underline mb-2 line-clamp-2">{file.name}</a>
+            {tagsList.length > 0 && (
+              <div className="flex flex-wrap gap-1 mb-2">
+                {tagsList.map(t => <span key={t} className="cms-input text-[10px] px-2 py-0.5 rounded font-bold border cms-border flex items-center gap-1 opacity-90"><svg className="w-2.5 h-2.5 opacity-60"><use href="#icon-tag"></use></svg>{t}</span>)}
+              </div>
+            )}
+          </div>
+          <div className="flex justify-between items-center mt-auto pt-3 border-t cms-border">
+            <span className="text-[10px] opacity-60">{file.fullDate}</span>
+            <div className="flex gap-2">
+               <button className="text-muted hover:text-[var(--accent)] transition"><svg className="w-4 h-4"><use href="#icon-tag"></use></svg></button>
+               <button className="text-[var(--accent)] font-bold text-sm ml-2">Sửa</button>
             </div>
-          )}
-          <div className="text-xs text-muted line-clamp-2 mb-4">{file.preview || '...'}</div>
+          </div>
         </div>
-        <div className="flex justify-between items-center mt-auto pt-3 border-t cms-border">
-          <span className="text-[10px] opacity-60">{file.fullDate}</span>
-          <button className="cms-btn px-4 py-1.5 rounded-lg text-xs font-bold transition">Sửa</button>
+      );
+    }
+
+    // Giao diện Grid View
+    return (
+      <div key={file.sha} className="cms-card flex flex-col relative overflow-hidden group hover:scale-[1.02] transition border cms-border">
+        <div className="h-24 cms-input flex items-center justify-center border-b cms-border overflow-hidden opacity-50 font-bold text-center p-4">{file.name}</div>
+        <div className="p-4 flex flex-col flex-1">
+          <span className="text-[10px] uppercase font-bold text-muted mb-2"><svg className="w-3 h-3 inline"><use href="#icon-folder"></use></svg> {file.repoName}</span>
+          <a href={file.url} target="_blank" rel="noreferrer" className="font-bold text-lg mb-2 line-clamp-2 hover:underline">{file.name}</a>
+          <div className="text-sm opacity-70 line-clamp-3 flex-1 mb-4">{file.preview}</div>
+          <div className="flex justify-between items-center pt-3 border-t cms-border">
+            <span className="text-[10px] opacity-60">{file.fullDate}</span>
+            <button className="cms-btn px-4 py-1.5 rounded-lg text-xs font-bold transition">Sửa</button>
+          </div>
         </div>
       </div>
     );
@@ -342,186 +346,151 @@ export default function App() {
   return (
     <div className="flex-col w-full min-h-screen fade-in flex bg-[var(--bg-body)]">
       <SVGIcons />
-      <header className="cms-glass sticky top-0 z-[60] py-3 px-4 md:px-6 lg:px-8 flex flex-col sm:flex-row justify-between items-center gap-4 transition-all border-b cms-border shadow-sm">
-        <h1 className="text-xl font-bold tracking-tight shrink-0 text-[var(--accent)] hidden sm:block">vietndj</h1>
-        <div className="flex-1 w-full max-w-2xl flex items-center gap-2">
-          <div className="flex-1 flex items-center bg-[var(--bg-card)] rounded-xl px-4 py-2 w-full border cms-border shadow-sm">
-            <svg className="svg-icon text-muted"><use href="#icon-search"></use></svg>
-            <input type="text" value={searchQuery} onChange={(e)=>setSearchQuery(e.target.value)} placeholder="Tìm bài viết, repo... (Ctrl K)" className="bg-transparent border-none outline-none text-sm w-full ml-3 font-bold placeholder-[var(--text-muted)]" />
-          </div>
-        </div>
-        
-        {/* ========================================== */}
-        {/* MENU CÔNG CỤ VÀ CÁC NÚT HEADER ĐƯỢC KHÔI PHỤC */}
-        {/* ========================================== */}
-        <div className="flex items-center gap-2 shrink-0 relative" ref={toolsMenuRef}>
-          <button onClick={loadDatabase} className="hidden lg:block cms-btn px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1 outline-none">
-            ↻ Tải DB Lõi
-          </button>
-          <button className="cms-btn px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1 outline-none">
-            📝 Việc
-          </button>
+      
+      {/* 1. KHỐI HEADER TRÊN CÙNG (Tìm kiếm + Tool) GIỐNG HỆT ẢNH BẠN GỬI */}
+      <div className="bg-[var(--bg-card)] border-b cms-border pt-4 pb-3">
+        <div className="max-w-[1600px] mx-auto px-4 md:px-6 lg:px-8 flex flex-col md:flex-row items-center gap-4">
           
-          <div className="relative">
-            <button onClick={() => setIsToolsOpen(!isToolsOpen)} className="cms-btn px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1 outline-none">
-              Công cụ ▾
-            </button>
+          <h1 className="text-2xl font-bold tracking-tight text-[var(--accent)] w-full md:w-[120px] text-center md:text-left">vietndj</h1>
+          
+          <div className="flex-1 flex w-full items-center gap-2">
+            <div className="flex-1 flex items-center bg-[var(--bg-hover)] rounded-xl px-4 py-2 border border-transparent focus-within:border-[var(--accent)] transition-all">
+              <svg className="svg-icon text-muted"><use href="#icon-search"></use></svg>
+              <input type="text" value={searchQuery} onChange={(e)=>setSearchQuery(e.target.value)} placeholder="Tìm bài viết, repo... (Ctrl K)" className="bg-transparent border-none outline-none text-sm w-full ml-3 font-bold placeholder-[var(--text-muted)]" />
+            </div>
             
-            {/* Dropdown Menu */}
-            {isToolsOpen && (
-              <div className="absolute right-0 top-full mt-2 w-56 cms-card shadow-2xl flex flex-col p-2 z-[100] border cms-border fade-in">
-                <div className="px-2 py-1 text-[10px] uppercase text-muted font-bold tracking-wider mb-1">Giao diện</div>
-                <div className="flex gap-1 px-1 mb-3">
-                  <button onClick={() => changeTheme('light')} className="flex-1 py-1.5 rounded text-[11px] font-bold cms-input hover:opacity-80 transition border cms-border">Sáng</button>
-                  <button onClick={() => changeTheme('dark')} className="flex-1 py-1.5 rounded text-[11px] font-bold cms-input hover:opacity-80 transition border cms-border">Tối</button>
-                  <button onClick={() => changeTheme('read')} className="flex-1 py-1.5 rounded text-[11px] font-bold cms-input hover:opacity-80 transition border cms-border text-[#D35400]">Sách</button>
+            {/* Nút Tìm kiếm sâu (Deep Search) chuẩn ảnh */}
+            <button onClick={() => setIsDeepSearch(!isDeepSearch)} className={`shrink-0 px-4 py-2 rounded-xl text-sm font-bold transition flex items-center gap-1.5 border cms-border ${isDeepSearch ? 'bg-[var(--accent)] text-white' : 'bg-transparent text-[var(--text-main)] hover:bg-[var(--bg-hover)]'}`}>
+              <svg className="w-4 h-4"><use href="#icon-grid"></use></svg> Sâu
+            </button>
+          </div>
+          
+          <div className="flex items-center gap-2 shrink-0 relative w-full md:w-auto justify-center" ref={toolsMenuRef}>
+            <button onClick={loadDatabase} className="hidden lg:block cms-btn px-3 py-2 rounded-xl text-xs font-bold transition outline-none">↻ Tải DB Lõi</button>
+            <button className="cms-btn px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1 outline-none">📝 Việc</button>
+            <div className="relative">
+              <button onClick={() => setIsToolsOpen(!isToolsOpen)} className="cms-btn px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1 outline-none">Công cụ ▾</button>
+              {isToolsOpen && (
+                <div className="absolute right-0 top-full mt-2 w-56 cms-card shadow-2xl flex flex-col p-2 z-[100] border cms-border fade-in">
+                  <div className="px-2 py-1 text-[10px] uppercase text-muted font-bold tracking-wider mb-1">Giao diện</div>
+                  <div className="flex gap-1 px-1 mb-3">
+                    <button onClick={() => changeTheme('light')} className="flex-1 py-1.5 rounded text-[11px] font-bold cms-input hover:opacity-80 transition border cms-border">Sáng</button>
+                    <button onClick={() => changeTheme('dark')} className="flex-1 py-1.5 rounded text-[11px] font-bold cms-input hover:opacity-80 transition border cms-border">Tối</button>
+                    <button onClick={() => changeTheme('read')} className="flex-1 py-1.5 rounded text-[11px] font-bold cms-input hover:opacity-80 transition border cms-border text-[#D35400]">Sách</button>
+                  </div>
+                  <hr className="cms-border my-1 border-t" />
+                  <button className="text-left px-3 py-2.5 text-xs font-bold hover:bg-[var(--bg-hover)] rounded-lg transition">🍅 Pomodoro</button>
+                  <button onClick={() => {localStorage.removeItem("cms_auth"); setIsAuthenticated(false);}} className="text-left px-3 py-2.5 text-xs font-bold text-red-500 hover:bg-[var(--bg-hover)] rounded-lg transition">🔒 Khóa App</button>
                 </div>
-                <hr className="cms-border my-1 border-t" />
-                <button className="text-left px-3 py-2.5 text-xs font-bold hover:bg-[var(--bg-hover)] rounded-lg transition">🍅 Pomodoro</button>
-                <button className="text-left px-3 py-2.5 text-xs font-bold hover:bg-[var(--bg-hover)] rounded-lg transition">📁 Tạo Kho mới</button>
-                <button onClick={() => window.location.href='tin.html'} className="text-left px-3 py-2.5 text-xs font-bold hover:bg-[var(--bg-hover)] rounded-lg transition">📖 Mở Reader</button>
-                <button onClick={() => window.location.href='vscode://'} className="text-left px-3 py-2.5 text-xs font-bold hover:bg-[var(--bg-hover)] rounded-lg transition">💻 Mở Code</button>
-                <button className="text-left px-3 py-2.5 text-xs font-bold text-[#8E44AD] hover:bg-[var(--bg-hover)] rounded-lg transition">🤖 Xuất Sách AI</button>
-                <hr className="cms-border my-1 border-t" />
-                <button onClick={() => {localStorage.removeItem("cms_auth"); setIsAuthenticated(false);}} className="text-left px-3 py-2.5 text-xs font-bold text-red-500 hover:bg-[var(--bg-hover)] rounded-lg transition">🔒 Khóa App</button>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
-      </header>
+      </div>
 
-      <div className="sticky top-[60px] lg:top-[68px] z-40 bg-[var(--bg-body)]/95 backdrop-blur-md border-b cms-border py-2 mb-6">
-        <div className="max-w-[1600px] mx-auto px-4 md:px-6 lg:px-8 flex flex-col gap-2">
+      {/* 2. KHỐI BỘ LỌC BÊN DƯỚI GIỐNG HỆT ẢNH BẠN GỬI */}
+      <div className="bg-[var(--bg-body)] border-b cms-border py-4 mb-6">
+        <div className="max-w-[1600px] mx-auto px-4 md:px-6 lg:px-8 flex flex-col gap-4">
+          
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-1">
-              <span className="text-[10px] font-bold text-muted uppercase mr-2">View</span>
-              <div className="flex bg-[var(--bg-card)] p-1 rounded-lg border cms-border shadow-sm">
-                <button onClick={() => setCurrentView('list')} className={`px-3 py-1 rounded-md text-xs font-bold transition ${currentView === 'list' ? 'bg-[var(--bg-body)] shadow-sm border cms-border text-[var(--text-main)]' : 'text-muted hover:text-[var(--text-main)]'}`}>List</button>
-                <button onClick={() => setCurrentView('grid')} className={`px-3 py-1 rounded-md text-xs font-bold transition ${currentView === 'grid' ? 'bg-[var(--bg-body)] shadow-sm border cms-border text-[var(--text-main)]' : 'text-muted hover:text-[var(--text-main)]'}`}>Grid</button>
+            <div className="flex items-center gap-3">
+              <span className="text-[10px] font-bold text-muted uppercase w-[40px]">VIEW</span>
+              <div className="flex bg-[var(--bg-hover)] p-1 rounded-lg border cms-border">
+                {['List', 'Grid', 'Kanban', 'Table', 'Feed'].map(v => (
+                  <button key={v} onClick={() => setCurrentView(v.toLowerCase())} className={`px-4 py-1 rounded-md text-xs font-bold transition ${currentView === v.toLowerCase() ? 'bg-[var(--bg-card)] shadow-sm text-[var(--text-main)]' : 'text-muted hover:text-[var(--text-main)]'}`}>
+                    {v}
+                  </button>
+                ))}
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <div className="flex bg-[var(--bg-card)] p-1 rounded-lg border cms-border shadow-sm">
-                <button onClick={() => setSortOrder('desc')} className={`px-3 py-1 rounded-md text-xs font-bold transition ${sortOrder === 'desc' ? 'bg-[var(--bg-body)] shadow-sm border cms-border' : 'text-muted'}`}>Mới ↓</button>
-                <button onClick={() => setSortOrder('asc')} className={`px-3 py-1 rounded-md text-xs font-bold transition ${sortOrder === 'asc' ? 'bg-[var(--bg-body)] shadow-sm border cms-border' : 'text-muted'}`}>Cũ ↑</button>
+              <div className="flex bg-[var(--bg-hover)] p-1 rounded-lg border cms-border">
+                <button onClick={() => setSortOrder('desc')} className={`px-4 py-1 rounded-md text-xs font-bold transition ${sortOrder === 'desc' ? 'bg-[var(--bg-card)] shadow-sm' : 'text-muted'}`}>Mới ↓</button>
+                <button onClick={() => setSortOrder('asc')} className={`px-4 py-1 rounded-md text-xs font-bold transition ${sortOrder === 'asc' ? 'bg-[var(--bg-card)] shadow-sm' : 'text-muted'}`}>Cũ ↑</button>
               </div>
-              <button onClick={loadDatabase} className="cms-btn bg-[var(--bg-card)] px-3 py-1.5 rounded-lg text-xs font-bold text-[var(--accent)] shadow-sm">{isSyncing ? '⏳...' : '↻ Tải lại'}</button>
+              <button onClick={loadDatabase} className="cms-btn px-4 py-1.5 rounded-lg text-xs font-bold text-[var(--accent)] border cms-border shadow-sm bg-[var(--bg-card)]">{isSyncing ? '⏳...' : '↻ Tải lại'}</button>
             </div>
           </div>
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 mt-1 scrollbar-hide">
-             <span className="text-[10px] font-bold text-muted uppercase shrink-0 mr-2 flex items-center gap-1"><svg className="w-3 h-3"><use href="#icon-folder"></use></svg> Kho</span>
-             <button onClick={() => setActiveRepo('all')} className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition whitespace-nowrap ${activeRepo === 'all' ? 'bg-[var(--accent)] text-white border-transparent' : 'bg-[var(--bg-card)] text-[var(--text-main)] border-[var(--border)] hover:bg-[var(--bg-hover)]'}`}>Tất cả</button>
-             {Object.keys(db.repos).map(r => (<button key={r} onClick={() => setActiveRepo(r)} className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition whitespace-nowrap ${activeRepo === r ? 'bg-[var(--accent)] text-white border-transparent' : 'bg-[var(--bg-card)] text-[var(--text-main)] border-[var(--border)] hover:bg-[var(--bg-hover)]'}`}>{r} <span className="opacity-60 font-normal">({db.repos[r].length})</span></button>))}
+
+          <div className="flex items-center gap-3 overflow-x-auto scrollbar-hide">
+             <span className="text-[10px] font-bold text-muted uppercase w-[40px] shrink-0 flex items-center gap-1"><svg className="w-3 h-3"><use href="#icon-folder"></use></svg> KHO</span>
+             <div className="flex gap-2">
+               <button onClick={() => setActiveRepo('all')} className={`px-4 py-1.5 text-xs font-bold rounded-lg transition whitespace-nowrap ${activeRepo === 'all' ? 'bg-[var(--accent)] text-white' : 'bg-[var(--bg-hover)] hover:bg-gray-200 dark:hover:bg-gray-800'}`}>Tất cả</button>
+               {Object.keys(db.repos).map(r => (
+                 <button key={r} onClick={() => setActiveRepo(r)} className={`px-4 py-1.5 text-xs font-bold rounded-lg transition whitespace-nowrap ${activeRepo === r ? 'bg-[var(--accent)] text-white' : 'bg-[var(--bg-hover)] hover:bg-gray-200 dark:hover:bg-gray-800'}`}>
+                   {r} <span className="opacity-60 font-normal">({db.repos[r].length})</span>
+                 </button>
+               ))}
+             </div>
           </div>
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
-             <span className="text-[10px] font-bold text-muted uppercase shrink-0 mr-2 flex items-center gap-1"><svg className="w-3 h-3"><use href="#icon-tag"></use></svg> Nhãn</span>
-             <button onClick={() => setActiveTag('all')} className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition whitespace-nowrap ${activeTag === 'all' ? 'bg-[var(--accent)] text-white border-transparent' : 'bg-[var(--bg-card)] text-[var(--text-main)] border-[var(--border)] hover:bg-[var(--bg-hover)]'}`}>Tất cả</button>
-             {allUniqueTags.map(t => (<button key={t} onClick={() => setActiveTag(t)} className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition whitespace-nowrap ${activeTag === t ? 'bg-[var(--accent)] text-white border-transparent' : 'bg-[var(--bg-card)] text-[var(--text-main)] border-[var(--border)] hover:bg-[var(--bg-hover)]'}`}>{t}</button>))}
+
+          <div className="flex items-center gap-3 overflow-x-auto scrollbar-hide">
+             <span className="text-[10px] font-bold text-muted uppercase w-[40px] shrink-0 flex items-center gap-1"><svg className="w-3 h-3"><use href="#icon-tag"></use></svg> NHÃN</span>
+             <div className="flex gap-2">
+               <button onClick={() => setActiveTag('all')} className={`px-4 py-1.5 text-xs font-bold rounded-lg transition whitespace-nowrap ${activeTag === 'all' ? 'bg-[var(--accent)] text-white' : 'bg-[var(--bg-hover)] hover:bg-gray-200 dark:hover:bg-gray-800'}`}>Tất cả</button>
+               {allUniqueTags.map(t => (
+                 <button key={t} onClick={() => setActiveTag(t)} className={`px-4 py-1.5 text-xs font-bold rounded-lg transition whitespace-nowrap ${activeTag === t ? 'bg-[var(--accent)] text-white' : 'bg-[var(--bg-hover)] hover:bg-gray-200 dark:hover:bg-gray-800'}`}>
+                   {t}
+                 </button>
+               ))}
+               {allUniqueTags.length > 0 && <button className="px-3 py-1 text-xs font-bold rounded-lg border border-[var(--accent)] text-[var(--accent)] hover:bg-[var(--accent)] hover:text-white transition shrink-0">⚙ Sửa</button>}
+             </div>
           </div>
+
         </div>
       </div>
       
       <main className="flex-1 w-full max-w-[1600px] mx-auto px-4 md:px-6 lg:px-8 pb-20">
         
+        {/* ========================================= */}
+        {/* KHỐI SOẠN THẢO HTML (Tối ưu trải nghiệm gõ) */}
         <section className="cms-card overflow-hidden mb-8 shadow-sm">
           <button onClick={() => setIsEditorOpen(!isEditorOpen)} className="w-full px-6 py-4 flex justify-between items-center hover:bg-[var(--bg-hover)] font-semibold text-[var(--accent)] outline-none border-b cms-border">
             <span className="flex items-center gap-2"><svg className="svg-icon"><use href="#icon-edit"></use></svg> Soạn thảo HTML</span>
             <span style={{ transform: isEditorOpen ? 'rotate(180deg)' : 'rotate(0deg)' }} className="transition-transform">▼</span>
           </button>
-
           {isEditorOpen && (
             <div className="p-6 bg-[var(--bg-card)] fade-in flex flex-col gap-5">
-              
               <div>
                  <label className="block text-[11px] font-bold text-muted mb-2 uppercase">📁 Lưu vào Kho</label>
                  <div className="flex flex-wrap gap-2">
                     {repoKeysList.map(r => {
-                       const fullPath = `${username}/${r}`;
-                       const isActive = repo === fullPath;
-                       return (
-                          <button
-                             key={r}
-                             onClick={() => { setRepo(fullPath); localStorage.setItem('cms_last_repo', fullPath); }}
-                             className={`px-3 py-1.5 text-xs font-bold rounded-lg transition border ${isActive ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-md' : 'bg-[var(--bg-hover)] text-[var(--text-main)] border-transparent hover:opacity-80'}`}
-                          >
-                             {r}
-                          </button>
-                       )
+                       const fullPath = `${username}/${r}`; const isActive = repo === fullPath;
+                       return (<button key={r} onClick={() => { setRepo(fullPath); localStorage.setItem('cms_last_repo', fullPath); }} className={`px-3 py-1.5 text-xs font-bold rounded-lg transition border ${isActive ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-md' : 'bg-[var(--bg-hover)] text-[var(--text-main)] border-transparent hover:opacity-80'}`}>{r}</button>)
                     })}
                  </div>
               </div>
-
               <div>
-                 <input
-                    type="text"
-                    value={title}
-                    onChange={(e)=>autoSlugify(e.target.value, tags)}
-                    onKeyDown={(e) => { if(e.key === 'Enter') { e.preventDefault(); document.getElementById('html-content-editor')?.focus(); } }}
-                    className="w-full px-4 py-4 text-2xl font-black text-[var(--text-main)] bg-[var(--bg-hover)] border-2 border-transparent focus:border-[var(--accent)] rounded-xl outline-none transition-all placeholder:text-gray-400"
-                    placeholder="Nhập tiêu đề bài viết... (Enter để viết nội dung)"
-                 />
+                 <input type="text" value={title} onChange={(e)=>autoSlugify(e.target.value, tags)} onKeyDown={(e) => { if(e.key === 'Enter') { e.preventDefault(); document.getElementById('html-content-editor')?.focus(); } }} className="w-full px-4 py-4 text-2xl font-black text-[var(--text-main)] bg-[var(--bg-hover)] border-2 border-transparent focus:border-[var(--accent)] rounded-xl outline-none transition-all placeholder:text-gray-400" placeholder="Nhập tiêu đề bài viết... (Enter để viết nội dung)" />
               </div>
-
               <div className="bg-[var(--bg-hover)] p-4 rounded-xl border border-transparent focus-within:border-[var(--accent)] transition-all">
                  <div className="flex items-center gap-2 mb-2">
                      <svg className="w-4 h-4 text-muted"><use href="#icon-tag"></use></svg>
-                     <input
-                         type="text"
-                         value={tags}
-                         onChange={(e)=>{setTags(e.target.value); autoSlugify(title, e.target.value);}}
-                         className="flex-1 bg-transparent text-sm font-bold text-[var(--accent)] outline-none placeholder:text-muted placeholder:font-normal"
-                         placeholder="Gõ tag mới (cách bằng dấu phẩy)..."
-                     />
+                     <input type="text" value={tags} onChange={(e)=>{setTags(e.target.value); autoSlugify(title, e.target.value);}} className="flex-1 bg-transparent text-sm font-bold text-[var(--accent)] outline-none placeholder:text-muted placeholder:font-normal" placeholder="Gõ tag mới (cách bằng dấu phẩy)..." />
                  </div>
                  {allUniqueTags.length > 0 && (
                      <div className="flex flex-wrap gap-1.5 pt-3 border-t border-[var(--border)]">
                         {allUniqueTags.map(t => {
                             const isSelected = tags.split(',').map(x=>x.trim()).includes(t);
-                            return (
-                                <button
-                                   key={t}
-                                   onClick={() => toggleTag(t)}
-                                   className={`px-2.5 py-1 text-[10px] font-bold rounded-md transition border ${isSelected ? 'bg-[var(--accent)] text-white border-[var(--accent)]' : 'bg-[var(--bg-card)] text-muted border-[var(--border)] hover:opacity-80 shadow-sm'}`}
-                                >
-                                  {t}
-                                </button>
-                            )
+                            return (<button key={t} onClick={() => toggleTag(t)} className={`px-2.5 py-1 text-[10px] font-bold rounded-md transition border ${isSelected ? 'bg-[var(--accent)] text-white border-[var(--accent)]' : 'bg-[var(--bg-card)] text-muted border-[var(--border)] hover:opacity-80 shadow-sm'}`}>{t}</button>)
                         })}
                      </div>
                  )}
               </div>
-
               <div>
-                 <textarea
-                    id="html-content-editor"
-                    rows="10"
-                    value={content}
-                    onChange={(e)=>setContent(e.target.value)}
-                    className="w-full px-4 py-4 bg-[#1D1D1F] text-[#34C759] border-none rounded-xl focus:ring-2 focus:ring-[var(--accent)] font-mono text-sm leading-relaxed outline-none shadow-inner"
-                    placeholder="Nhập mã HTML vào đây..."
-                 ></textarea>
+                 <textarea id="html-content-editor" rows="10" value={content} onChange={(e)=>setContent(e.target.value)} className="w-full px-4 py-4 bg-[#1D1D1F] text-[#34C759] border-none rounded-xl focus:ring-2 focus:ring-[var(--accent)] font-mono text-sm leading-relaxed outline-none shadow-inner" placeholder="Nhập mã HTML vào đây..."></textarea>
               </div>
-
               <details className="group border cms-border rounded-xl bg-[var(--bg-hover)]">
                  <summary className="px-4 py-3 text-xs font-bold text-muted cursor-pointer flex items-center gap-2 outline-none hover:text-[var(--text-main)]">
                     <span className="group-open:rotate-90 transition-transform">▶</span> Cài đặt nâng cao (Token PAT, URL Slug)
                  </summary>
                  <div className="p-4 border-t cms-border grid grid-cols-1 md:grid-cols-2 gap-4">
-                     <div>
-                        <label className="block text-[10px] font-bold text-muted mb-1 uppercase">Mã Github PAT</label>
-                        <input type="password" value={token} onChange={(e)=>handleSaveToken(e.target.value)} className="w-full px-3 py-2 bg-[var(--bg-card)] border cms-border rounded-lg text-xs outline-none focus:border-[var(--accent)]" placeholder="Nhập Token GitHub..." />
-                     </div>
-                     <div>
-                        <label className="block text-[10px] font-bold text-muted mb-1 uppercase">Slug (URL)</label>
-                        <input type="text" value={slug} onChange={(e)=>setSlug(e.target.value)} className="w-full px-3 py-2 bg-[var(--bg-card)] border cms-border rounded-lg text-xs font-mono text-[var(--accent)] outline-none focus:border-[var(--accent)]" placeholder="kien-thuc..." />
-                     </div>
+                     <div><label className="block text-[10px] font-bold text-muted mb-1 uppercase">Mã Github PAT</label><input type="password" value={token} onChange={(e)=>handleSaveToken(e.target.value)} className="w-full px-3 py-2 bg-[var(--bg-card)] border cms-border rounded-lg text-xs outline-none focus:border-[var(--accent)]" placeholder="Nhập Token GitHub..." /></div>
+                     <div><label className="block text-[10px] font-bold text-muted mb-1 uppercase">Slug (URL)</label><input type="text" value={slug} onChange={(e)=>setSlug(e.target.value)} className="w-full px-3 py-2 bg-[var(--bg-card)] border cms-border rounded-lg text-xs font-mono text-[var(--accent)] outline-none focus:border-[var(--accent)]" placeholder="kien-thuc..." /></div>
                  </div>
               </details>
-
               <div className="flex pt-2">
-                 <button onClick={handleSaveArticle} disabled={isSaving} className="cms-btn-primary w-full md:w-auto px-10 py-4 rounded-xl shadow-lg text-sm disabled:opacity-50 hover:scale-[1.02] transition-transform">
-                    {isSaving ? '⏳ Đang lưu...' : '🚀 Lưu Bài Lên GitHub'}
-                 </button>
+                 <button onClick={handleSaveArticle} disabled={isSaving} className="cms-btn-primary w-full md:w-auto px-10 py-4 rounded-xl shadow-lg text-sm disabled:opacity-50 hover:scale-[1.02] transition-transform">{isSaving ? '⏳ Đang lưu...' : '🚀 Lưu Bài Lên GitHub'}</button>
               </div>
             </div>
           )}
@@ -543,7 +512,7 @@ export default function App() {
           Object.keys(groupedFiles).map(repoName => (
             <details key={repoName} open className="mb-8">
               <summary className="font-bold text-xl mb-4 border-b cms-border pb-2 cursor-pointer outline-none flex items-center gap-2"><svg className="w-6 h-6"><use href="#icon-folder"></use></svg> {repoName} <span className="cms-input text-xs px-2 py-0.5 rounded-full border cms-border text-muted">{groupedFiles[repoName].length}</span></summary>
-              <div className={currentView === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4' : 'grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4'}>{groupedFiles[repoName].map(f => renderCard(f, false))}</div>
+              <div className={currentView === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4' : 'flex flex-col gap-3'}>{groupedFiles[repoName].map(f => renderCard(f, false))}</div>
             </details>
           ))
         ) : (<div className="text-center py-20 text-muted font-bold text-sm">Không tìm thấy bài viết nào phù hợp.</div>)}
