@@ -1,22 +1,29 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 
 // ==========================================
-// 1. TIỆN ÍCH GITHUB API (Self-healing, No Cache-Control)
+// 1. TIỆN ÍCH GITHUB API (Self-healing)
 // ==========================================
+const username = 'vietndj'; // Hardcode theo hệ thống cũ
 const safeEnc = (fn) => { try { fn = decodeURIComponent(fn); } catch(e){} return encodeURIComponent(fn); };
+const getHeaders = (token) => token ? { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github.v3+json' } : { 'Accept': 'application/vnd.github.v3+json' };
 
-const getHeaders = (token) => token 
-  ? { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github.v3+json' } 
-  : { 'Accept': 'application/vnd.github.v3+json' };
+const fetchRawJSON = async (repoPath, file, token) => {
+  try {
+    const headers = { ...getHeaders(token), 'Accept': 'application/vnd.github.v3.raw' };
+    const res = await fetch(`https://api.github.com/repos/${repoPath}/contents/${safeEnc(file)}?t=${Date.now()}`, { headers });
+    if (res.ok) return await res.json();
+  } catch(e) {}
+  return null;
+};
 
-// Bộ Icon SVG nhúng trực tiếp để không phải sửa file index.html
+// ==========================================
+// 2. ICON SVG COMPONENT
+// ==========================================
 const SVGIcons = () => (
   <svg style={{ display: 'none' }}>
     <symbol id="icon-tag" viewBox="0 0 24 24"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></symbol>
-    <symbol id="icon-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></symbol>
+    <symbol id="icon-folder" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></symbol>
     <symbol id="icon-edit" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></symbol>
-    <symbol id="icon-trash" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></symbol>
-    <symbol id="icon-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></symbol>
   </svg>
 );
 
@@ -24,75 +31,91 @@ export default function App() {
   // --- STATE AUTH ---
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [pin, setPin] = useState('');
-  const [loginError, setLoginError] = useState(false);
   
   // --- STATE EDITOR ---
-  const [isEditorOpen, setIsEditorOpen] = useState(true); // Mở sẵn cho dễ nhìn
+  const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [token, setToken] = useState('');
-  const [repo, setRepo] = useState('vietndj/vietndj.github.io');
+  const [repo, setRepo] = useState(`${username}/${username}.github.io`);
   const [title, setTitle] = useState('');
   const [slug, setSlug] = useState('');
   const [tags, setTags] = useState('');
   const [content, setContent] = useState('');
+  
+  // --- STATE DATABASE & LỌC ---
+  const [db, setDb] = useState({ files: [], repos: {}, tags: {}, pinned: [] });
+  const [activeRepo, setActiveRepo] = useState('all');
   const [status, setStatus] = useState({ text: '', type: '' });
+  const [isSyncing, setIsSyncing] = useState(false);
 
-  // Load dữ liệu khi khởi động
+  // Khởi tạo Auth & Load Token
   useEffect(() => {
     if (localStorage.getItem("cms_auth") === "granted") setIsAuthenticated(true);
     const savedToken = localStorage.getItem('github_pat');
     if (savedToken) setToken(savedToken);
   }, []);
 
-  // Login
+  // Tự động tải DB khi đã đăng nhập và có Token
+  useEffect(() => {
+    if (isAuthenticated && token) {
+      loadDatabase();
+    }
+  }, [isAuthenticated, token]);
+
   const handleLogin = () => {
     if (pin.trim() === "0070") {
       localStorage.setItem("cms_auth", "granted");
       setIsAuthenticated(true);
-      setLoginError(false);
-    } else {
-      setLoginError(true);
-      setPin('');
-    }
+    } else alert("Mã PIN sai.");
   };
 
-  // Lưu Token
   const handleSaveToken = (val) => {
     setToken(val);
     try { localStorage.setItem('github_pat', val); } catch(err){}
   };
 
-  // Auto-Slugify (Lọc dấu tiếng Việt + gộp Tags)
-  const autoSlugify = (val, currentTags) => {
-    setTitle(val);
-    let s = val.toLowerCase().replace(/[áàảạãăắằẳẵặâấầẩẫậ]/gi,'a').replace(/[éèẻẽẹêếềểễệ]/gi,'e').replace(/[iíìỉĩị]/gi,'i').replace(/[óòỏõọôốồổỗộơớờởỡợ]/gi,'o').replace(/[úùủũụưứừửữự]/gi,'u').replace(/[ýỳỷỹỵ]/gi,'y').replace(/đ/gi,'d').replace(/\s+/g,'-').replace(/[^\w\-]+/g,'').replace(/\-\-+/g,'-').replace(/^-+|-+$/g,'');
-    let tagArr = currentTags.split(',').map(x=>x.trim()).filter(Boolean);
-    if(tagArr.length && s) { 
-        let ts = tagArr.join('-').toLowerCase().replace(/\s+/g,'-'); 
-        if(!s.includes(ts)) s += '-' + ts; 
+  // --- HÀM TẢI DATABASE CỐT LÕI ---
+  const loadDatabase = async () => {
+    if (!token || isSyncing) return;
+    setIsSyncing(true);
+    setStatus({ text: 'Đang tải Database lõi...', type: 'loading' });
+    
+    try {
+      // 1. Tải Metadata (chứa tags, pinned, links)
+      const meta = await fetchRawJSON(`${username}/${username}.github.io`, 'metadata.json', token);
+      // 2. Tải DB bài viết
+      const dbData = await fetchRawJSON(`${username}/${username}.github.io`, 'cms_db.json', token);
+      
+      if (dbData && dbData.allFiles) {
+        // Nhóm bài viết theo Repo
+        const reposMap = {};
+        dbData.allFiles.forEach(f => {
+          if(!reposMap[f.repoName]) reposMap[f.repoName] = [];
+          reposMap[f.repoName].push(f);
+        });
+
+        setDb({
+          files: dbData.allFiles,
+          repos: reposMap,
+          tags: meta?.tags || {},
+          pinned: meta?.pinned || []
+        });
+        setStatus({ text: '✅ Đã đồng bộ Database!', type: 'success' });
+        setTimeout(() => setStatus({ text: '', type: '' }), 3000);
+      } else {
+        throw new Error("Dữ liệu trống hoặc không hợp lệ");
+      }
+    } catch (e) {
+      setStatus({ text: `❌ Lỗi DB: ${e.message}`, type: 'error' });
+    } finally {
+      setIsSyncing(false);
     }
-    setSlug(s);
   };
 
-  // Gọi API thử để test CORS
-  const loadIndexFile = async () => {
-    if (!token) return alert("Cần nhập Token PAT!");
-    setStatus({ text: 'Đang tải...', type: 'loading' });
-    try {
-      const res = await fetch(`https://api.github.com/repos/${repo}/contents/index.html?t=${Date.now()}`, {
-        headers: { ...getHeaders(token), 'Accept': 'application/vnd.github.v3.raw' }
-      });
-      if (res.ok) {
-        setContent(await res.text());
-        setTitle("Trang chủ (index.html)");
-        setSlug("index.html");
-        setStatus({ text: '✅ Tải thành công index.html', type: 'success' });
-      } else {
-        throw new Error("Không tìm thấy file hoặc sai Repo");
-      }
-    } catch (e) { 
-      setStatus({ text: `❌ Lỗi: ${e.message}`, type: 'error' }); 
-    }
-  };
+  // Lọc bài viết hiển thị
+  const filteredFiles = useMemo(() => {
+    if (activeRepo === 'all') return db.files;
+    return db.files.filter(f => f.repoName === activeRepo);
+  }, [db.files, activeRepo]);
 
   // ==========================================
   // GIAO DIỆN LOGIN
@@ -101,32 +124,44 @@ export default function App() {
     return (
       <div className="flex fixed inset-0 flex-col items-center justify-center z-[99999] bg-[var(--bg-body)]">
         <div className="cms-card p-10 max-w-sm w-full mx-4 text-center shadow-2xl border cms-border">
-          <h2 className="text-2xl font-bold mb-2">Workspace</h2>
-          <p className="text-sm text-muted mb-6">Nhập mã PIN truy cập</p>
-          <input type="password" placeholder="••••" value={pin} onChange={(e) => setPin(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleLogin()} className="w-full text-center text-3xl tracking-[0.5em] font-bold px-4 py-4 cms-input rounded-2xl mb-6 border cms-border" />
+          <h2 className="text-2xl font-bold mb-2">Workspace React</h2>
+          <input type="password" placeholder="••••" value={pin} onChange={(e) => setPin(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleLogin()} className="w-full text-center text-3xl font-bold px-4 py-4 cms-input rounded-2xl mb-6 border cms-border" />
           <button onClick={handleLogin} className="w-full py-4 text-base cms-btn-primary rounded-xl shadow-md">Mở Khóa</button>
-          {loginError && <p className="text-red-500 text-sm font-bold mt-4">Mã PIN sai.</p>}
         </div>
       </div>
     );
   }
 
   // ==========================================
-  // GIAO DIỆN CHÍNH (APP)
+  // GIAO DIỆN CHÍNH
   // ==========================================
   return (
     <div className="flex-col w-full min-h-screen fade-in flex">
-      <SVGIcons /> {/* Chèn SVG Ẩn */}
+      <SVGIcons />
       
       {/* HEADER */}
-      <header className="cms-glass sticky top-0 z-[60] py-3 px-4 md:px-6 lg:px-8 flex justify-between items-center gap-4 transition-all">
+      <header className="cms-glass sticky top-0 z-[60] py-3 px-4 md:px-6 lg:px-8 flex justify-between items-center transition-all">
         <h1 className="text-xl font-bold tracking-tight text-[var(--accent)]">vietndj React</h1>
-        <button onClick={() => {localStorage.removeItem("cms_auth"); setIsAuthenticated(false)}} className="cms-btn px-3 py-2 rounded-xl text-xs font-bold text-red-500">🔒 Khóa App</button>
+        <div className="flex items-center gap-3">
+          <button onClick={loadDatabase} className="cms-btn px-3 py-2 rounded-xl text-xs font-bold text-[var(--accent)]">
+            {isSyncing ? '⏳ Đang tải...' : '↻ Tải DB'}
+          </button>
+          <button onClick={() => {localStorage.removeItem("cms_auth"); setIsAuthenticated(false)}} className="cms-btn px-3 py-2 rounded-xl text-xs font-bold text-red-500">
+            🔒 Khóa App
+          </button>
+        </div>
       </header>
+
+      {/* HIỂN THỊ TRẠNG THÁI TOAST */}
+      {status.text && (
+        <div className="fixed bottom-6 left-6 z-[9999] cms-card px-4 py-2 rounded-xl shadow-lg flex items-center gap-2 text-sm font-bold border-l-4 border-l-[var(--accent)] fade-in bg-[var(--bg-card)]">
+           {status.text}
+        </div>
+      )}
       
       <main className="flex-1 w-full max-w-[1200px] mx-auto px-4 md:px-6 lg:px-8 py-6">
         
-        {/* KHỐI EDITOR HTML */}
+        {/* KHỐI EDITOR */}
         <section className="cms-card overflow-hidden mb-6">
           <button onClick={() => setIsEditorOpen(!isEditorOpen)} className="w-full px-6 py-4 flex justify-between items-center hover:bg-[var(--bg-hover)] font-semibold text-[var(--accent)] outline-none">
             <span className="flex items-center gap-2">
@@ -134,67 +169,77 @@ export default function App() {
             </span>
             <span style={{ transform: isEditorOpen ? 'rotate(180deg)' : 'rotate(0deg)' }} className="transition-transform">▼</span>
           </button>
-
+          
           {isEditorOpen && (
             <div className="p-6 border-t cms-border bg-[var(--bg-card)] fade-in">
-              {/* Token & Repo */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                  <div>
                     <label className="block text-[11px] font-bold text-muted mb-1.5 uppercase">Mã Github PAT</label>
-                    <input type="password" value={token} onChange={(e)=>handleSaveToken(e.target.value)} className="w-full px-4 py-2.5 cms-input rounded-xl text-sm" placeholder="Nhập Token GitHub..." />
+                    <input type="password" value={token} onChange={(e)=>handleSaveToken(e.target.value)} className="w-full px-4 py-2.5 cms-input rounded-xl text-sm" placeholder="Nhập Token..." />
                  </div>
                  <div>
                     <label className="block text-[11px] font-bold text-muted mb-1.5 uppercase">Kho (Repo)</label>
                     <input type="text" value={repo} onChange={(e)=>setRepo(e.target.value)} className="w-full px-4 py-2.5 cms-input rounded-xl text-sm font-bold text-[var(--accent)]" />
                  </div>
               </div>
-
-              {/* Title & Slug */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                 <div className="md:col-span-2">
-                    <label className="block text-[11px] font-bold text-muted mb-1.5 uppercase">Tiêu đề bài viết</label>
-                    <input type="text" value={title} onChange={(e)=>autoSlugify(e.target.value, tags)} placeholder="Vd: Kiến thức lập trình..." className="w-full px-4 py-2.5 cms-input rounded-xl text-sm font-bold" />
-                 </div>
-                 <div>
-                    <label className="block text-[11px] font-bold text-muted mb-1.5 uppercase">Slug (URL)</label>
-                    <input type="text" value={slug} onChange={(e)=>setSlug(e.target.value)} placeholder="kien-thuc-lap-trinh..." className="w-full px-4 py-2.5 cms-input rounded-xl text-sm font-mono text-[var(--accent)]" />
-                 </div>
-              </div>
-
-              {/* Tags */}
               <div className="mb-4">
-                 <label className="block text-[11px] font-bold text-muted mb-1.5 uppercase flex items-center gap-1">
-                   <svg className="w-3 h-3"><use href="#icon-tag"></use></svg> Nhãn (Tags)
-                 </label>
-                 <input type="text" value={tags} onChange={(e)=>{setTags(e.target.value); autoSlugify(title, e.target.value);}} className="w-full px-4 py-2.5 cms-input rounded-xl text-sm font-bold text-[var(--accent)]" placeholder="Gõ tag (cách bằng dấu phẩy)..." />
+                 <label className="block text-[11px] font-bold text-muted mb-1.5 uppercase">Tiêu đề bài viết</label>
+                 <input type="text" value={title} onChange={(e)=>setTitle(e.target.value)} className="w-full px-4 py-2.5 cms-input rounded-xl text-sm font-bold" />
               </div>
-
-              {/* Editor */}
               <div className="mb-5">
                  <label className="block text-[11px] font-bold text-muted mb-1.5 uppercase">Nội dung HTML</label>
-                 <textarea rows="12" value={content} onChange={(e)=>setContent(e.target.value)} className="w-full px-4 py-3 bg-[#1D1D1F] text-[#34C759] border-none rounded-xl focus:ring-2 focus:ring-[var(--accent)] font-mono text-xs leading-relaxed outline-none" placeholder="Nhập mã HTML vào đây..."></textarea>
+                 <textarea rows="6" value={content} onChange={(e)=>setContent(e.target.value)} className="w-full px-4 py-3 bg-[#1D1D1F] text-[#34C759] border-none rounded-xl font-mono text-xs outline-none"></textarea>
               </div>
-
-              {/* Action Buttons */}
-              <div className="flex flex-wrap gap-3 items-center">
-                 <button className="cms-btn-primary px-8 py-3 rounded-xl shadow-md">Lưu Bài (Chờ API Save)</button>
-                 <button onClick={loadIndexFile} className="cms-btn px-6 py-3 rounded-xl font-bold flex items-center gap-2">
-                    Test Nạp index.html
-                 </button>
-              </div>
-
-              {/* Status Toast */}
-              {status.text && (
-                 <div className={`mt-4 px-4 py-3 font-bold text-sm rounded-xl border ${status.type === 'error' ? 'bg-red-50 text-red-500 border-red-200' : status.type === 'success' ? 'bg-green-50 text-green-600 border-green-200' : 'cms-input text-[var(--accent)] animate-pulse border-transparent'}`}>
-                    {status.text}
-                 </div>
-              )}
             </div>
           )}
         </section>
 
-        <div className="text-center py-20 text-muted font-bold text-sm">
-          [Bước tiếp theo: Chúng ta sẽ nạp khối Database hiển thị Danh sách Repo vào đây]
+        {/* KHỐI LỌC REPO */}
+        <div className="mb-6 overflow-x-auto pb-2 flex gap-2 items-center">
+          <span className="text-[10px] font-bold text-muted uppercase shrink-0 mr-2 flex items-center gap-1">
+             <svg className="w-3 h-3"><use href="#icon-folder"></use></svg> Lọc Kho
+          </span>
+          <button 
+             onClick={() => setActiveRepo('all')} 
+             className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition whitespace-nowrap ${activeRepo === 'all' ? 'bg-[var(--accent)] text-white border-transparent' : 'cms-input hover:opacity-80'}`}>
+             Tất cả
+          </button>
+          {Object.keys(db.repos).map(r => (
+            <button 
+              key={r} onClick={() => setActiveRepo(r)} 
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition whitespace-nowrap ${activeRepo === r ? 'bg-[var(--accent)] text-white border-transparent' : 'cms-input hover:opacity-80'}`}>
+              {r} ({db.repos[r].length})
+            </button>
+          ))}
+        </div>
+
+        {/* DANH SÁCH BÀI VIẾT (GRID VIEW CƠ BẢN) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+          {filteredFiles.length > 0 ? (
+            filteredFiles.map((file, idx) => (
+              <div key={idx} className="cms-card p-4 flex flex-col relative group hover:scale-[1.01] transition border cms-border">
+                <span className="text-[10px] text-muted flex items-center gap-1 mb-2">
+                  <svg className="w-3 h-3"><use href="#icon-folder"></use></svg> {file.repoName}
+                </span>
+                <a href={file.url} target="_blank" rel="noreferrer" className="font-bold text-[15px] hover:underline mb-2 line-clamp-2">
+                  {file.name}
+                </a>
+                <div className="text-xs text-muted line-clamp-3 mb-4 flex-1">
+                  {file.preview || 'Không có mô tả...'}
+                </div>
+                <div className="flex justify-between items-center pt-3 border-t cms-border">
+                  <span className="text-[10px] opacity-60">{file.fullDate}</span>
+                  <button className="cms-btn px-3 py-1 rounded text-[10px] font-bold text-[var(--accent)]">
+                    Sửa
+                  </button>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="col-span-full text-center py-20 text-muted font-bold text-sm">
+              Không có bài viết nào để hiển thị.
+            </div>
+          )}
         </div>
 
       </main>
