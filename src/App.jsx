@@ -21,10 +21,6 @@ const getFileShaSafe = async (repoPath, file, token) => {
   let d2 = await fetch(`https://api.github.com/repos/${repoPath}/contents/?t=${Date.now()}`, { headers: getHeaders(token) }).then(r => r.ok ? r.json() : null); if(d2 && Array.isArray(d2)) { const f = d2.find(x => x.name === file); if(f) return f.sha; } return null; } catch(e) { return null; }
 };
 
-const parsePreview = (html) => {
-  try { const doc = new DOMParser().parseFromString(html, 'text/html'); return (doc.body.textContent || "").replace(/\s+/g,' ').trim().substring(0, 150) + '...'; } catch(e) { return "..."; }
-};
-
 // ==========================================
 // 2. COMPONENT SVG
 // ==========================================
@@ -32,17 +28,12 @@ const SVGIcons = () => (
   <svg style={{ display: 'none' }}>
     <symbol id="icon-tag" viewBox="0 0 24 24"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></symbol>
     <symbol id="icon-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></symbol>
-    <symbol id="icon-move" viewBox="0 0 24 24"><polyline points="5 9 2 12 5 15"></polyline><polyline points="9 5 12 2 15 5"></polyline><polyline points="19 9 22 12 19 15"></polyline><polyline points="9 19 12 22 15 19"></polyline><line x1="2" y1="12" x2="22" y2="12"></line><line x1="12" y1="2" x2="12" y2="22"></line></symbol>
-    <symbol id="icon-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></symbol>
     <symbol id="icon-edit" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></symbol>
-    <symbol id="icon-trash" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></symbol>
     <symbol id="icon-folder" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></symbol>
-    <symbol id="icon-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></symbol>
     <symbol id="icon-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></symbol>
     <symbol id="icon-timer" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></symbol>
     <symbol id="icon-pin" viewBox="0 0 24 24"><line x1="12" y1="17" x2="12" y2="22"></line><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"></path></symbol>
     <symbol id="icon-pin-filled" viewBox="0 0 24 24"><line x1="12" y1="17" x2="12" y2="22" stroke="currentColor"></line><path fill="currentColor" stroke="none" d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"></path></symbol>
-    <symbol id="icon-palette" viewBox="0 0 24 24"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"></circle><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"></circle><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"></circle><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"></circle><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"></path></symbol>
   </svg>
 );
 
@@ -69,19 +60,14 @@ export default function App() {
   const [isTasksOpen, setIsTasksOpen] = useState(false);
   const [isToolsOpen, setIsToolsOpen] = useState(false);
   const [nativeTaskInput, setNativeTaskInput] = useState('');
-  const [bulkSet, setBulkSet] = useState(new Set());
 
-  // POMODORO STATES
+  // POMODORO & EXPORT
   const [isPomoOpen, setIsPomoOpen] = useState(false);
   const [pomoTime, setPomoTime] = useState(1500); 
   const [isPomoActive, setIsPomoActive] = useState(false);
-  const [pomoTask, setPomoTask] = useState('');
-  const [pomoWebhook, setPomoWebhook] = useState(() => localStorage.getItem('cms_pomo_webhook') || '');
-  const [isWebhookSettingsOpen, setIsWebhookSettingsOpen] = useState(false);
-
-  // EXPORT AI NOTEBOOK STATES
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [exportTarget, setExportTarget] = useState('all');
+  const [exportResult, setExportResult] = useState(null);
 
   // EDITOR STATES 
   const [isEditorOpen, setIsEditorOpen] = useState(false);
@@ -89,18 +75,17 @@ export default function App() {
   const [repo, setRepo] = useState(() => localStorage.getItem('cms_last_repo') || `${username}/${username}.github.io`);
   const [title, setTitle] = useState('');
   const [slug, setSlug] = useState('');
-  const [tags, setTags] = useState(() => localStorage.getItem('cms_last_tags') || ''); // Tự động load Tag gần nhất
+  const [tags, setTags] = useState(() => localStorage.getItem('cms_last_tags') || ''); 
   const [content, setContent] = useState('');
   const [editorOriginal, setEditorOriginal] = useState({ repo: '', filename: '', sha: '' });
 
-  const [activeModal, setActiveModal] = useState({ type: null, data: null });
   const toolsMenuRef = useRef(null);
-  const titleInputRef = useRef(null); // Ref để Focus vào Tiêu đề
+  const editorInputRef = useRef(null); // Focus vào mã HTML
 
-  // Focus Tiêu đề khi mở Editor
+  // Tự động focus vào ô NHẬP HTML khi bật Editor (Yêu cầu mới)
   useEffect(() => {
-    if (isEditorOpen && titleInputRef.current) {
-        setTimeout(() => titleInputRef.current.focus(), 100);
+    if (isEditorOpen && editorInputRef.current) {
+        setTimeout(() => editorInputRef.current.focus(), 150);
     }
   }, [isEditorOpen]);
 
@@ -108,26 +93,14 @@ export default function App() {
   useEffect(() => {
     const handleGlobalKeyDown = (e) => {
         const isCmd = navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? e.metaKey : e.ctrlKey;
-        
-        // Ctrl + E: Đóng/mở Editor
         if (isCmd && e.key.toLowerCase() === 'e') {
-            e.preventDefault();
-            setIsEditorOpen(prev => !prev);
+            e.preventDefault(); setIsEditorOpen(prev => !prev);
         }
-        // Ctrl + S: Lưu bài
         if (isCmd && e.key.toLowerCase() === 's') {
-            e.preventDefault();
-            const btnSave = document.getElementById('btn-save-article');
-            if (btnSave && !btnSave.disabled) btnSave.click();
-        }
-        // Ctrl + K: Focus ô Tìm kiếm
-        if (isCmd && e.key.toLowerCase() === 'k') {
-            e.preventDefault();
-            document.getElementById('search-input-main')?.focus();
+            e.preventDefault(); const btnSave = document.getElementById('btn-save-article'); if (btnSave && !btnSave.disabled) btnSave.click();
         }
     };
-    window.addEventListener('keydown', handleGlobalKeyDown);
-    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+    window.addEventListener('keydown', handleGlobalKeyDown); return () => window.removeEventListener('keydown', handleGlobalKeyDown);
   }, []);
 
   useEffect(() => {
@@ -143,25 +116,6 @@ export default function App() {
 
   useEffect(() => { if (isAuthenticated && token && db.files.length === 0) loadDatabase(); }, [isAuthenticated, token]);
 
-  // Pomodoro Timer Logic
-  useEffect(() => {
-    let interval = null;
-    if (isPomoActive && pomoTime > 0) {
-      interval = setInterval(() => { setPomoTime(p => p - 1); }, 1000);
-    } else if (isPomoActive && pomoTime <= 0) {
-      setIsPomoActive(false);
-      alert("Hết giờ Pomodoro!");
-      try { new Audio('https://vietndj.github.io/1.mp3').play(); } catch(e){}
-      if (pomoWebhook) {
-        fetch(pomoWebhook.startsWith('http') ? pomoWebhook : `https://ntfy.sh/${pomoWebhook}`, {
-          method: 'POST', body: `Hoàn thành: ${pomoTask || 'Phiên làm việc'}`, headers: { 'Title': '🍅 CMS Pomo', 'Tags': 'alarm_clock' }
-        }).catch(e => console.log('Ntfy error', e));
-      }
-      setPomoTime(1500);
-    }
-    return () => clearInterval(interval);
-  }, [isPomoActive, pomoTime, pomoWebhook, pomoTask]);
-
   const handleLogin = () => { if (pin.trim() === SECRET_PIN) { localStorage.setItem("cms_auth", "granted"); setIsAuthenticated(true); } else alert("Mã PIN sai."); };
   const handleSaveToken = (val) => { setToken(val); try { localStorage.setItem('github_pat', val); } catch(err){} };
   const changeTheme = (theme) => { document.documentElement.setAttribute('data-theme', theme); localStorage.setItem('cms_theme', theme); setIsToolsOpen(false); };
@@ -172,16 +126,16 @@ export default function App() {
   // ==========================================
   const loadDatabase = async () => {
     if (!token || isSyncing) return;
-    setIsSyncing(true); setStatus({ text: 'Đang tải Database lõi...', type: 'loading' });
+    setIsSyncing(true); setStatus({ text: 'Đang tải Database...', type: 'loading' });
     try {
       const meta = await fetchRawJSON(`${username}/${username}.github.io`, 'metadata.json', token);
       const dbData = await fetchRawJSON(`${username}/${username}.github.io`, 'cms_db.json', token);
       if (dbData && dbData.allFiles) {
         const reposMap = {}; dbData.allFiles.forEach(f => { if(!reposMap[f.repoName]) reposMap[f.repoName] = []; reposMap[f.repoName].push(f); });
         saveLocalDb({ files: dbData.allFiles, repos: reposMap, tags: meta?.tags || {}, pinned: meta?.pinned || [], links: meta?.links || {}, colors: meta?.colors || {}, titles: meta?.titles || {}, tasks: meta?.tasks || [], customCol: meta?.customCol || [] });
-        setStatus({ text: '✅ Đã đồng bộ Database!', type: 'success' }); setTimeout(() => setStatus({ text: '', type: '' }), 3000);
+        setStatus({ text: '✅ Đã đồng bộ!', type: 'success' }); setTimeout(() => setStatus({ text: '', type: '' }), 3000);
       }
-    } catch (e) { setStatus({ text: `❌ Lỗi DB: ${e.message}`, type: 'error' }); } finally { setIsSyncing(false); }
+    } catch (e) { setStatus({ text: `❌ Lỗi: ${e.message}`, type: 'error' }); } finally { setIsSyncing(false); }
   };
 
   const syncMetaAndDB = async (dbState) => {
@@ -194,40 +148,6 @@ export default function App() {
       await fetch(`https://api.github.com/repos/${username}/${username}.github.io/contents/cms_db.json`, { method: 'PUT', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ message: 'Sync DB', content: dbContent, sha: dbSha || undefined }) });
   };
 
-  const compileAllForNotebookLM = async () => {
-      if (!token) return alert("Cần nhập Token PAT!");
-      setIsExportModalOpen(false);
-      setStatus({ text: "Đang trích xuất dữ liệu...", type: "loading" });
-      try {
-          let targetFiles = db.files;
-          if (exportTarget !== 'all') targetFiles = db.files.filter(f => f.repoName === exportTarget);
-          targetFiles = targetFiles.filter(f => !['index.html', 'fix-url.html', 'tin.html', 'cms_db.json', 'metadata.json'].includes(f.fileName));
-          let ct = `SIÊU SÁCH KIẾN THỨC: ${username.toUpperCase()}\n====================================\n\n`; let tc = 0;
-          const grouped = {}; targetFiles.forEach(f => { if(!grouped[f.repoName]) grouped[f.repoName] = []; grouped[f.repoName].push(f); });
-          for (let rName in grouped) {
-              ct += `\n\n[KHO: ${rName.toUpperCase()}]\n\n`;
-              for (let f of grouped[rName]) {
-                  tc++; setStatus({ text: `Đang trích xuất (${tc}/${targetFiles.length}): ${f.name}...`, type: "loading" });
-                  let sN = f.fileName; try { sN = decodeURIComponent(f.fileName); } catch(e){}
-                  const rC = await fetchText(`https://api.github.com/repos/${username}/${rName}/contents/${safeEnc(sN)}?t=${Date.now()}`, token);
-                  if (rC) {
-                      const d = new DOMParser().parseFromString(rC, 'text/html'); d.querySelectorAll('script,style,nav,header,footer,iframe,svg,button').forEach(x => x.remove());
-                      const contentText = (d.body.innerText || d.body.textContent || "").replace(/\n{3,}/g, '\n\n').trim();
-                      const ti = db.titles[`${rName}/${f.fileName}`] || f.name;
-                      ct += `BÀI: ${ti}\n[Nội dung]\n${contentText}\n------------------------\n\n`;
-                  }
-                  await new Promise(r => setTimeout(r, 50)); 
-              }
-          }
-          ct = ct.replace('====================================', `Tổng số bài: ${tc}\n====================================`);
-          setStatus({ text: "Đang tạo file tải xuống...", type: "loading" });
-          const blob = new Blob([ct], { type: 'text/plain;charset=utf-8' });
-          const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `notebooklm_${exportTarget}_${Date.now()}.txt`;
-          document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
-          setStatus({ text: "✅ Tải file thành công!", type: "success" }); setTimeout(() => setStatus({ text: '', type: '' }), 3000);
-      } catch (e) { setStatus({ text: `❌ Lỗi: ${e.message}`, type: "error" }); }
-  };
-
   const autoSlugify = (val, currentTags) => {
     setTitle(val);
     let s = val.toLowerCase().replace(/[áàảạãăắằẳẵặâấầẩẫậ]/gi,'a').replace(/[éèẻẽẹêếềểễệ]/gi,'e').replace(/[iíìỉĩị]/gi,'i').replace(/[óòỏõọôốồổỗộơớờởỡợ]/gi,'o').replace(/[úùủũụưứừửữự]/gi,'u').replace(/[ýỳỷỹỵ]/gi,'y').replace(/đ/gi,'d').replace(/\s+/g,'-').replace(/[^\w\-]+/g,'').replace(/\-\-+/g,'-').replace(/^-+|-+$/g,'');
@@ -236,29 +156,18 @@ export default function App() {
     setSlug(s);
   };
 
-  // Tự động lấy Title khi Paste nội dung
   const handleContentChange = (e) => {
-    const val = e.target.value;
-    setContent(val);
+    const val = e.target.value; setContent(val);
     if (!title.trim() && val.includes('<title>')) {
         const match = val.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
-        if (match && match[1]) {
-            const extractedTitle = match[1].trim();
-            if (extractedTitle) autoSlugify(extractedTitle, tags);
-        }
+        if (match && match[1]) { const extractedTitle = match[1].trim(); if (extractedTitle) autoSlugify(extractedTitle, tags); }
     }
   };
 
-  const toggleTagEditor = (t) => {
-    let currentTags = tags.split(',').map(x => x.trim()).filter(Boolean);
-    if (currentTags.includes(t)) currentTags = currentTags.filter(x => x !== t); else currentTags.push(t); 
-    const newTagsStr = currentTags.join(', '); setTags(newTagsStr); autoSlugify(title, newTagsStr);
-  };
-
   const handleSaveArticle = async () => {
-    if (!token) return alert("Vui lòng nhập Token GitHub PAT (Ở phần Cài đặt nâng cao)!");
-    if (!repo || !title || !slug || !content) return alert("Thiếu dữ liệu (Kho, Tiêu đề, Slug, Nội dung)!");
-    setIsSaving(true); setStatus({ text: '⏳ Đang lưu file HTML...', type: 'loading' });
+    if (!token) return alert("Cần Token PAT!");
+    if (!repo || !title || !slug || !content) return alert("Thiếu dữ liệu!");
+    setIsSaving(true); setStatus({ text: '⏳ Đang lưu...', type: 'loading' });
     try {
       let filename = slug.endsWith('.html') ? slug : slug + '.html';
       let rName = repo.includes('/') ? (repo.split('/')[1] || repo.split('/')[0]) : repo;
@@ -279,7 +188,6 @@ export default function App() {
         db.pinned = db.pinned.filter(x => x !== oldKey);
       }
 
-      setStatus({ text: 'Đang đồng bộ Metadata & CMS DB...', type: 'loading' });
       let newTags = { ...db.tags }; let tagArr = tags.split(',').map(x => x.trim()).filter(Boolean);
       if (tagArr.length) newTags[fileKey] = tagArr; else delete newTags[fileKey];
       let newTitles = { ...db.titles }; newTitles[fileKey] = title;
@@ -288,404 +196,186 @@ export default function App() {
       if (editorOriginal.sha) newFiles = newFiles.filter(x => x.sha !== editorOriginal.sha);
       let fileIndex = newFiles.findIndex(f => f.sha === (resHTMLData.content?.sha || fileSha));
       const dDate = new Date();
-      const newFileObj = { repoName: rName, name: title, fileName: filename, sha: resHTMLData.content?.sha || fileSha, url: `https://${rOwner}.github.io/${rName === `${rOwner}.github.io` ? '' : rName + '/'}${filename}`, timestamp: dDate.getTime(), fullDate: dDate.toLocaleString('vi-VN'), preview: parsePreview(content) };
+      const newFileObj = { repoName: rName, name: title, fileName: filename, sha: resHTMLData.content?.sha || fileSha, url: `https://${rOwner}.github.io/${rName === `${rOwner}.github.io` ? '' : rName + '/'}${filename}`, timestamp: dDate.getTime(), fullDate: dDate.toLocaleString('vi-VN') };
       if (fileIndex !== -1) newFiles[fileIndex] = newFileObj; else newFiles.unshift(newFileObj);
 
       const newDbState = { ...db, files: newFiles, tags: newTags, titles: newTitles };
       await syncMetaAndDB(newDbState); saveLocalDb(newDbState);
       
-      // Lưu lại Repo & Tag gần nhất
       localStorage.setItem('cms_last_repo', `${rOwner}/${rName}`);
       localStorage.setItem('cms_last_tags', tags);
 
-      setStatus({ text: '✅ Đăng bài thành công!', type: 'success' });
+      setStatus({ text: '✅ Đăng thành công!', type: 'success' });
       setTitle(''); setSlug(''); setContent(''); setEditorOriginal({ repo:'', filename:'', sha:'' });
-      // Cố tình không setTags('') để giữ nguyên Tag cho bài viết sau
-      setTimeout(() => setStatus({ text: '', type: '' }), 4000);
+      setTimeout(() => setStatus({ text: '', type: '' }), 3000);
     } catch (error) { setStatus({ text: `❌ Lỗi: ${error.message}`, type: 'error' }); } finally { setIsSaving(false); }
   };
 
-  const editFileContent = async (rName, f, sha) => {
-    if(!token) return alert("Cần Token ở mục Cài đặt nâng cao!"); setIsEditorOpen(true); window.scrollTo({top:0,behavior:'smooth'});
-    setStatus({ text: 'Đang nạp file...', type: 'loading' });
-    try {
-      const res = await fetchText(`https://api.github.com/repos/${username}/${rName}/contents/${safeEnc(f)}?t=${Date.now()}`, token);
-      if(res) {
-        setContent(res);
-        const rp = rName === username || rName === `${username}.github.io` ? `${username}/${username}.github.io` : `${username}/${rName}`;
-        setRepo(rp); setTitle(db.titles[`${rName}/${f}`] || f.replace('.html','')); setSlug(f.replace('.html',''));
-        setTags((db.tags[`${rName}/${f}`] || []).join(', '));
-        setEditorOriginal({ repo: rp, filename: f, sha: sha });
-        setStatus({ text: '✅ Đã nạp thành công!', type: 'success' }); setTimeout(() => setStatus({ text: '', type: '' }), 2000);
-      } else throw new Error("Không tìm thấy file");
-    } catch(e) { setStatus({ text: `❌ Lỗi: ${e.message}`, type: 'error' }); }
-  };
-
-  const togglePin = async (r, f) => {
-    if(!token) return; const k = `${r}/${f}`; let newPinned = [...db.pinned];
-    if(newPinned.includes(k)) newPinned = newPinned.filter(x => x !== k); else newPinned.push(k);
-    const newDb = { ...db, pinned: newPinned }; saveLocalDb(newDb); syncMetaAndDB(newDb);
-  };
-
-  const toggleFileSelection = (r, f, sha, e) => {
-    e.stopPropagation(); const k = `${r}|${f}|${sha}`; const newSet = new Set(bulkSet);
-    if(newSet.has(k)) newSet.delete(k); else newSet.add(k); setBulkSet(newSet);
-  };
-
-  // ==========================================
-  // DATA FILTERING
-  // ==========================================
-  const repoKeysList = useMemo(() => { const keys = Object.keys(db.repos); if (!keys.includes(`${username}.github.io`)) keys.unshift(`${username}.github.io`); return keys; }, [db.repos]);
+  const repoKeysList = useMemo(() => { const keys = Object.keys(db.repos || {}); if (!keys.includes(`${username}.github.io`)) keys.unshift(`${username}.github.io`); return keys; }, [db.repos]);
   const allUniqueTags = useMemo(() => { const tagsSet = new Set(); Object.values(db.tags).forEach(arr => arr.forEach(t => tagsSet.add(t))); return Array.from(tagsSet).sort(); }, [db.tags]);
   const getFileTags = (r, f) => db.tags[`${r}/${f}`] || [];
-  const getFileLinks = (r, f) => db.links[`${r}/${f}`] || [];
 
   const processedFiles = useMemo(() => {
     let filtered = db.files.filter(f => {
       const matchRepo = activeRepo === 'all' || f.repoName === activeRepo;
       const matchTag = activeTag === 'all' || getFileTags(f.repoName, f.fileName).includes(activeTag);
       const sq = searchQuery.toLowerCase();
-      const matchSearch = !sq || (f.name || "").toLowerCase().includes(sq) || (f.repoName || "").toLowerCase().includes(sq) || (isDeepSearch && (f.preview || "").toLowerCase().includes(sq));
+      const matchSearch = !sq || (f.name || "").toLowerCase().includes(sq) || (f.repoName || "").toLowerCase().includes(sq);
       return matchRepo && matchTag && matchSearch;
     });
-    if(currentView === 'table') {
-        filtered.sort((a,b)=> tableSort.by==='name' ? (tableSort.dir==='asc'?(a.name||"").localeCompare(b.name||""):(b.name||"").localeCompare(a.name||"")) : (tableSort.dir==='asc'?(a.timestamp||0)-(b.timestamp||0):(b.timestamp||0)-(a.timestamp||0)));
-    } else {
-        filtered.sort((a, b) => sortOrder === 'desc' ? (b.timestamp || 0) - (a.timestamp || 0) : (a.timestamp || 0) - (b.timestamp || 0));
-    }
+    filtered.sort((a, b) => sortOrder === 'desc' ? (b.timestamp || 0) - (a.timestamp || 0) : (a.timestamp || 0) - (b.timestamp || 0));
     return filtered;
-  }, [db.files, activeRepo, activeTag, searchQuery, isDeepSearch, sortOrder, currentView, tableSort, db.tags]);
-
-  const recentFiles = useMemo(() => { if (activeTag !== 'all' || activeRepo !== 'all' || searchQuery.trim() !== '') return []; return [...db.files].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)).slice(0, 6); }, [db.files, activeRepo, activeTag, searchQuery]);
-  const pinnedFiles = useMemo(() => processedFiles.filter(f => db.pinned.includes(`${f.repoName}/${f.fileName}`)), [processedFiles, db.pinned]);
-  const unpinnedFiles = useMemo(() => processedFiles.filter(f => !db.pinned.includes(`${f.repoName}/${f.fileName}`)), [processedFiles, db.pinned]);
-  const groupedFilesByRepo = useMemo(() => { const groups = {}; unpinnedFiles.forEach(f => { if (!groups[f.repoName]) groups[f.repoName] = []; groups[f.repoName].push(f); }); return groups; }, [unpinnedFiles]);
+  }, [db.files, activeRepo, activeTag, searchQuery, sortOrder, db.tags]);
 
   // ==========================================
-  // RENDER HELPERS
+  // RENDER CARD (TỐI ƯU CHI TIẾT THEO YÊU CẦU)
   // ==========================================
-  const ActionIcons = ({ file, isPinned, isFeed }) => {
-    if (isFeed) {
-      return (
-        <div className="flex flex-wrap gap-2 ml-auto">
-          <button onClick={(e)=>{e.stopPropagation(); editFileContent(file.repoName, file.fileName, file.sha);}} className="cms-btn-primary px-5 py-2.5 rounded-xl text-sm font-bold shadow-sm flex items-center gap-1 hover:opacity-90 transition"><svg className="w-4 h-4"><use href="#icon-edit"></use></svg> Sửa bài</button>
-          <button onClick={(e)=>{e.stopPropagation(); togglePin(file.repoName, file.fileName);}} className={`cms-btn px-4 py-2.5 rounded-xl text-sm font-bold flex items-center gap-1.5 ${isPinned ? 'text-[#FF9500]' : ''}`}><svg className="w-4 h-4"><use href={isPinned ? "#icon-pin-filled" : "#icon-pin"}></use></svg> Ghim</button>
-          <button onClick={(e)=>{e.stopPropagation(); setActiveModal({type: 'color', data: file});}} className="cms-btn px-4 py-2.5 rounded-xl text-sm font-bold flex items-center gap-1.5"><svg className="w-4 h-4"><use href="#icon-palette"></use></svg> Màu</button>
-          <button onClick={(e)=>{e.stopPropagation(); setActiveModal({type: 'tag', data: file});}} className="cms-btn px-4 py-2.5 rounded-xl text-sm font-bold flex items-center gap-1.5"><svg className="w-4 h-4"><use href="#icon-tag"></use></svg> Nhãn</button>
-          <button onClick={(e)=>{e.stopPropagation(); setActiveModal({type: 'link', data: file});}} className="cms-btn px-4 py-2.5 rounded-xl text-sm font-bold flex items-center gap-1.5 text-[var(--accent)]"><svg className="w-4 h-4"><use href="#icon-link"></use></svg> Link</button>
-        </div>
-      );
-    }
-    return (
-      <div className="flex gap-0.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition duration-300">
-        <button onClick={(e)=>{e.stopPropagation(); togglePin(file.repoName, file.fileName);}} className={`icon-btn ${isPinned ? 'text-[#FF9500]' : ''}`}><svg className="svg-icon"><use href={isPinned ? "#icon-pin-filled" : "#icon-pin"}></use></svg></button>
-        <button onClick={(e)=>{e.stopPropagation(); setActiveModal({type: 'color', data: file});}} className="icon-btn"><svg className="svg-icon"><use href="#icon-palette"></use></svg></button>
-        <button onClick={(e)=>{e.stopPropagation(); setActiveModal({type: 'tag', data: file});}} className="icon-btn"><svg className="svg-icon"><use href="#icon-tag"></use></svg></button>
-        <button onClick={(e)=>{e.stopPropagation(); setActiveModal({type: 'link', data: file});}} className="icon-btn text-[var(--accent)]"><svg className="svg-icon"><use href="#icon-link"></use></svg></button>
-        <button onClick={(e)=>{e.stopPropagation(); setActiveModal({type: 'move', data: file});}} className="icon-btn"><svg className="svg-icon"><use href="#icon-move"></use></svg></button>
-        <button onClick={(e)=>{e.stopPropagation(); editFileContent(file.repoName, file.fileName, file.sha);}} className="icon-btn text-[var(--accent)] cms-input ml-1"><svg className="svg-icon"><use href="#icon-edit"></use></svg></button>
-      </div>
-    );
-  };
-
-  const renderTagsAndLinks = (r, f) => {
-    const tagsList = getFileTags(r, f); const linksList = getFileLinks(r, f);
-    return (
-      <>
-        {tagsList.length > 0 && (<div className="flex flex-wrap gap-1.5 mb-2 empty:hidden">{tagsList.map(t => <span key={t} className="cms-input text-[10px] px-2.5 py-1 rounded font-bold border cms-border flex items-center gap-1 opacity-90"><svg className="w-2.5 h-2.5 opacity-60"><use href="#icon-tag"></use></svg>{t}</span>)}</div>)}
-        {linksList.length > 0 && (<div className="flex flex-wrap gap-1.5 mb-3 empty:hidden">{linksList.map((l,i) => <a key={i} href={l.url} target="_blank" rel="noreferrer" onClick={e=>e.stopPropagation()} className="bg-[#007AFF]/10 text-[var(--accent)] text-[10px] px-2 py-0.5 rounded font-bold border border-transparent hover:border-[#007AFF]/30 transition flex items-center gap-1"><svg className="w-3 h-3"><use href="#icon-link"></use></svg>{l.title}</a>)}</div>)}
-      </>
-    );
-  };
-
-  const renderCard = (file, viewType) => {
+  const renderCard = (file) => {
     const isPinned = db.pinned.includes(`${file.repoName}/${file.fileName}`);
-    const dateFmt = file.fullDate ? (viewType === 'kanban' ? (file.fullDate.split(' ')[1] || file.fullDate) : file.fullDate) : '';
     const col = db.colors[`${file.repoName}/${file.fileName}`];
     const isDark = col && getContrastYIQ(col) === '#FFFFFF';
     const stl = col ? { backgroundColor: col, borderColor: 'transparent', color: isDark ? '#FFF' : '#1D1D1F' } : {};
-    const isChecked = bulkSet.has(`${file.repoName}|${file.fileName}|${file.sha}`);
-
-    if (viewType === 'recent') return (
-        <div key={file.sha} className="cms-card p-3 min-w-[240px] max-w-[240px] flex flex-col group hover:border-[var(--accent)] transition cursor-pointer border cms-border" onClick={() => window.open(file.url, '_blank')}>
-          <div className="text-[10px] text-muted mb-1 flex items-center gap-1"><svg className="w-3 h-3"><use href="#icon-folder"></use></svg>{file.repoName}</div>
-          <h4 className="font-bold text-sm line-clamp-2 mb-2 group-hover:text-[var(--accent)] transition">{file.name}</h4>
-          <div className="flex justify-between items-center mt-auto border-t cms-border pt-2"><span className="text-[10px] opacity-70">{dateFmt}</span><button onClick={(e)=>{e.stopPropagation(); editFileContent(file.repoName, file.fileName, file.sha)}} className="text-[10px] bg-[var(--bg-hover)] text-[var(--accent)] px-3 py-1 rounded font-bold hover:opacity-80 transition">Sửa</button></div>
-        </div>
-    );
-
-    if (viewType === 'feed') return (
-        <article key={file.sha} className="cms-card p-8 flex flex-col relative mb-8 border cms-border" style={stl}>
-          <input type="checkbox" checked={isChecked} onChange={(e) => toggleFileSelection(file.repoName, file.fileName, file.sha, e)} className="absolute top-8 left-8 w-4 h-4 z-10 cursor-pointer accent-[#007AFF]" />
-          <div className="flex items-center gap-3 mb-4 pl-10"><div className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-xl cms-input border cms-border"><svg className="w-5 h-5"><use href="#icon-folder"></use></svg></div><div><p className="text-sm font-bold cursor-pointer hover:underline opacity-80" onClick={()=>setActiveRepo(file.repoName)}>{file.repoName}</p><p className="text-[11px] font-semibold opacity-70 mt-0.5">{dateFmt}</p></div></div>
-          <h2 className="text-3xl font-bold mb-4 pl-10"><a href={file.url} target="_blank" rel="noreferrer" className="hover:underline opacity-90">{file.name}</a></h2>
-          <div className="pl-10">{renderTagsAndLinks(file.repoName, file.fileName)}</div>
-          <div className="w-full h-64 cms-input mt-4 mb-6 rounded-xl flex items-center justify-center overflow-hidden border cms-border bg-gray-100"><div className="opacity-40 font-bold text-xl px-4 text-center" dangerouslySetInnerHTML={{__html: file.coverHTML || file.name}}></div></div>
-          <div className="text-[16px] leading-relaxed mb-8 opacity-90" dangerouslySetInnerHTML={{__html: (file.preview||'')}}></div>
-          <div className="flex flex-wrap gap-2 pt-5 border-t cms-border mt-auto items-center"><a href={file.url} target="_blank" rel="noreferrer" className="cms-btn px-6 py-2.5 rounded-xl text-sm font-bold shadow-sm bg-[var(--bg-card)]">Đọc bài</a><ActionIcons file={file} isPinned={isPinned} isFeed={true} /></div>
-        </article>
-    );
-
-    if (viewType === 'grid') {
-      const gradClass = getGradient(file.sha || file.name);
-      return (
-        <div key={file.sha} className="cms-card flex flex-col relative overflow-hidden group hover:scale-[1.02] transition border cms-border" style={stl}>
-          <input type="checkbox" checked={isChecked} onChange={(e) => toggleFileSelection(file.repoName, file.fileName, file.sha, e)} className="absolute top-3 left-3 w-4 h-4 z-10 cursor-pointer accent-[#007AFF] opacity-0 group-hover:opacity-100 transition" />
-          <div className={`h-28 flex items-center justify-center border-b cms-border overflow-hidden opacity-90 font-bold text-center p-4 text-sm text-white bg-gradient-to-br ${gradClass}`}>{file.name}</div>
-          <div className="p-5 flex flex-col flex-1">
-            <span className="text-[10px] uppercase font-bold text-muted mb-2 flex items-center gap-1"><svg className="w-3 h-3"><use href="#icon-folder"></use></svg> {file.repoName}</span>
-            <a href={file.url} target="_blank" rel="noreferrer" className="font-bold text-lg mb-3 line-clamp-2 hover:underline">{file.name}</a>
-            {renderTagsAndLinks(file.repoName, file.fileName)}
-            <div className="text-sm opacity-70 line-clamp-4 flex-1 mb-4" dangerouslySetInnerHTML={{__html: (file.preview||'')}}></div>
-            <div className="flex justify-between items-center pt-3 border-t cms-border"><span className="text-[10px] opacity-60">{dateFmt}</span><ActionIcons file={file} isPinned={isPinned} /></div>
-          </div>
-        </div>
-      );
-    }
-
-    if (viewType === 'kanban') return (
-        <div key={file.sha} className="cms-card p-4 flex flex-col relative group hover:scale-[1.01] transition border cms-border mb-3" style={stl}>
-          <input type="checkbox" checked={isChecked} onChange={(e) => toggleFileSelection(file.repoName, file.fileName, file.sha, e)} className="absolute top-4 left-4 w-4 h-4 z-10 cursor-pointer accent-[#007AFF] opacity-0 group-hover:opacity-100 transition" />
-          <div className="pl-6"><a href={file.url} target="_blank" rel="noreferrer" className="font-bold text-[15px] hover:underline mb-2 line-clamp-2">{file.name}</a>{renderTagsAndLinks(file.repoName, file.fileName)}</div>
-          <div className="flex justify-between items-center mt-auto pt-3 border-t cms-border"><span className="text-[10px] opacity-60">{dateFmt}</span><ActionIcons file={file} isPinned={isPinned} /></div>
-        </div>
-    );
-
-    if (viewType === 'table') return (
-        <tr key={file.sha} className={`group border-b cms-border hover:bg-[var(--bg-hover)] transition ${isDark ? 'text-white' : ''}`} style={stl}>
-          <td className="p-3 text-center"><input type="checkbox" checked={isChecked} onChange={(e) => toggleFileSelection(file.repoName, file.fileName, file.sha, e)} className="accent-[#007AFF] w-4 h-4 cursor-pointer" /></td>
-          <td className="p-3"><a href={file.url} target="_blank" rel="noreferrer" className="font-bold hover:text-[var(--accent)] text-[15px] block mb-1">{file.name}</a>{renderTagsAndLinks(file.repoName, file.fileName)}</td>
-          <td className="p-3 text-xs opacity-70 line-clamp-2 max-w-[200px] leading-relaxed">{file.preview||''}</td>
-          <td className="p-3 text-xs opacity-80 whitespace-nowrap">{dateFmt}</td>
-          <td className="p-3"><div className="flex gap-1 justify-center"><ActionIcons file={file} isPinned={isPinned} /></div></td>
-        </tr>
-    );
 
     return (
-      <div key={file.sha} className="cms-card p-4 flex flex-col relative group hover:scale-[1.01] transition border cms-border" style={stl}>
-        <input type="checkbox" checked={isChecked} onChange={(e) => toggleFileSelection(file.repoName, file.fileName, file.sha, e)} className="absolute top-5 left-4 w-4 h-4 z-10 cursor-pointer accent-[#007AFF] opacity-0 group-hover:opacity-100 transition" />
-        <div className="pl-6">
-          <div className="text-[10px] text-muted flex items-center gap-1 mb-2 font-bold uppercase tracking-wide"><svg className="w-3 h-3"><use href="#icon-folder"></use></svg> {file.repoName}</div>
-          <a href={file.url} target="_blank" rel="noreferrer" className="font-bold text-[15px] hover:text-[var(--accent)] mb-2 line-clamp-2">{file.name}</a>
-          {renderTagsAndLinks(file.repoName, file.fileName)}
-          <div className="text-xs text-muted line-clamp-2 mb-4">{file.preview || '...'}</div>
+      <div key={file.sha} className="cms-card p-3 flex flex-col relative group transition border cms-border hover:border-[var(--accent)]" style={stl}>
+        <div className="flex justify-between items-start gap-3">
+          <div className="flex-1 min-w-0">
+            <div className="text-[9px] text-muted uppercase font-bold tracking-tight opacity-70 mb-0.5 flex items-center gap-1">
+              <svg className="w-2.5 h-2.5"><use href="#icon-folder"></use></svg>{file.repoName}
+            </div>
+            <a href={file.url} target="_blank" rel="noreferrer" className="font-bold text-[14px] leading-tight hover:underline line-clamp-2 block">
+                {file.name}
+            </a>
+            {/* Render nhãn rất nhỏ để tiết kiệm chỗ */}
+            <div className="flex flex-wrap gap-1 mt-1">
+               {getFileTags(file.repoName, file.fileName).map(t => <span key={t} className="text-[9px] px-1.5 py-0.5 rounded-md bg-black/5 dark:bg-white/5 opacity-60 font-bold border border-black/5">{t}</span>)}
+            </div>
+          </div>
+          
+          {/* NÚT EDIT LUÔN HIỂN THỊ - MỜ (CHO IPAD) */}
+          <button 
+            onClick={(e)=>{e.stopPropagation(); editFileContent(file.repoName, file.fileName, file.sha);}} 
+            className="shrink-0 cms-input px-3 py-1.5 rounded-lg text-[10px] font-black opacity-40 hover:opacity-100 transition uppercase border cms-border bg-white dark:bg-gray-800"
+          >
+            Sửa
+          </button>
         </div>
-        <div className="flex justify-between items-center mt-auto pt-3 border-t cms-border"><span className="text-[10px] opacity-60">{dateFmt}</span><div className="flex items-center gap-2"><ActionIcons file={file} isPinned={isPinned} /><button onClick={(e)=>{e.stopPropagation(); editFileContent(file.repoName, file.fileName, file.sha)}} className="cms-btn px-4 py-1.5 rounded-lg text-xs font-bold transition sm:hidden group-hover:block">Sửa</button></div></div>
+        
+        <div className="flex justify-between items-center mt-2 pt-2 border-t cms-border-faint opacity-50">
+            <span className="text-[9px] font-mono">{file.fullDate ? file.fullDate.split(' ')[0] : ''}</span>
+            <div className="flex gap-1">
+                <button onClick={(e)=>{e.stopPropagation(); togglePin(file.repoName, file.fileName);}} className={isPinned ? 'text-[#FF9500]' : ''}><svg className="w-3.5 h-3.5"><use href={isPinned ? "#icon-pin-filled" : "#icon-pin"}></use></svg></button>
+                <button onClick={(e)=>{e.stopPropagation(); setActiveModal({type: 'tag', data: file});}}><svg className="w-3.5 h-3.5"><use href="#icon-tag"></use></svg></button>
+            </div>
+        </div>
       </div>
     );
   };
 
-  const renderViews = () => {
-    if (processedFiles.length === 0) return <div className="text-center py-20 text-muted font-bold text-sm">Trống</div>;
-    
-    if (currentView === 'feed') return <div className="flex flex-col max-w-4xl mx-auto w-full">{pinnedFiles.length > 0 && <h3 className="font-bold mb-4 text-[#FF9500] text-xl border-b cms-border pb-2">📌 Đã ghim</h3>}{pinnedFiles.map(f => renderCard(f, 'feed'))}{unpinnedFiles.length > 0 && <h3 className="font-bold mt-4 mb-4 text-xl border-b cms-border pb-2">Khác</h3>}{unpinnedFiles.map(f => renderCard(f, 'feed'))}</div>;
-    
-    if (currentView === 'grid') return <div className="flex flex-col gap-6">{pinnedFiles.length > 0 && <><h3 className="font-bold mb-2 text-[#FF9500] text-lg border-b cms-border pb-2">📌 Đã ghim</h3><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">{pinnedFiles.map(f => renderCard(f, 'grid'))}</div></>}{unpinnedFiles.length > 0 && <><h3 className="font-bold mt-4 mb-2 text-lg border-b cms-border pb-2">Khác</h3><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">{unpinnedFiles.map(f => renderCard(f, 'grid'))}</div></>}</div>;
-
-    if (currentView === 'kanban') return <div className="flex overflow-x-auto gap-6 pb-6 items-start min-h-[70vh] kanban-scroll">{pinnedFiles.length > 0 && <div className="w-[320px] shrink-0 bg-[var(--bg-hover)] rounded-2xl flex flex-col h-full max-h-[70vh] border cms-border p-2"><div className="px-3 py-2 flex justify-between items-center font-bold text-sm mb-2 text-[#FF9500]"><span>📌 Đã ghim</span><span className="cms-card px-2 py-0.5 rounded-full text-[10px] shadow-sm">{pinnedFiles.length}</span></div><div className="overflow-y-auto kanban-scroll px-1 pb-2 flex-1">{pinnedFiles.map(f => renderCard(f, 'kanban'))}</div></div>}{Object.keys(groupedFilesByRepo).map(r => <div key={r} className="w-[320px] shrink-0 bg-[var(--bg-hover)] rounded-2xl flex flex-col h-full max-h-[70vh] border cms-border p-2"><div className="px-3 py-2 flex justify-between items-center font-bold text-sm mb-2 cursor-pointer hover:opacity-70 transition" onClick={() => setActiveRepo(r)}><span>{r}</span><span className="cms-card px-2 py-0.5 rounded-full text-[10px] shadow-sm">{groupedFilesByRepo[r].length}</span></div><div className="overflow-y-auto kanban-scroll px-1 pb-2 flex-1">{groupedFilesByRepo[r].map(f => renderCard(f, 'kanban'))}</div></div>)}</div>;
-
-    if (currentView === 'table') return <div className="flex flex-col gap-6">{pinnedFiles.length > 0 && <details open className="mb-4"><summary className="font-bold text-lg mb-2 cursor-pointer border-b cms-border pb-2 flex items-center gap-2 outline-none text-[#FF9500]">📌 Đã ghim <span className="text-sm text-muted">({pinnedFiles.length})</span></summary><div className="cms-card overflow-x-auto"><table className="w-full text-left text-sm min-w-[800px]"><tr className="cms-input text-muted text-[10px] uppercase tracking-wider border-b cms-border"><th className="p-3 w-8"></th><th className="p-3 cursor-pointer hover:underline" onClick={()=>setTableSort({by:'name',dir:tableSort.dir==='asc'?'desc':'asc'})}>Bài viết</th><th className="p-3">Mô tả</th><th className="p-3 w-32 cursor-pointer hover:underline" onClick={()=>setTableSort({by:'date',dir:tableSort.dir==='asc'?'desc':'asc'})}>Cập nhật</th><th className="p-3 text-center w-40">Thao tác</th></tr>{pinnedFiles.map(f => renderCard(f, 'table'))}</table></div></details>}{Object.keys(groupedFilesByRepo).map(r => <details key={r} open className="mb-4"><summary className="font-bold text-lg mb-2 cursor-pointer border-b cms-border pb-2 flex items-center gap-2 outline-none">{r} <span className="text-sm text-muted">({groupedFilesByRepo[r].length})</span></summary><div className="cms-card overflow-x-auto"><table className="w-full text-left text-sm min-w-[800px]"><tr className="cms-input text-muted text-[10px] uppercase tracking-wider border-b cms-border"><th className="p-3 w-8"></th><th className="p-3 cursor-pointer hover:underline" onClick={()=>setTableSort({by:'name',dir:tableSort.dir==='asc'?'desc':'asc'})}>Bài viết</th><th className="p-3">Mô tả</th><th className="p-3 w-32 cursor-pointer hover:underline" onClick={()=>setTableSort({by:'date',dir:tableSort.dir==='asc'?'desc':'asc'})}>Cập nhật</th><th className="p-3 text-center w-40">Thao tác</th></tr>{groupedFilesByRepo[r].map(f => renderCard(f, 'table'))}</table></div></details>)}</div>;
-
-    // List
-    return <div className="flex flex-col gap-6">{pinnedFiles.length > 0 && <details open className="mb-6"><summary className="font-bold text-xl mb-4 border-b cms-border pb-2 cursor-pointer outline-none text-[#FF9500] flex items-center gap-2"><svg className="w-6 h-6"><use href="#icon-pin-filled"></use></svg> 📌 Đã ghim <span className="cms-input text-xs px-2 py-0.5 rounded-full border cms-border text-[var(--text-main)]">{pinnedFiles.length}</span></summary><div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">{pinnedFiles.map(f => renderCard(f, 'list'))}</div></details>}{Object.keys(groupedFilesByRepo).map(r => <details key={r} open className="mb-6"><summary className="font-bold text-xl mb-4 border-b cms-border pb-2 cursor-pointer outline-none flex items-center gap-2"><svg className="w-6 h-6"><use href="#icon-folder"></use></svg> {r} <span className="cms-input text-xs px-2 py-0.5 rounded-full border cms-border text-muted">{groupedFilesByRepo[r].length}</span></summary><div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">{groupedFilesByRepo[r].map(f => renderCard(f, 'list'))}</div></details>)}</div>;
-  };
-
-  if (!isAuthenticated) return ( <div className="flex fixed inset-0 flex-col items-center justify-center z-[99999] bg-[var(--bg-body)]"><div className="cms-card p-10 max-w-sm w-full mx-4 text-center shadow-2xl border cms-border"><h2 className="text-2xl font-bold mb-2">Workspace React</h2><input type="password" placeholder="••••" value={pin} onChange={(e) => setPin(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleLogin()} className="w-full text-center text-3xl font-bold px-4 py-4 cms-input rounded-2xl mb-6 border cms-border" /><button onClick={handleLogin} className="w-full py-4 text-base cms-btn-primary rounded-xl shadow-md">Mở Khóa</button></div></div> );
+  if (!isAuthenticated) return ( <div className="flex fixed inset-0 flex-col items-center justify-center z-[99999] bg-[var(--bg-body)]"><div className="cms-card p-10 max-w-sm w-full mx-4 text-center shadow-2xl border cms-border"><h2 className="text-2xl font-bold mb-2">Workspace</h2><input type="password" placeholder="••••" value={pin} onChange={(e) => setPin(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleLogin()} className="w-full text-center text-3xl font-bold px-4 py-4 cms-input rounded-2xl mb-6 border cms-border" /><button onClick={handleLogin} className="w-full py-4 text-base cms-btn-primary rounded-xl shadow-md">Mở Khóa</button></div></div> );
 
   return (
     <div className="flex-col w-full min-h-screen fade-in flex bg-[var(--bg-body)]">
       <SVGIcons />
-      {/* HEADER BẢN CŨ */}
+      {/* HEADER */}
       <div className="bg-[var(--bg-card)] border-b cms-border pt-4 pb-3">
         <div className="max-w-[1600px] mx-auto px-4 md:px-6 lg:px-8 flex flex-col md:flex-row items-center gap-4">
-          <h1 className="text-2xl font-bold tracking-tight text-[var(--accent)] w-full md:w-[120px] text-center md:text-left">vietndj</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-[var(--accent)]">vietndj</h1>
           <div className="flex-1 flex w-full items-center gap-2">
-            <div className="flex-1 flex items-center bg-[var(--bg-hover)] rounded-xl px-4 py-2 border border-transparent focus-within:border-[var(--accent)] transition-all"><svg className="svg-icon text-muted"><use href="#icon-search"></use></svg><input id="search-input-main" type="text" value={searchQuery} onChange={(e)=>setSearchQuery(e.target.value)} placeholder="Tìm bài viết, repo... (Ctrl K)" className="bg-transparent border-none outline-none text-sm w-full ml-3 font-bold placeholder-[var(--text-muted)]" /></div>
-            <button onClick={() => setIsDeepSearch(!isDeepSearch)} className={`shrink-0 px-4 py-2 rounded-xl text-sm font-bold transition flex items-center gap-1.5 border cms-border ${isDeepSearch ? 'bg-[var(--accent)] text-white' : 'bg-transparent text-[var(--text-main)] hover:bg-[var(--bg-hover)]'}`}><svg className="w-4 h-4"><use href="#icon-grid"></use></svg> Sâu</button>
+            <div className="flex-1 flex items-center bg-[var(--bg-hover)] rounded-xl px-4 py-2 border border-transparent focus-within:border-[var(--accent)]"><svg className="svg-icon text-muted"><use href="#icon-search"></use></svg><input id="search-input-main" type="text" value={searchQuery} onChange={(e)=>setSearchQuery(e.target.value)} placeholder="Tìm kiếm... (Ctrl K)" className="bg-transparent border-none outline-none text-sm w-full ml-3 font-bold" /></div>
           </div>
-          
-          <div className="flex items-center gap-2 shrink-0 relative w-full md:w-auto justify-center" ref={toolsMenuRef}>
-            <button onClick={loadDatabase} className="hidden lg:block cms-btn px-3 py-2 rounded-xl text-xs font-bold transition outline-none">↻ Tải DB Lõi</button>
-            <button onClick={()=>setIsTasksOpen(!isTasksOpen)} className="cms-btn px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1 outline-none">📝 Việc</button>
-            
-            {/* DROPDOWN MENU */}
-            <div className="relative">
-              <button onClick={() => setIsToolsOpen(!isToolsOpen)} className="cms-btn px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1 outline-none">Công cụ ▾</button>
-              {isToolsOpen && ( 
+          <div className="flex items-center gap-2 relative" ref={toolsMenuRef}>
+            <button onClick={loadDatabase} className="cms-btn px-3 py-2 rounded-xl text-xs font-bold transition">↻ Tải DB</button>
+            <button onClick={()=>setIsTasksOpen(!isTasksOpen)} className="cms-btn px-3 py-2 rounded-xl text-xs font-bold transition">📝 Việc</button>
+            <button onClick={() => setIsToolsOpen(!isToolsOpen)} className="cms-btn px-3 py-2 rounded-xl text-xs font-bold transition">Công cụ ▾</button>
+            {isToolsOpen && ( 
                 <div className="absolute right-0 top-full mt-2 w-56 cms-card shadow-2xl flex flex-col p-2 z-[100] border cms-border fade-in">
-                  <div className="px-2 py-1 text-[10px] uppercase text-muted font-bold tracking-wider mb-1">Giao diện</div>
                   <div className="flex gap-1 px-1 mb-3">
-                    <button onClick={() => changeTheme('light')} className="flex-1 py-1.5 rounded text-[11px] font-bold cms-input hover:opacity-80 transition border cms-border">Sáng</button>
-                    <button onClick={() => changeTheme('dark')} className="flex-1 py-1.5 rounded text-[11px] font-bold cms-input hover:opacity-80 transition border cms-border">Tối</button>
-                    <button onClick={() => changeTheme('read')} className="flex-1 py-1.5 rounded text-[11px] font-bold cms-input hover:opacity-80 transition border cms-border text-[#D35400]">Sách</button>
+                    <button onClick={() => changeTheme('light')} className="flex-1 py-1.5 rounded text-[11px] font-bold cms-input border cms-border">Sáng</button>
+                    <button onClick={() => changeTheme('dark')} className="flex-1 py-1.5 rounded text-[11px] font-bold cms-input border cms-border">Tối</button>
                   </div>
+                  <button onClick={() => setIsPomoOpen(!isPomoOpen)} className="text-left px-3 py-2.5 text-xs font-bold hover:bg-[var(--bg-hover)] rounded-lg">🍅 Pomodoro</button>
+                  <button onClick={() => window.open('https://vietndj.github.io/tin.html', '_blank')} className="text-left px-3 py-2.5 text-xs font-bold hover:bg-[var(--bg-hover)] rounded-lg">📖 Mở Reader</button>
                   <hr className="cms-border my-1 border-t" />
-                  <button onClick={() => { setIsPomoOpen(!isPomoOpen); setIsToolsOpen(false); }} className="text-left px-3 py-2.5 text-xs font-bold hover:bg-[var(--bg-hover)] rounded-lg transition">🍅 Pomodoro</button>
-                  <button onClick={() => window.open('https://vietndj.github.io/tin.html', '_blank')} className="text-left px-3 py-2.5 text-xs font-bold hover:bg-[var(--bg-hover)] rounded-lg transition">📖 Mở Reader</button>
-                  <button onClick={() => { setIsExportModalOpen(true); setIsToolsOpen(false); }} className="text-left px-3 py-2.5 text-xs font-bold text-[#8E44AD] hover:bg-[var(--bg-hover)] rounded-lg transition">🤖 Xuất Sách AI</button>
-                  <hr className="cms-border my-1 border-t" />
-                  <button onClick={() => {localStorage.removeItem("cms_auth"); setIsAuthenticated(false);}} className="text-left px-3 py-2.5 text-xs font-bold text-red-500 hover:bg-[var(--bg-hover)] rounded-lg transition">🔒 Khóa App</button>
+                  <button onClick={() => {localStorage.removeItem("cms_auth"); setIsAuthenticated(false);}} className="text-left px-3 py-2.5 text-xs font-bold text-red-500 hover:bg-[var(--bg-hover)] rounded-lg">🔒 Khóa App</button>
                 </div> 
               )}
-            </div>
           </div>
-
         </div>
       </div>
 
-      {/* FILTERS BẢN CŨ */}
-      <div className="bg-[var(--bg-body)] border-b cms-border py-4 mb-6 sticky top-0 z-40">
-        <div className="max-w-[1600px] mx-auto px-4 md:px-6 lg:px-8 flex flex-col gap-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <span className="text-[10px] font-bold text-muted uppercase w-[40px]">VIEW</span>
-              <div className="flex bg-[var(--bg-hover)] p-1 rounded-lg border cms-border overflow-x-auto scrollbar-hide">
-                {['List', 'Grid', 'Kanban', 'Table', 'Feed'].map(v => <button key={v} onClick={() => setCurrentView(v.toLowerCase())} className={`px-4 py-1.5 rounded-md text-xs font-bold transition ${currentView === v.toLowerCase() ? 'bg-[var(--bg-card)] shadow-sm text-[var(--text-main)]' : 'text-muted hover:text-[var(--text-main)]'}`}>{v}</button>)}
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="flex bg-[var(--bg-hover)] p-1 rounded-lg border cms-border"><button onClick={() => setSortOrder('desc')} className={`px-4 py-1.5 rounded-md text-xs font-bold transition ${sortOrder === 'desc' ? 'bg-[var(--bg-card)] shadow-sm' : 'text-muted'}`}>Mới ↓</button><button onClick={() => setSortOrder('asc')} className={`px-4 py-1.5 rounded-md text-xs font-bold transition ${sortOrder === 'asc' ? 'bg-[var(--bg-card)] shadow-sm' : 'text-muted'}`}>Cũ ↑</button></div>
-              <button onClick={loadDatabase} className="cms-btn px-4 py-2 rounded-lg text-xs font-bold text-[var(--accent)] border cms-border shadow-sm bg-[var(--bg-card)]">{isSyncing ? '⏳...' : '↻ Tải lại'}</button>
-            </div>
+      <div className="bg-[var(--bg-body)] border-b cms-border py-3 mb-6 sticky top-0 z-40">
+        <div className="max-w-[1600px] mx-auto px-4 md:px-6 lg:px-8 flex flex-col gap-3">
+          <div className="flex items-center gap-3 overflow-x-auto scrollbar-hide">
+             <span className="text-[10px] font-bold text-muted uppercase shrink-0">KHO</span>
+             <div className="flex gap-1.5"><button onClick={() => setActiveRepo('all')} className={`px-3 py-1.5 text-[11px] font-bold rounded-lg transition ${activeRepo === 'all' ? 'bg-[var(--accent)] text-white' : 'bg-[var(--bg-hover)]'}`}>Tất cả</button>{Object.keys(db.repos).map(r => (<button key={r} onClick={() => setActiveRepo(r)} className={`px-3 py-1.5 text-[11px] font-bold rounded-lg transition whitespace-nowrap ${activeRepo === r ? 'bg-[var(--accent)] text-white' : 'bg-[var(--bg-hover)]'}`}>{r}</button>))}</div>
           </div>
           <div className="flex items-center gap-3 overflow-x-auto scrollbar-hide">
-             <span className="text-[10px] font-bold text-muted uppercase w-[40px] shrink-0 flex items-center gap-1"><svg className="w-3 h-3"><use href="#icon-folder"></use></svg> KHO</span>
-             <div className="flex gap-2"><button onClick={() => setActiveRepo('all')} className={`px-4 py-1.5 text-xs font-bold rounded-lg transition whitespace-nowrap ${activeRepo === 'all' ? 'bg-[var(--accent)] text-white' : 'bg-[var(--bg-hover)] hover:bg-gray-200 dark:hover:bg-gray-800'}`}>Tất cả</button>{Object.keys(db.repos).map(r => (<button key={r} onClick={() => setActiveRepo(r)} className={`px-4 py-1.5 text-xs font-bold rounded-lg transition whitespace-nowrap ${activeRepo === r ? 'bg-[var(--accent)] text-white' : 'bg-[var(--bg-hover)] hover:bg-gray-200 dark:hover:bg-gray-800'}`}>{r} <span className="opacity-60 font-normal">({db.repos[r].length})</span></button>))}</div>
-          </div>
-          <div className="flex items-center gap-3 overflow-x-auto scrollbar-hide">
-             <span className="text-[10px] font-bold text-muted uppercase w-[40px] shrink-0 flex items-center gap-1"><svg className="w-3 h-3"><use href="#icon-tag"></use></svg> NHÃN</span>
-             <div className="flex gap-2"><button onClick={() => setActiveTag('all')} className={`px-4 py-1.5 text-xs font-bold rounded-lg transition whitespace-nowrap ${activeTag === 'all' ? 'bg-[var(--accent)] text-white' : 'bg-[var(--bg-hover)] hover:bg-gray-200 dark:hover:bg-gray-800'}`}>Tất cả</button>{allUniqueTags.map(t => (<button key={t} onClick={() => setActiveTag(t)} className={`px-4 py-1.5 text-xs font-bold rounded-lg transition whitespace-nowrap ${activeTag === t ? 'bg-[var(--accent)] text-white' : 'bg-[var(--bg-hover)] hover:bg-gray-200 dark:hover:bg-gray-800'}`}>{t}</button>))}</div>
+             <span className="text-[10px] font-bold text-muted uppercase shrink-0">NHÃN</span>
+             <div className="flex gap-1.5"><button onClick={() => setActiveTag('all')} className={`px-3 py-1.5 text-[11px] font-bold rounded-lg transition ${activeTag === 'all' ? 'bg-[var(--accent)] text-white' : 'bg-[var(--bg-hover)]'}`}>Tất cả</button>{allUniqueTags.map(t => (<button key={t} onClick={() => setActiveTag(t)} className={`px-3 py-1.5 text-[11px] font-bold rounded-lg transition whitespace-nowrap ${activeTag === t ? 'bg-[var(--accent)] text-white' : 'bg-[var(--bg-hover)]'}`}>{t}</button>))}</div>
           </div>
         </div>
       </div>
       
-      {/* MAIN CONTAINER */}
       <div className="flex flex-col lg:flex-row gap-6 px-4 md:px-6 lg:px-8 max-w-[1600px] mx-auto items-start w-full relative pb-20">
         <main className="flex-1 w-full min-w-0 flex flex-col gap-6">
           
-          {/* EDITOR (Tối ưu giao diện gõ) */}
+          {/* EDITOR TỐI ƯU UX TỘT ĐỘ */}
           <section className="cms-card overflow-hidden shadow-sm">
-            <button onClick={() => setIsEditorOpen(!isEditorOpen)} className="w-full px-6 py-4 flex justify-between items-center hover:bg-[var(--bg-hover)] font-semibold text-[var(--accent)] outline-none border-b cms-border">
+            <button onClick={() => setIsEditorOpen(!isEditorOpen)} className="w-full px-6 py-3 flex justify-between items-center hover:bg-[var(--bg-hover)] font-semibold text-[var(--accent)] outline-none border-b cms-border">
                 <span className="flex items-center gap-2">
-                    <svg className="svg-icon"><use href="#icon-edit"></use></svg> Soạn thảo HTML
-                    <span className="text-[10px] text-muted border border-[#EAE0D0] px-1.5 py-0.5 rounded font-mono ml-2 uppercase bg-white">Ctrl E</span>
+                    <svg className="svg-icon"><use href="#icon-edit"></use></svg> Soạn thảo HTML <span className="text-[10px] text-muted border px-1.5 py-0.5 rounded font-mono ml-2 uppercase bg-white dark:bg-gray-800">Ctrl E</span>
                 </span>
-                <span style={{ transform: isEditorOpen ? 'rotate(180deg)' : 'rotate(0deg)' }} className="transition-transform">▼</span>
+                <span>▼</span>
             </button>
             {isEditorOpen && (
-              <div className="p-6 bg-[var(--bg-card)] fade-in flex flex-col gap-5">
-                <div>
-                   <label className="block text-[11px] font-bold text-muted mb-2 uppercase">📁 Lưu vào Kho</label>
-                   <div className="flex flex-wrap gap-2">{repoKeysList.map(r => { const fullPath = `${username}/${r}`; const isActive = repo === fullPath; return (<button key={r} onClick={() => { setRepo(fullPath); localStorage.setItem('cms_last_repo', fullPath); }} className={`px-3 py-1.5 text-xs font-bold rounded-lg transition border ${isActive ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-md' : 'bg-[var(--bg-hover)] text-[var(--text-main)] border-transparent hover:opacity-80'}`}>{r}</button>) })}</div>
+              <div className="p-5 bg-[var(--bg-card)] fade-in flex flex-col gap-4">
+                <div className="flex flex-wrap gap-2">
+                    {repoKeysList.map(r => { const fullPath = `${username}/${r}`; const isActive = repo === fullPath; return (<button key={r} onClick={() => { setRepo(fullPath); }} className={`px-3 py-1.5 text-[10px] font-bold rounded-lg transition border ${isActive ? 'bg-[var(--accent)] text-white' : 'bg-[var(--bg-hover)] text-muted'}`}>{r}</button>) })}
                 </div>
-                <div>
-                   <input ref={titleInputRef} type="text" value={title} onChange={(e)=>autoSlugify(e.target.value, tags)} onKeyDown={(e) => { if(e.key === 'Enter') { e.preventDefault(); document.getElementById('html-content-editor')?.focus(); } }} className="w-full px-4 py-4 text-2xl font-black text-[var(--text-main)] bg-[var(--bg-hover)] border-2 border-transparent focus:border-[var(--accent)] rounded-xl outline-none transition-all placeholder:text-gray-400" placeholder="Nhập tiêu đề bài viết... (Enter để viết nội dung)" />
+                {/* TEXTAREA LÀ NƠI FOCUS ĐẦU TIÊN (Ctrl E -> Paste luôn) */}
+                <textarea 
+                    ref={editorInputRef}
+                    id="html-content-editor" rows="12" 
+                    value={content} onChange={handleContentChange} 
+                    className="w-full px-4 py-4 bg-[#1D1D1F] text-[#34C759] border-none rounded-xl focus:ring-2 focus:ring-[var(--accent)] font-mono text-sm shadow-inner" 
+                    placeholder="Mở soạn thảo (Ctrl E) -> Dán HTML (Ctrl V) -> Lưu (Ctrl S)... Tiêu đề tự bóc từ HTML."
+                ></textarea>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <input type="text" value={title} onChange={(e)=>autoSlugify(e.target.value, tags)} className="px-4 py-3 text-sm font-bold bg-[var(--bg-hover)] rounded-xl outline-none" placeholder="Tiêu đề (có thể sửa sau)" />
+                    <input type="text" value={tags} onChange={(e)=>setTags(e.target.value)} className="px-4 py-3 text-sm font-bold bg-[var(--bg-hover)] text-[var(--accent)] rounded-xl outline-none" placeholder="Nhãn (cách bằng dấu phẩy)..." />
                 </div>
-                <div className="bg-[var(--bg-hover)] p-4 rounded-xl border border-transparent focus-within:border-[var(--accent)] transition-all">
-                   <div className="flex items-center gap-2 mb-2"><svg className="w-4 h-4 text-muted"><use href="#icon-tag"></use></svg><input type="text" value={tags} onChange={(e)=>{setTags(e.target.value); autoSlugify(title, e.target.value);}} className="flex-1 bg-transparent text-sm font-bold text-[var(--accent)] outline-none placeholder:text-muted placeholder:font-normal" placeholder="Gõ tag mới (cách bằng dấu phẩy)..." /></div>
-                   {allUniqueTags.length > 0 && (<div className="flex flex-wrap gap-1.5 pt-3 border-t border-[var(--border)]">{allUniqueTags.map(t => { const isSelected = tags.split(',').map(x=>x.trim()).includes(t); return (<button key={t} onClick={() => toggleTagEditor(t)} className={`px-2.5 py-1 text-[10px] font-bold rounded-md transition border ${isSelected ? 'bg-[var(--accent)] text-white border-[var(--accent)]' : 'bg-[var(--bg-card)] text-muted border-[var(--border)] hover:opacity-80 shadow-sm'}`}>{t}</button>) })}</div>)}
-                </div>
-                <div>
-                   <textarea id="html-content-editor" rows="10" value={content} onChange={handleContentChange} className="w-full px-4 py-4 bg-[#1D1D1F] text-[#34C759] border-none rounded-xl focus:ring-2 focus:ring-[var(--accent)] font-mono text-sm leading-relaxed outline-none shadow-inner" placeholder="Nhập mã HTML vào đây... Nếu paste HTML có <title>, hệ thống sẽ tự động bóc lấy tiêu đề."></textarea>
-                </div>
-                <details className="group border cms-border rounded-xl bg-[var(--bg-hover)]"><summary className="px-4 py-3 text-xs font-bold text-muted cursor-pointer flex items-center gap-2 outline-none hover:text-[var(--text-main)]"><span className="group-open:rotate-90 transition-transform">▶</span> Cài đặt nâng cao (Token PAT, URL Slug)</summary><div className="p-4 border-t cms-border grid grid-cols-1 md:grid-cols-2 gap-4"><div><label className="block text-[10px] font-bold text-muted mb-1 uppercase">Mã Github PAT</label><input type="password" value={token} onChange={(e)=>handleSaveToken(e.target.value)} className="w-full px-3 py-2 bg-[var(--bg-card)] border cms-border rounded-lg text-xs outline-none focus:border-[var(--accent)]" placeholder="Nhập Token GitHub..." /></div><div><label className="block text-[10px] font-bold text-muted mb-1 uppercase">Slug (URL)</label><input type="text" value={slug} onChange={(e)=>setSlug(e.target.value)} className="w-full px-3 py-2 bg-[var(--bg-card)] border cms-border rounded-lg text-xs font-mono text-[var(--accent)] outline-none focus:border-[var(--accent)]" placeholder="kien-thuc..." /></div></div></details>
                 <div className="flex pt-2 justify-between items-center">
-                   <button id="btn-save-article" onClick={handleSaveArticle} disabled={isSaving} className="cms-btn-primary w-full md:w-auto px-10 py-4 rounded-xl shadow-lg text-sm disabled:opacity-50 hover:scale-[1.02] transition-transform">
-                      {isSaving ? '⏳ Đang lưu...' : '🚀 Lưu Bài Lên GitHub (Ctrl S)'}
+                   <button id="btn-save-article" onClick={handleSaveArticle} disabled={isSaving} className="cms-btn-primary px-10 py-3.5 rounded-xl shadow-lg text-sm font-bold disabled:opacity-50">
+                      {isSaving ? '⏳...' : '🚀 Lưu Bài Lên GitHub (Ctrl S)'}
                    </button>
-                   {editorOriginal.sha && (<button onClick={()=>setEditorOriginal({repo:'',filename:'',sha:''})} className="text-red-500 font-bold px-4 py-2 hover:bg-red-50 rounded-xl transition">✕ Hủy Sửa</button>)}
+                   {editorOriginal.sha && (<button onClick={()=>setEditorOriginal({repo:'',filename:'',sha:''})} className="text-red-500 font-bold px-4 py-2">✕ Hủy Sửa</button>)}
                 </div>
               </div>
             )}
           </section>
 
-          {/* RECENT FILES */}
-          {recentFiles.length > 0 && (<div className="mb-8"><h3 className="font-bold text-lg mb-3 flex items-center gap-2 text-[var(--accent)]"><svg className="w-5 h-5"><use href="#icon-timer"></use></svg> Vừa thao tác gần đây</h3><div className="flex overflow-x-auto gap-4 pb-4 scrollbar-hide">{recentFiles.map(f => renderCard(f, 'recent'))}</div></div>)}
-          
-          {/* MAIN VIEWS */}
-          {renderViews()}
+          {/* MAIN GRID - HIỂN THỊ CHẶT CHẼ */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+             {processedFiles.map(f => renderCard(f))}
+          </div>
         </main>
 
-        {/* CỘT SIDEBAR TASK */}
+        {/* SIDEBAR TASK */}
         {isTasksOpen && (
-          <aside className="w-full lg:w-[320px] shrink-0 sticky top-[150px] h-[calc(100vh-160px)] fade-in">
-             <div className="cms-card p-4 flex flex-col h-full shadow-sm">
-                <div className="flex justify-between items-center mb-4 border-b cms-border pb-3"><h2 className="text-sm font-bold text-[var(--accent)] flex items-center gap-1.5"><svg className="svg-icon w-4 h-4"><use href="#icon-edit"></use></svg> Ghi chú Nhanh</h2><button onClick={()=>setIsTasksOpen(false)} className="text-muted hover:text-red-500 font-bold px-1">✕</button></div>
-                <div className="flex gap-2 mb-4"><input type="text" value={nativeTaskInput} onChange={e=>setNativeTaskInput(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'){const n=[{id:Date.now(),title:nativeTaskInput,completed:false},...db.tasks]; saveLocalDb({...db,tasks:n}); syncMetaAndDB({...db,tasks:n}); setNativeTaskInput('');}}} className="flex-1 cms-input border cms-border px-3 py-2 rounded-lg text-sm font-medium outline-none" placeholder="Nhập ghi chú..." /><button onClick={()=>{if(!nativeTaskInput)return; const n=[{id:Date.now(),title:nativeTaskInput,completed:false},...db.tasks]; saveLocalDb({...db,tasks:n}); syncMetaAndDB({...db,tasks:n}); setNativeTaskInput('');}} className="cms-btn-primary w-9 h-9 rounded-lg">+</button></div>
-                <div className="flex-1 overflow-y-auto kanban-scroll space-y-2 pr-1">
-                  {db.tasks.map(t => <div key={t.id} className={`cms-card p-3 flex gap-2 border cms-border shadow-sm group ${t.completed?'opacity-50':''}`}><input type="checkbox" checked={t.completed} onChange={()=>{const n=db.tasks.map(x=>x.id===t.id?{...x,completed:!x.completed}:x); saveLocalDb({...db,tasks:n}); syncMetaAndDB({...db,tasks:n});}} className="mt-1 accent-[#007AFF] w-4 h-4" /><span className="flex-1 text-sm font-medium">{t.title}</span><button onClick={()=>{const n=db.tasks.filter(x=>x.id!==t.id); saveLocalDb({...db,tasks:n}); syncMetaAndDB({...db,tasks:n});}} className="text-red-500 font-bold opacity-0 group-hover:opacity-100">✕</button></div>)}
+          <aside className="w-full lg:w-[300px] shrink-0 sticky top-[120px] h-[calc(100vh-140px)] fade-in">
+             <div className="cms-card p-4 flex flex-col h-full">
+                <div className="flex justify-between items-center mb-4"><h2 className="text-xs font-bold text-[var(--accent)] uppercase tracking-widest">Ghi chú</h2><button onClick={()=>setIsTasksOpen(false)}>✕</button></div>
+                <div className="flex gap-2 mb-4"><input type="text" value={nativeTaskInput} onChange={e=>setNativeTaskInput(e.target.value)} onKeyDown={e=>{if(e.key==='Enter' && nativeTaskInput){const n=[{id:Date.now(),title:nativeTaskInput,completed:false},...db.tasks]; saveLocalDb({...db,tasks:n}); syncMetaAndDB({...db,tasks:n}); setNativeTaskInput('');}}} className="flex-1 cms-input border px-3 py-2 rounded-lg text-xs" placeholder="Ghi chú nhanh..." /></div>
+                <div className="flex-1 overflow-y-auto space-y-2">
+                  {db.tasks.map(t => <div key={t.id} className="cms-card p-2 flex gap-2 border text-[11px] font-medium"><input type="checkbox" checked={t.completed} onChange={()=>{const n=db.tasks.map(x=>x.id===t.id?{...x,completed:!x.completed}:x); saveLocalDb({...db,tasks:n}); syncMetaAndDB({...db,tasks:n});}} /><span>{t.title}</span></div>)}
                 </div>
              </div>
           </aside>
         )}
       </div>
 
-      {/* CÁC WIDGET & MODAL PHỤ */}
-      {bulkSet.size > 0 && (<div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-[100] cms-card px-6 py-3 rounded-full shadow-2xl flex items-center gap-4 fade-in"><span className="text-sm font-bold whitespace-nowrap"><span className="text-[var(--accent)] text-base">{bulkSet.size}</span> chọn</span><div className="h-4 w-px bg-[var(--border)]"></div><button onClick={() => setActiveModal({type: 'bulkMove'})} className="text-sm font-bold text-[var(--accent)] hover:opacity-80">Chuyển Repo</button><button onClick={() => setBulkSet(new Set())} className="text-sm font-bold text-muted hover:text-red-500 ml-2">Hủy</button></div>)}
-      
-      {/* POMODORO KHÔI PHỤC */}
-      {isPomoOpen && (
-        <div className="fixed bottom-6 right-6 w-72 cms-card z-[100] p-4 shadow-2xl border cms-border fade-in">
-           <div className="flex justify-between items-center font-bold text-sm mb-4 border-b cms-border pb-2">
-              <span><svg className="w-4 h-4 inline pb-0.5 text-[#FF9500]"><use href="#icon-timer"></use></svg> Pomodoro</span>
-              <div>
-                 <span onClick={() => setIsWebhookSettingsOpen(!isWebhookSettingsOpen)} className="cursor-pointer mr-3 text-muted hover:text-[var(--accent)]">⚙️</span>
-                 <span onClick={()=>setIsPomoOpen(false)} className="cursor-pointer text-red-500 font-bold">✕</span>
-              </div>
-           </div>
-           
-           <div className="flex gap-2 mb-4">
-              <button onClick={() => setPomoTime(1500)} className="flex-1 cms-btn-primary py-1.5 rounded-lg text-xs font-bold">25 Phút</button>
-              <button onClick={() => setPomoTime(300)} className="flex-1 cms-input border cms-border py-1.5 rounded-lg text-xs font-bold text-muted">5 Phút</button>
-           </div>
-
-           <div className="text-4xl font-black text-center mb-4 font-mono text-[var(--accent)]">
-              {Math.floor(pomoTime / 60).toString().padStart(2, '0')}:{(pomoTime % 60).toString().padStart(2, '0')}
-           </div>
-           
-           <input type="text" value={pomoTask} onChange={(e) => setPomoTask(e.target.value)} className="w-full cms-input border cms-border px-3 py-2 rounded-lg text-sm mb-4" placeholder="Bạn đang làm gì?" />
-           
-           <div className="flex gap-2">
-              <button onClick={() => setIsPomoActive(!isPomoActive)} className={`flex-1 py-2 rounded-xl text-xs font-bold transition ${isPomoActive ? 'bg-[#FF9500] text-white' : 'cms-btn-primary'}`}>
-                {isPomoActive ? 'DỪNG LẠI' : 'BẮT ĐẦU'}
-              </button>
-              <button onClick={() => { setIsPomoActive(false); setPomoTime(1500); }} className="px-4 py-2 cms-input border cms-border rounded-xl text-xs font-bold transition hover:opacity-80">Reset</button>
-           </div>
-
-           {isWebhookSettingsOpen && (
-              <div className="mt-4 pt-3 border-t cms-border">
-                  <input type="text" value={pomoWebhook} onChange={(e) => {setPomoWebhook(e.target.value); localStorage.setItem('cms_pomo_webhook', e.target.value)}} placeholder="Ntfy Topic (VD: vietndj)" className="w-full cms-input border cms-border px-3 py-2 text-xs mb-2 rounded-lg" />
-                  <p className="text-[10px] text-muted">WebHook này sẽ báo về điện thoại khi hết giờ.</p>
-              </div>
-           )}
-        </div>
-      )}
-
-      {/* MODAL XUẤT SÁCH AI MỚI */}
-      {isExportModalOpen && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[999999] flex items-center justify-center fade-in">
-          <div className="cms-card p-6 max-w-sm w-full mx-4 border cms-border shadow-2xl">
-            <h3 className="text-xl font-bold mb-2 flex items-center gap-2">🤖 Xuất Sách AI</h3>
-            <p className="text-sm text-muted mb-4">Chọn kho dữ liệu để tải về máy dưới dạng file .txt. Tối ưu định dạng cho NotebookLM.</p>
-            
-            <select value={exportTarget} onChange={(e) => setExportTarget(e.target.value)} className="w-full px-4 py-3 cms-input border cms-border rounded-xl text-sm mb-6 font-bold cursor-pointer outline-none focus:border-[var(--accent)]">
-                <option value="all">📚 Tất cả các Kho</option>
-                {repoKeysList.map(r => (
-                    <option key={r} value={r}>📁 Kho: {r}</option>
-                ))}
-            </select>
-            
-            <div className="flex justify-end gap-3 pt-4 border-t cms-border">
-                <button onClick={() => setIsExportModalOpen(false)} className="cms-btn px-5 py-2.5 rounded-xl text-sm font-bold">Hủy</button>
-                <button onClick={compileAllForNotebookLM} className="cms-btn-primary px-6 py-2.5 rounded-xl text-sm shadow-md">🚀 Xuất và Tải Về</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {status.text && (<div className="fixed bottom-6 left-6 z-[9999] cms-card px-4 py-2 rounded-xl shadow-lg flex items-center gap-2 text-sm font-bold border-l-4 border-l-[var(--accent)] fade-in bg-[var(--bg-card)]">{status.text}</div>)}
-      {activeModal.type && (<div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[999999] flex items-center justify-center fade-in"><div className="cms-card p-6 max-w-sm w-full mx-4 border cms-border"><h3 className="text-xl font-bold mb-4 capitalize">Tác vụ: {activeModal.type}</h3><p className="text-sm text-muted mb-6">Tính năng này đang được React hóa trong bản cập nhật sau.</p><div className="flex justify-end gap-3"><button onClick={() => setActiveModal({type: null, data: null})} className="cms-btn px-5 py-2 rounded-lg text-sm font-bold">Đóng</button></div></div></div>)}
-
+      {status.text && (<div className="fixed bottom-6 left-6 z-[9999] cms-card px-4 py-2 rounded-xl shadow-lg text-sm font-bold border-l-4 border-l-[var(--accent)] fade-in bg-[var(--bg-card)]">{status.text}</div>)}
     </div>
   );
 }
