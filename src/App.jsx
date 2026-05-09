@@ -20,10 +20,6 @@ const getFileShaSafe = async (repoPath, file, token) => {
   let d2 = await fetch(`https://api.github.com/repos/${repoPath}/contents/?t=${Date.now()}`, { headers: getHeaders(token) }).then(r => r.ok ? r.json() : null); if(d2 && Array.isArray(d2)) { const f = d2.find(x => x.name === file); if(f) return f.sha; } return null; } catch(e) { return null; }
 };
 
-const parsePreview = (html) => {
-  try { const doc = new DOMParser().parseFromString(html, 'text/html'); return (doc.body.textContent || "").replace(/\s+/g,' ').trim().substring(0, 150) + '...'; } catch(e) { return "..."; }
-};
-
 // ==========================================
 // 2. COMPONENT SVG
 // ==========================================
@@ -78,7 +74,7 @@ export default function App() {
   const toolsMenuRef = useRef(null);
   const editorInputRef = useRef(null); 
 
-  // Focus ô NHẬP HTML khi mở Editor
+  // Tự động focus ô NHẬP HTML khi bật Editor
   useEffect(() => {
     if (isEditorOpen && editorInputRef.current) {
         setTimeout(() => editorInputRef.current.focus(), 100);
@@ -154,7 +150,7 @@ export default function App() {
       setActiveModal({ type: null, data: null });
   };
 
-  // --- XUẤT SÁCH AI ---
+  // --- XUẤT SÁCH AI (API Trực tiếp, không phụ thuộc Link Public) ---
   const handleExportAI = async () => {
       if (!token) return alert("Cần Token PAT!");
       setStatus({ text: "Đang đóng gói sách...", type: "loading" });
@@ -166,9 +162,8 @@ export default function App() {
               const f = targets[i];
               setStatus({ text: `Đang nạp (${i+1}/${targets.length}): ${f.name}`, type: "loading" });
               
-              let rC = null;
-              // Lấy qua API chuẩn để đảm bảo lấy được content, bỏ qua link public
-              rC = await fetchText(`https://api.github.com/repos/${username}/${f.repoName}/contents/${safeEnc(f.fileName)}?t=${Date.now()}`, token);
+              // Lấy qua API chuẩn để đảm bảo lấy được content
+              let rC = await fetchText(`https://api.github.com/repos/${username}/${f.repoName}/contents/${safeEnc(f.fileName)}?t=${Date.now()}`, token);
               
               if (rC) {
                   const d = new DOMParser().parseFromString(rC, 'text/html');
@@ -201,6 +196,12 @@ export default function App() {
         const match = val.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
         if (match && match[1]) autoSlugify(match[1].trim(), tags);
     }
+  };
+
+  const toggleTagEditor = (t) => {
+    let currentTags = tags.split(',').map(x => x.trim()).filter(Boolean);
+    if (currentTags.includes(t)) currentTags = currentTags.filter(x => x !== t); else currentTags.push(t); 
+    const newTagsStr = currentTags.join(', '); setTags(newTagsStr); autoSlugify(title, newTagsStr);
   };
 
   const handleSaveArticle = async () => {
@@ -299,12 +300,12 @@ export default function App() {
   }, [unpinnedFiles]);
 
   // ==========================================
-  // RENDER THẺ BÀI VIẾT (CARD) - SIÊU NÉN
+  // RENDER THẺ BÀI VIẾT (CARD) - SIÊU NÉN CẤP ĐỘ 2
   // ==========================================
   const renderCard = (file, isRecent = false) => {
     const isP = db.pinned.includes(`${file.repoName}/${file.fileName}`);
     const col = db.colors[`${file.repoName}/${file.fileName}`];
-    // Xác định màu chữ phụ thuộc vào màu nền (Light/Dark)
+    // Xác định màu chữ phụ thuộc vào màu nền (Light/Dark) để không bị chìm
     const isDark = col && getContrastYIQ(col) === '#FFFFFF';
     const textColor = col ? (isDark ? '#FFF' : '#1D1D1F') : 'var(--text-main)';
     const textMutedColor = col ? (isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)') : 'var(--text-muted)';
@@ -314,18 +315,32 @@ export default function App() {
     const tagsList = getFileTags(file.repoName, file.fileName);
     const dateFmt = file.fullDate?.split(' ')[0] || '';
 
+    if (isRecent) {
+      return (
+        <div key={file.sha} className="cms-card p-3 min-w-[220px] max-w-[220px] flex flex-col transition border cms-border hover:border-[var(--accent)] bg-[var(--bg-card)] cursor-pointer" onClick={() => window.open(file.url, '_blank')}>
+          <h4 className="font-bold text-sm leading-snug line-clamp-2 mb-2 text-[var(--text-main)] flex-1">{file.name}</h4>
+          <div className="flex justify-between items-end mt-auto pt-2 border-t border-black/5 dark:border-white/5">
+             <div className="flex flex-col gap-0.5 opacity-60">
+                 <span className="text-[9px] uppercase font-bold tracking-tight">{file.repoName}</span>
+             </div>
+             <button onClick={(e)=>{e.stopPropagation(); editFileContent(file.repoName, file.fileName, file.sha)}} className="text-[9px] font-black uppercase text-[var(--text-main)] px-2 py-1 rounded border cms-border opacity-50 hover:opacity-100 transition">Sửa</button>
+          </div>
+        </div>
+      );
+    }
+
     return (
-      <div key={file.sha} className="cms-card p-4 flex flex-col relative transition bg-[var(--bg-card)] cursor-pointer group hover:scale-[1.01] shadow-sm hover:shadow-md" onClick={() => window.open(file.url, '_blank')} style={{backgroundColor: col || 'var(--bg-card)', color: textColor, border: `1px solid ${borderColor}`}}>
+      <div key={file.sha} className="cms-card p-4 flex flex-col relative transition border cms-border hover:border-[var(--accent)] bg-[var(--bg-card)] cursor-pointer hover:-translate-y-0.5 shadow-sm" onClick={() => window.open(file.url, '_blank')} style={{backgroundColor: col || 'var(--bg-card)', color: textColor, border: `1px solid ${borderColor}`}}>
         
-        {/* TIÊU ĐỀ LÀ VUA */}
+        {/* TIÊU ĐỀ LUÔN NỔI BẬT NHẤT */}
         <div className="flex-1 min-w-0 mb-3">
-            <h4 className="font-bold text-[16px] leading-snug line-clamp-3" style={{color: textColor}}>
+            <h4 className="font-bold text-[16px] leading-[1.3] line-clamp-3" style={{color: textColor}}>
                 {file.name}
             </h4>
         </div>
         
-        {/* FOOTER NÉN: KHO + NGÀY + TAGS -> TRÊN CÙNG 1 HOẶC 2 DÒNG */}
-        <div className="mt-auto pt-3 border-t flex justify-between items-end gap-2" style={{borderColor: borderColor}}>
+        {/* FOOTER NÉN GỌN XUỐNG DƯỚI CÙNG (REPO, DATE, TAG, NÚT SỬA) */}
+        <div className="mt-auto pt-3 border-t flex justify-between items-center gap-2" style={{borderColor: borderColor}}>
             <div className="flex flex-col gap-1.5 min-w-0 flex-1">
                 {/* Dòng 1: Kho & Ngày */}
                 <div className="flex items-center gap-2" style={{color: textMutedColor}}>
@@ -337,7 +352,7 @@ export default function App() {
                     </span>
                 </div>
                 
-                {/* Dòng 2: Tags (Nén sát) */}
+                {/* Dòng 2: Tags  */}
                 {tagsList.length > 0 && (
                    <div className="flex flex-wrap gap-1">
                        {tagsList.map(t => <span key={t} className="text-[8px] px-1.5 py-0.5 rounded uppercase font-bold" style={{backgroundColor: btnBg, color: textColor}}>{t}</span>)}
@@ -345,12 +360,11 @@ export default function App() {
                 )}
             </div>
 
-            {/* NÚT THAO TÁC GÓC PHẢI */}
+            {/* CÁC NÚT THAO TÁC (LUÔN MỞ SẴN CHO IPAD) */}
             <div className="flex items-center gap-2 shrink-0">
                 <button onClick={(e)=>{e.stopPropagation(); togglePin(file.repoName, file.fileName);}} className="transition hover:scale-110" style={{color: isP ? '#FF9500' : textMutedColor}}><svg className="w-4 h-4"><use href={isP ? "#icon-pin-filled" : "#icon-pin"}></use></svg></button>
                 <button onClick={(e)=>{e.stopPropagation(); setActiveModal({type: 'color', data: file});}} className="hover:scale-110 transition" style={{color: textMutedColor}}><svg className="w-4 h-4"><use href="#icon-palette"></use></svg></button>
-                {/* NÚT SỬA MỜ, LUÔN HIỂN THỊ */}
-                <button onClick={(e)=>{e.stopPropagation(); editFileContent(file.repoName, file.fileName, file.sha);}} className="text-[10px] font-black uppercase transition px-2.5 py-1.5 rounded-md flex items-center gap-1 opacity-50 hover:opacity-100" style={{backgroundColor: btnBg, color: textColor}}><svg className="w-3 h-3"><use href="#icon-edit"></use></svg>Sửa</button>
+                <button onClick={(e)=>{e.stopPropagation(); editFileContent(file.repoName, file.fileName, file.sha);}} className="text-[10px] font-black uppercase transition px-2.5 py-1.5 rounded-md flex items-center gap-1 opacity-40 hover:opacity-100 hover:scale-105" style={{backgroundColor: btnBg, color: textColor}}><svg className="w-3 h-3"><use href="#icon-edit"></use></svg>Sửa</button>
             </div>
         </div>
       </div>
@@ -361,7 +375,7 @@ export default function App() {
   const renderViews = () => {
     if (processedFiles.length === 0) return <div className="text-center py-20 text-muted font-bold text-sm">Trống</div>;
     return (
-      <div className="flex flex-col gap-8">
+      <div className="flex flex-col gap-6">
         {pinnedFiles.length > 0 && (
             <details open className="mb-2 outline-none">
                 <summary className="font-bold text-lg mb-4 border-b border-gray-200 dark:border-gray-800 pb-2 cursor-pointer outline-none text-[#FF9500] flex items-center gap-2">
@@ -409,7 +423,7 @@ export default function App() {
       <div className="flex flex-col lg:flex-row gap-6 px-4 md:px-6 lg:px-8 max-w-[1600px] mx-auto items-start w-full relative pb-20 mt-6">
         <main className="flex-1 w-full min-w-0 flex flex-col gap-8">
           
-          {/* EDITOR TỐI ƯU UX TỘT ĐỘ */}
+          {/* EDITOR TỐI ƯU UX */}
           <section className="cms-card overflow-hidden border border-[var(--border)]">
             <button onClick={() => setIsEditorOpen(!isEditorOpen)} className="w-full px-6 py-3 flex justify-between items-center bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] font-bold text-[var(--accent)] outline-none">
                 <span className="flex items-center gap-2">
@@ -445,6 +459,8 @@ export default function App() {
           </section>
 
           {/* MAIN GRID */}
+          {recentFiles.length > 0 && <div className="mb-2"><h3 className="text-[10px] font-black text-[var(--text-muted)] uppercase tracking-widest mb-3 ml-1">🔥 Vừa Thao Tác</h3><div className="flex overflow-x-auto gap-3 pb-2 scrollbar-hide">{recentFiles.map(f => renderCard(f, true))}</div></div>}
+
           {renderViews()}
         </main>
 
@@ -462,11 +478,11 @@ export default function App() {
         )}
       </div>
 
-      {/* MODAL MÀU SẮC LÕI (Bắt buộc dùng màu Solid Trắng/Đen) */}
+      {/* MODAL MÀU SẮC LÕI (Sửa lỗi màn hình đen) */}
       {activeModal.type === 'color' && (
         <div className="fixed inset-0 z-[999999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" style={{ backgroundColor: 'rgba(0,0,0,0.6)' }} onClick={()=>setActiveModal({type:null,data:null})}>
             <div className="bg-white dark:bg-gray-900 p-6 rounded-2xl w-full max-w-xs shadow-2xl border border-gray-200 dark:border-gray-800" onClick={e=>e.stopPropagation()}>
-                <h4 className="font-bold mb-4 text-gray-900 dark:text-white text-center text-sm">Gắn màu cho thẻ bài viết</h4>
+                <h4 className="font-bold mb-4 text-gray-900 dark:text-white text-center text-sm">Gắn màu cho thẻ</h4>
                 <div className="grid grid-cols-5 gap-3">
                     {[null, '#F2F2F7', '#FFD8BF', '#FFE58F', '#D9F7BE', '#BAE7FF', '#D6E4FF', '#EFDBFF', '#FFD6E7', '#1D1D1F'].map((c, i) => (
                         <button key={i} onClick={()=>handleSetColor(`${activeModal.data.repoName}/${activeModal.data.fileName}`, c)} className="w-10 h-10 rounded-full border border-gray-300 dark:border-gray-600 shadow-inner flex items-center justify-center transition hover:scale-110" style={{backgroundColor: c || '#F9FAFB'}}>
@@ -478,7 +494,7 @@ export default function App() {
         </div>
       )}
 
-      {/* MODAL XUẤT SÁCH AI LÕI (Bắt buộc dùng màu Solid Trắng/Đen) */}
+      {/* MODAL XUẤT SÁCH AI LÕI (Sửa lỗi màn hình đen) */}
       {isExportModalOpen && (
         <div className="fixed inset-0 z-[999999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" style={{ backgroundColor: 'rgba(0,0,0,0.7)' }} onClick={()=>{if(!status.text) {setIsExportModalOpen(false); setExportResult(null);}}}>
           <div className="bg-white dark:bg-gray-900 p-8 rounded-3xl w-full max-w-sm shadow-2xl border border-gray-200 dark:border-gray-800" onClick={e=>e.stopPropagation()}>
