@@ -55,12 +55,12 @@ export default function App() {
   const [isToolsOpen, setIsToolsOpen] = useState(false);
   const [nativeTaskInput, setNativeTaskInput] = useState('');
 
-  // STATES KHÔNG DÙNG MODAL NỮA
+  const [activeColorPickerCard, setActiveColorPickerCard] = useState(null); 
+
+  // EXPORT AI & TASK PROGRESS (Non-blocking)
   const [isExportSectionOpen, setIsExportSectionOpen] = useState(false);
   const [exportTarget, setExportTarget] = useState('all');
-  const [exportResult, setExportResult] = useState(null);
-  
-  const [activeColorPickerCard, setActiveColorPickerCard] = useState(null); // Lưu ID thẻ đang mở bảng màu
+  const [exportJob, setExportJob] = useState({ isRunning: false, total: 0, current: 0, currentFile: '', resultUrl: null, filename: '' });
 
   // EDITOR STATES 
   const [isEditorOpen, setIsEditorOpen] = useState(false);
@@ -76,20 +76,14 @@ export default function App() {
   const editorInputRef = useRef(null); 
 
   useEffect(() => {
-    if (isEditorOpen && editorInputRef.current) {
-        setTimeout(() => editorInputRef.current.focus(), 100);
-    }
+    if (isEditorOpen && editorInputRef.current) setTimeout(() => editorInputRef.current.focus(), 100);
   }, [isEditorOpen]);
 
   useEffect(() => {
     const handleGlobalKeyDown = (e) => {
         const isCmd = navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? e.metaKey : e.ctrlKey;
-        if (isCmd && e.key.toLowerCase() === 'e') {
-            e.preventDefault(); setIsEditorOpen(prev => !prev); setIsExportSectionOpen(false);
-        }
-        if (isCmd && e.key.toLowerCase() === 's') {
-            e.preventDefault(); document.getElementById('btn-save-article')?.click();
-        }
+        if (isCmd && e.key.toLowerCase() === 'e') { e.preventDefault(); setIsEditorOpen(prev => !prev); setIsExportSectionOpen(false); }
+        if (isCmd && e.key.toLowerCase() === 's') { e.preventDefault(); document.getElementById('btn-save-article')?.click(); }
     };
     window.addEventListener('keydown', handleGlobalKeyDown); return () => window.removeEventListener('keydown', handleGlobalKeyDown);
   }, []);
@@ -135,7 +129,6 @@ export default function App() {
       await fetch(`https://api.github.com/repos/${username}/${username}.github.io/contents/cms_db.json`, { method: 'PUT', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ message: 'Sync DB', content: dbContent, sha: dbSha || undefined }) });
   };
 
-  // --- LƯU MÀU SẮC TRỰC TIẾP ---
   const handleSetColor = async (fileKey, color) => {
       const newColors = { ...db.colors };
       if (color) newColors[fileKey] = color; else delete newColors[fileKey];
@@ -143,20 +136,27 @@ export default function App() {
       setDb(newState);
       await syncMetaAndDB(newState);
       saveLocalDb(newState);
-      setActiveColorPickerCard(null); // Đóng bảng màu
+      setActiveColorPickerCard(null); 
   };
 
-  // --- XUẤT SÁCH AI ---
+  // --- XUẤT SÁCH AI (CHẠY NGẦM KHÔNG BLOCK UI) ---
   const handleExportAI = async () => {
       if (!token) return alert("Cần Token PAT!");
-      setStatus({ text: "Đang đóng gói sách...", type: "loading" });
+      let targets = db.files.filter(f => (exportTarget === 'all' || f.repoName === exportTarget) && !['index.html', 'tin.html', 'cms_db.json', 'metadata.json'].includes(f.fileName));
+      
+      if (targets.length === 0) return alert("Không có bài viết nào để xuất!");
+
+      // 1. Kích hoạt Widget Tiến trình & Đóng Panel xuất cho đỡ vướng
+      setExportJob({ isRunning: true, total: targets.length, current: 0, currentFile: 'Đang chuẩn bị...', resultUrl: null, filename: '' });
+      setIsExportSectionOpen(false);
+
       try {
-          let targets = db.files.filter(f => (exportTarget === 'all' || f.repoName === exportTarget) && !['index.html', 'tin.html', 'cms_db.json', 'metadata.json'].includes(f.fileName));
           let ct = `SIÊU SÁCH KIẾN THỨC: ${username.toUpperCase()}\n===========================\n\n`;
           
           for (let i = 0; i < targets.length; i++) {
               const f = targets[i];
-              setStatus({ text: `Đang nạp (${i+1}/${targets.length}): ${f.name}`, type: "loading" });
+              // 2. Cập nhật state tiến trình
+              setExportJob(prev => ({ ...prev, current: i + 1, currentFile: f.name }));
               
               let rC = await fetchText(`https://api.github.com/repos/${username}/${f.repoName}/contents/${safeEnc(f.fileName)}?t=${Date.now()}`, token);
               
@@ -164,16 +164,23 @@ export default function App() {
                   const d = new DOMParser().parseFromString(rC, 'text/html');
                   d.querySelectorAll('script,style,button,nav').forEach(x => x.remove());
                   const textContent = (d.body.innerText || d.body.textContent || "").replace(/\n{3,}/g, '\n\n').trim();
-                  ct += `BÀI: ${db.titles[`${f.repoName}/${f.fileName}`] || f.name}\n${textContent}\n\n------------------------\n\n`;
+                  ct += `BÀI: ${db.titles[\`${f.repoName}/${f.fileName}\`] || f.name}\n${textContent}\n\n------------------------\n\n`;
               }
-              await new Promise(r => setTimeout(r, 40));
+              // 3. QUAN TRỌNG: Nhường luồng cho trình duyệt vẽ UI, không bị đơ app
+              await new Promise(r => setTimeout(r, 50)); 
           }
           
           const blob = new Blob([ct], { type: 'text/plain;charset=utf-8' });
-          setExportResult({ url: URL.createObjectURL(blob), filename: `notebooklm_${exportTarget}_${Date.now()}.txt`, count: targets.length });
-          setStatus({ text: "✅ Hoàn tất đóng gói!", type: "success" });
-          setTimeout(() => setStatus({ text: '', type: '' }), 3000);
-      } catch (e) { setStatus({ text: "❌ Lỗi xuất file", type: "error" }); }
+          setExportJob(prev => ({ 
+              ...prev, 
+              isRunning: false, 
+              resultUrl: URL.createObjectURL(blob), 
+              filename: `notebooklm_${exportTarget}_${Date.now()}.txt` 
+          }));
+      } catch (e) { 
+          setExportJob(prev => ({ ...prev, isRunning: false }));
+          setStatus({ text: "❌ Lỗi xuất file", type: "error" }); 
+      }
   };
 
   const autoSlugify = (val, currentTags) => {
@@ -279,9 +286,6 @@ export default function App() {
     return sortedGroups; 
   }, [unpinnedFiles]);
 
-  // ==========================================
-  // RENDER THẺ BÀI VIẾT (CARD) & INLINE COLOR PICKER
-  // ==========================================
   const renderCard = (file, isRecent = false) => {
     const fileKey = `${file.repoName}/${file.fileName}`;
     const isP = db.pinned.includes(fileKey);
@@ -341,18 +345,11 @@ export default function App() {
             </div>
         </div>
 
-        {/* INLINE COLOR PICKER (MỞ RỘNG BÊN TRONG THẺ) */}
         {isColorPickerOpen && (
             <div className="mt-4 pt-4 border-t fade-in" style={{borderColor: borderColor}} onClick={e => e.stopPropagation()}>
                <div className="flex flex-wrap gap-2 justify-center">
                   {[null, '#F2F2F7', '#FFD8BF', '#FFE58F', '#D9F7BE', '#BAE7FF', '#D6E4FF', '#EFDBFF', '#FFD6E7', '#1D1D1F'].map((c, i) => (
-                    <button 
-                      key={i} 
-                      onClick={() => handleSetColor(fileKey, c)} 
-                      className="w-6 h-6 rounded-full border flex items-center justify-center cursor-pointer hover:scale-125 transition" 
-                      style={{ backgroundColor: c || 'var(--bg-hover)', borderColor: c ? 'transparent' : 'var(--border)' }}
-                      title={c === null ? "Xóa màu" : "Đổi màu"}
-                    >
+                    <button key={i} onClick={() => handleSetColor(fileKey, c)} className="w-6 h-6 rounded-full border flex items-center justify-center cursor-pointer hover:scale-125 transition" style={{ backgroundColor: c || 'var(--bg-hover)', borderColor: c ? 'transparent' : 'var(--border)' }}>
                       {c === null && <span className="text-[8px] font-bold text-[var(--text-muted)] leading-none">✕</span>}
                     </button>
                   ))}
@@ -419,7 +416,7 @@ export default function App() {
                       <button onClick={() => changeTheme('dark')} className="flex-1 py-1.5 rounded text-[11px] font-bold border cms-border text-[var(--text-main)] hover:bg-[var(--bg-hover)] transition">Tối</button>
                   </div>
                   <button onClick={() => window.open('https://vietndj.github.io/tin.html', '_blank')} className="w-full text-left px-3 py-2 text-xs font-bold hover:bg-[var(--bg-hover)] rounded text-[var(--text-main)] transition">📖 Mở Reader</button>
-                  <button onClick={() => { setIsExportSectionOpen(!isExportSectionOpen); setIsEditorOpen(false); setIsToolsOpen(false); }} className="w-full text-left px-3 py-2 text-xs font-bold text-[#8E44AD] hover:bg-[var(--bg-hover)] rounded transition">🤖 Xuất Sách AI</button>
+                  <button onClick={() => { setIsExportSectionOpen(true); setIsEditorOpen(false); setIsToolsOpen(false); }} className="w-full text-left px-3 py-2 text-xs font-bold text-[#8E44AD] hover:bg-[var(--bg-hover)] rounded transition">🤖 Xuất Sách AI</button>
                   <hr className="my-1 border-t cms-border"/>
                   <button onClick={() => {localStorage.removeItem("cms_auth"); setIsAuthenticated(false);}} className="w-full text-left px-3 py-2 text-xs font-bold text-red-500 hover:bg-[var(--bg-hover)] rounded transition">🔒 Khóa App</button>
               </div> 
@@ -436,35 +433,23 @@ export default function App() {
       <div className="flex flex-col lg:flex-row gap-6 px-4 md:px-6 lg:px-8 max-w-[1600px] mx-auto items-start w-full relative pb-20 mt-6">
         <main className="flex-1 w-full min-w-0 flex flex-col gap-8">
 
-          {/* INLINE PANEL: XUẤT SÁCH AI (THAY CHO MODAL) */}
+          {/* INLINE PANEL: XUẤT SÁCH AI (KHỞI CHẠY) */}
           {isExportSectionOpen && (
             <section className="cms-card p-6 border cms-border fade-in">
               <div className="flex justify-between items-center mb-4">
                   <h3 className="text-xl font-bold text-[var(--text-main)] flex items-center gap-2">🤖 Xuất Sách AI cho NotebookLM</h3>
                   <button onClick={() => setIsExportSectionOpen(false)} className="text-[var(--text-muted)] font-bold hover:text-red-500 transition">✕</button>
               </div>
-              {!exportResult ? (
-                  <>
-                    <p className="text-sm mb-6 text-[var(--text-muted)]">Tính năng này sẽ quét trực tiếp mã nguồn để gom tất cả bài viết thành 1 file .txt sạch.</p>
-                    <div className="flex flex-col md:flex-row gap-4 items-center">
-                        <select value={exportTarget} onChange={(e)=>setExportTarget(e.target.value)} className="w-full md:w-auto flex-1 px-4 py-3 bg-[var(--bg-hover)] border cms-border text-[var(--text-main)] rounded-xl text-sm font-bold outline-none cursor-pointer">
-                            <option value="all">📚 Xuất Toàn Bộ Các Kho</option>
-                            {repoKeysList.map(r => <option key={r} value={r}>📁 Chỉ xuất Kho: {r}</option>)}
-                        </select>
-                        <button onClick={handleExportAI} className="w-full md:w-auto px-8 py-3 bg-[var(--accent)] text-white rounded-xl font-bold hover:opacity-90 transition shadow-md whitespace-nowrap">
-                            🚀 BẮT ĐẦU ĐÓNG GÓI
-                        </button>
-                    </div>
-                  </>
-              ) : (
-                  <div className="text-center py-4 bg-[var(--bg-hover)] rounded-xl border border-green-500/30">
-                      <h4 className="font-bold text-lg text-[var(--text-main)] mb-2">🎉 Đóng gói thành công!</h4>
-                      <p className="text-sm text-[var(--text-muted)] mb-4">Đã gom <b className="text-[var(--accent)]">{exportResult.count}</b> bài viết vào 1 file.</p>
-                      <a href={exportResult.url} download={exportResult.filename} className="inline-block px-8 py-3 bg-green-500 text-white rounded-xl font-bold no-underline hover:opacity-90 transition shadow-md" onClick={() => { setTimeout(()=>{setIsExportSectionOpen(false); setExportResult(null)}, 500) }}>
-                          ⬇️ TẢI FILE (.TXT) VỀ MÁY
-                      </a>
-                  </div>
-              )}
+              <p className="text-sm mb-6 text-[var(--text-muted)]">Chọn phân vùng Kho để đóng gói toàn bộ HTML thành file text thô thuần túy.</p>
+              <div className="flex flex-col md:flex-row gap-4 items-center">
+                  <select value={exportTarget} onChange={(e)=>setExportTarget(e.target.value)} className="w-full md:w-auto flex-1 px-4 py-3 bg-[var(--bg-hover)] border cms-border text-[var(--text-main)] rounded-xl text-sm font-bold outline-none cursor-pointer">
+                      <option value="all">📚 Xuất Toàn Bộ Các Kho</option>
+                      {repoKeysList.map(r => <option key={r} value={r}>📁 Chỉ xuất Kho: {r}</option>)}
+                  </select>
+                  <button onClick={handleExportAI} className="w-full md:w-auto px-8 py-3 bg-[var(--accent)] text-white rounded-xl font-bold hover:opacity-90 transition shadow-md whitespace-nowrap">
+                      🚀 BẮT ĐẦU ĐÓNG GÓI
+                  </button>
+              </div>
             </section>
           )}
           
@@ -521,6 +506,44 @@ export default function App() {
           </aside>
         )}
       </div>
+
+      {/* ======================================================== */}
+      {/* WIDGET TIẾN TRÌNH CHẠY NGẦM (GÓC DƯỚI PHẢI) */}
+      {/* ======================================================== */}
+      {(exportJob.isRunning || exportJob.resultUrl) && (
+          <div className="fixed bottom-24 right-6 z-[999999] w-[280px] cms-card p-4 shadow-2xl border cms-border fade-in">
+              {exportJob.isRunning ? (
+                  <>
+                      <div className="flex justify-between items-center mb-3">
+                          <span className="text-xs font-bold text-[var(--text-main)] flex items-center gap-2">
+                              <span className="relative flex h-2.5 w-2.5">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--accent)] opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[var(--accent)]"></span>
+                              </span>
+                              Đang đóng gói Sách...
+                          </span>
+                          <span className="text-[10px] font-bold text-[var(--text-muted)] bg-[var(--bg-hover)] px-2 py-0.5 rounded-md">
+                              {exportJob.current} / {exportJob.total}
+                          </span>
+                      </div>
+                      <div className="w-full bg-[var(--bg-hover)] rounded-full h-1.5 mb-2 overflow-hidden border cms-border">
+                          <div className="bg-[var(--accent)] h-1.5 rounded-full transition-all duration-300" style={{ width: `${(exportJob.current / exportJob.total) * 100}%` }}></div>
+                      </div>
+                      <p className="text-[10px] text-[var(--text-muted)] truncate" title={exportJob.currentFile}>{exportJob.currentFile}</p>
+                  </>
+              ) : (
+                  <>
+                      <div className="flex justify-between items-center mb-3">
+                          <span className="text-sm font-bold text-green-500 flex items-center gap-1">🎉 Xong {exportJob.total} bài!</span>
+                          <button onClick={() => setExportJob({isRunning: false, total: 0, current: 0, currentFile: '', resultUrl: null, filename: ''})} className="text-[var(--text-muted)] hover:text-red-500 font-bold px-1">✕</button>
+                      </div>
+                      <a href={exportJob.resultUrl} download={exportJob.filename} className="block text-center w-full py-2.5 bg-green-500 text-white rounded-lg text-xs font-bold shadow-md hover:opacity-90 transition hover:scale-105" onClick={() => setTimeout(() => setExportJob({isRunning: false, total: 0, current: 0, currentFile: '', resultUrl: null, filename: ''}), 1000)}>
+                          ⬇️ TẢI XUỐNG (.TXT)
+                      </a>
+                  </>
+              )}
+          </div>
+      )}
 
       {/* TOAST THÔNG BÁO */}
       {status.text && (
