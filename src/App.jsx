@@ -21,18 +21,26 @@ const getFileShaSafe = async (repoPath, file, token) => {
 };
 
 // ==========================================
-// 2. COMPONENT SVG
+// 2. COMPONENT SVG (ĐÃ UPDATE BỘ ICON MỚI SANG TRỌNG)
 // ==========================================
 const SVGIcons = () => (
   <svg style={{ display: 'none' }}>
-    <symbol id="icon-tag" viewBox="0 0 24 24"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></symbol>
-    <symbol id="icon-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></symbol>
-    <symbol id="icon-edit" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></symbol>
-    <symbol id="icon-folder" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></symbol>
-    <symbol id="icon-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></symbol>
-    <symbol id="icon-pin" viewBox="0 0 24 24"><line x1="12" y1="17" x2="12" y2="22"></line><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"></path></symbol>
-    <symbol id="icon-pin-filled" viewBox="0 0 24 24"><line x1="12" y1="17" x2="12" y2="22" stroke="currentColor"></line><path fill="currentColor" stroke="none" d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"></path></symbol>
-    <symbol id="icon-palette" viewBox="0 0 24 24"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"></circle><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"></circle><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"></circle><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"></circle><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"></path></symbol>
+    {/* Folder */}
+    <symbol id="icon-folder" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z" /></symbol>
+    {/* Edit */}
+    <symbol id="icon-edit" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /></symbol>
+    {/* Search */}
+    <symbol id="icon-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" fill="none" stroke="currentColor" strokeWidth="2" /><path fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" d="m21 21-4.3-4.3" /></symbol>
+    {/* Pin */}
+    <symbol id="icon-pin" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M12 17v5"/><path fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></symbol>
+    {/* Pin Filled */}
+    <symbol id="icon-pin-filled" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M12 17v5"/><path fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></symbol>
+    {/* Tag */}
+    <symbol id="icon-tag" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z" /><path fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" d="M7 7h.01" /></symbol>
+    {/* Palette */}
+    <symbol id="icon-palette" viewBox="0 0 24 24"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2Z" /></symbol>
+    {/* Link */}
+    <symbol id="icon-link" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></symbol>
   </svg>
 );
 
@@ -90,6 +98,17 @@ export default function App() {
   const toolsMenuRef = useRef(null);
   const editorInputRef = useRef(null); 
 
+  // --- CÀI ĐẶT FAVICON ĐẶC TRƯNG ---
+  useEffect(() => {
+    let link = document.querySelector("link[rel~='icon']");
+    if (!link) {
+      link = document.createElement('link');
+      link.rel = 'icon';
+      document.head.appendChild(link);
+    }
+    link.href = "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23007AFF' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect width='18' height='18' x='3' y='3' rx='2' ry='2'></rect><path d='M9 15v-6l4 3-4 3Z'></path></svg>";
+  }, []);
+
   useEffect(() => {
     if (isEditorOpen && editorInputRef.current) setTimeout(() => editorInputRef.current.focus(), 100);
   }, [isEditorOpen]);
@@ -121,11 +140,11 @@ export default function App() {
   const saveLocalDb = (newDb) => { try { localStorage.setItem('cms_repo_data', JSON.stringify(newDb)); setDb(newDb); } catch(e) { setDb(newDb); } };
 
   // ==========================================
-  // HÀM TẢI DB (ĐÃ BỎ MÀNG LỌC ẨN FILE, CHỈ KHỬ TRÙNG LẶP)
+  // HÀM TẢI DB: ĐÃ XÓA MÀNG LỌC ẨN FILE 
   // ==========================================
   const loadDatabase = async () => {
     if (!token) {
-        setStatus({ text: '⚠️ Cần có Token GitHub để tải DB!', type: 'error' });
+        setStatus({ text: 'Cần có Token GitHub để tải DB!', type: 'error' });
         setTimeout(() => setStatus({ text: '', type: '' }), 3000);
         return;
     }
@@ -139,10 +158,7 @@ export default function App() {
       const dbData = await fetchRawJSON(`${username}/${username}.github.io`, 'cms_db.json', token);
       
       if (dbData && dbData.allFiles) {
-        
-        // -------------------------------------------------------------
-        // CHỈ KHỬ TRÙNG LẶP - KHÔNG ẨN BẤT CỨ FILE NÀO (export, index...)
-        // -------------------------------------------------------------
+        // KHỬ TRÙNG LẶP DỰA TRÊN TÊN FILE
         const uniqueFilesMap = new Map();
         
         dbData.allFiles.forEach(f => {
@@ -153,8 +169,8 @@ export default function App() {
         });
         
         const cleanFiles = Array.from(uniqueFilesMap.values()).sort((a, b) => b.timestamp - a.timestamp);
-
         const reposMap = {}; cleanFiles.forEach(f => { if(!reposMap[f.repoName]) reposMap[f.repoName] = []; reposMap[f.repoName].push(f); });
+        
         const loadedDb = { files: cleanFiles, repos: reposMap, tags: meta?.tags || {}, pinned: meta?.pinned || [], links: meta?.links || {}, colors: meta?.colors || {}, titles: meta?.titles || {}, tasks: meta?.tasks || [], customCol: meta?.customCol || [] };
         
         saveLocalDb(loadedDb);
@@ -165,7 +181,6 @@ export default function App() {
             setTags(ctx.tags);
         }
 
-        // TỰ ĐỘNG GHI ĐÈ LÊN GITHUB NẾU CÓ RÁC TRÙNG LẶP
         if (cleanFiles.length < dbData.allFiles.length) {
             setStatus({ text: 'Đang dọn dẹp thẻ trùng lặp trên GitHub...', type: 'loading' });
             const dbContent = await encodeBase64UTF8Async(JSON.stringify({ allFiles: cleanFiles }));
@@ -177,10 +192,10 @@ export default function App() {
             });
         }
 
-        setStatus({ text: '✅ Đã tải và đồng bộ xong!', type: 'success' }); setTimeout(() => setStatus({ text: '', type: '' }), 3000);
+        setStatus({ text: 'Đã tải và đồng bộ xong!', type: 'success' }); setTimeout(() => setStatus({ text: '', type: '' }), 3000);
       }
     } catch (e) { 
-        setStatus({ text: `❌ Lỗi DB: ${e.message}`, type: 'error' }); 
+        setStatus({ text: `Lỗi DB: ${e.message}`, type: 'error' }); 
         setTimeout(() => setStatus({ text: '', type: '' }), 5000);
     } finally { 
         setIsSyncing(false); 
@@ -207,7 +222,6 @@ export default function App() {
       setActiveColorPickerCard(null); 
   };
 
-  // --- LOGIC TITLE, SLUG & NHÃN ---
   const generateSlug = (val, currentTags) => {
     let s = val.toLowerCase().replace(/[áàảạãăắằẳẵặâấầẩẫậ]/gi,'a').replace(/[éèẻẽẹêếềểễệ]/gi,'e').replace(/[iíìỉĩị]/gi,'i').replace(/[óòỏõọôốồổỗộơớờởỡợ]/gi,'o').replace(/[úùủũụưứừửữự]/gi,'u').replace(/[ýỳỷỹỵ]/gi,'y').replace(/đ/gi,'d').replace(/\s+/g,'-').replace(/[^\w\-]+/g,'').replace(/\-\-+/g,'-').replace(/^-+|-+$/g,'');
     let tagArr = currentTags.split(',').map(x=>x.trim()).filter(Boolean);
@@ -268,17 +282,19 @@ export default function App() {
     applyLatestTagAndRepo();
   };
 
-  // --- LƯU BÀI TỐI ƯU ---
+  // ==========================================
+  // LƯU BÀI (ĐÃ FIX THUẬT TOÁN CHUYỂN REPO)
+  // ==========================================
   const handleSaveArticle = async () => {
     if (!token) {
-        setStatus({ text: '⚠️ Cần Token GitHub để Lưu Bài!', type: 'error' });
+        setStatus({ text: 'Cần Token GitHub để Lưu Bài!', type: 'error' });
         setTimeout(() => setStatus({ text: '', type: '' }), 3000);
         return;
     }
     if (!repo || !title || !slug || !content) return alert("Thiếu dữ liệu (Kho, Tiêu đề, Slug, Nội dung)!");
     
     setIsSaving(true); 
-    setStatus({ text: '⏳ Đang lưu HTML lên GitHub...', type: 'loading' });
+    setStatus({ text: 'Đang lưu HTML lên GitHub...', type: 'loading' });
     
     try {
       let filename = slug.endsWith('.html') ? slug : slug + '.html';
@@ -287,20 +303,37 @@ export default function App() {
       let fileKey = `${rName}/${filename}`;
 
       const encodedContent = await encodeBase64UTF8Async(content);
+      // Lấy SHA của file ĐÍCH (nếu đã tồn tại ở Repo mới)
       let fileSha = await getFileShaSafe(`${rOwner}/${rName}`, filename, token);
 
+      // 1. LƯU VÀO REPO MỚI
       const resHTML = await fetch(`https://api.github.com/repos/${rOwner}/${rName}/contents/${safeEnc(filename)}`, { method: 'PUT', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ message: `Save: ${title}`, content: encodedContent, sha: fileSha || undefined }) });
       if (!resHTML.ok) throw new Error("Lỗi khi ghi HTML");
       const resHTMLData = await resHTML.json();
 
-      if (editorOriginal.filename && (editorOriginal.filename !== filename || editorOriginal.repo !== `${rOwner}/${rName}`) && editorOriginal.sha) {
-        await fetch(`https://api.github.com/repos/${editorOriginal.repo}/contents/${safeEnc(editorOriginal.filename)}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ message: `Xóa file cũ`, sha: editorOriginal.sha }) });
-        const oldKey = `${editorOriginal.repo.split('/')[1]||editorOriginal.repo.split('/')[0]}/${editorOriginal.filename}`;
-        delete db.tags[oldKey]; delete db.titles[oldKey]; delete db.colors[oldKey]; delete db.links[oldKey];
-        db.pinned = db.pinned.filter(x => x !== oldKey);
+      // 2. XÓA BÀI Ở REPO CŨ NẾU LÀ ĐANG "CHUYỂN NHÀ" HOẶC "ĐỔI TÊN"
+      const oldRepoName = editorOriginal.repo ? (editorOriginal.repo.includes('/') ? editorOriginal.repo.split('/')[1] : editorOriginal.repo) : null;
+      const isMovingRepo = oldRepoName && oldRepoName !== rName;
+      const isRenaming = editorOriginal.filename && editorOriginal.filename !== filename;
+
+      if (editorOriginal.filename && (isMovingRepo || isRenaming) && editorOriginal.sha) {
+        const oldOwner = editorOriginal.repo.split('/')[0] || username;
+        // Kiểm tra xem file cũ có thực sự tồn tại và lấy đúng SHA hiện tại của nó trên GitHub
+        let currentOldSha = await getFileShaSafe(`${oldOwner}/${oldRepoName}`, editorOriginal.filename, token);
+        
+        if (currentOldSha) {
+            await fetch(`https://api.github.com/repos/${oldOwner}/${oldRepoName}/contents/${safeEnc(editorOriginal.filename)}`, { 
+                method: 'DELETE', 
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, 
+                body: JSON.stringify({ message: `Xóa file do chuyển/đổi tên`, sha: currentOldSha }) 
+            });
+            const oldKey = `${oldRepoName}/${editorOriginal.filename}`;
+            delete db.tags[oldKey]; delete db.titles[oldKey]; delete db.colors[oldKey]; delete db.links[oldKey];
+            db.pinned = db.pinned.filter(x => x !== oldKey);
+        }
       }
 
-      setStatus({ text: '⏳ Đang đồng bộ Metadata & DB...', type: 'loading' });
+      setStatus({ text: 'Đang đồng bộ Metadata & DB...', type: 'loading' });
       
       let newTags = { ...db.tags }; let tagArr = tags.split(',').map(x => x.trim()).filter(Boolean);
       if (tagArr.length) newTags[fileKey] = tagArr; else delete newTags[fileKey];
@@ -311,12 +344,11 @@ export default function App() {
       let validLinks = uploadLinks.filter(l => l.title.trim() && l.url.trim());
       if (validLinks.length) newLinksDb[fileKey] = validLinks; else delete newLinksDb[fileKey];
       
-      // BỘ LỌC CHẶN THẺ ẢO: Chém tất cả thẻ nào trùng tên file & repo hoặc trùng SHA cũ
+      // LỌC THẺ ẢO
       let newFiles = [...db.files].filter(f => {
           const isSameNewFile = f.repoName === rName && f.fileName === filename;
-          const isSameOldFile = editorOriginal.filename && f.repoName === (editorOriginal.repo.split('/')[1] || editorOriginal.repo.split('/')[0]) && f.fileName === editorOriginal.filename;
-          const isSameOldSha = editorOriginal.sha && f.sha === editorOriginal.sha;
-          return !(isSameNewFile || isSameOldFile || isSameOldSha);
+          const isSameOldFile = oldRepoName && f.repoName === oldRepoName && f.fileName === editorOriginal.filename;
+          return !(isSameNewFile || isSameOldFile);
       });
 
       const dDate = new Date();
@@ -328,14 +360,14 @@ export default function App() {
       localStorage.setItem('cms_last_repo', `${rOwner}/${rName}`);
       localStorage.setItem('cms_last_tags', tags);
 
-      setStatus({ text: '✅ Đăng bài thành công!', type: 'success' });
+      setStatus({ text: 'Đăng bài thành công!', type: 'success' });
       
       setTitle(''); setSlug(''); setContent(''); setUploadLinks([]); setIsSlugEdited(false); setEditorOriginal({ repo:'', filename:'', sha:'' });
       applyLatestTagAndRepo(newState); 
       
       setTimeout(() => setStatus({ text: '', type: '' }), 4000);
     } catch (error) { 
-        setStatus({ text: `❌ Lỗi lưu bài: ${error.message}`, type: 'error' }); 
+        setStatus({ text: `Lỗi lưu bài: ${error.message}`, type: 'error' }); 
         setTimeout(() => setStatus({ text: '', type: '' }), 5000);
     } finally { 
         setIsSaving(false); 
@@ -344,14 +376,14 @@ export default function App() {
 
   const editFileContent = async (rName, f, sha) => {
     if(!token) {
-        setStatus({ text: '⚠️ Cần Token GitHub để sửa bài!', type: 'error' });
+        setStatus({ text: 'Cần Token GitHub để sửa bài!', type: 'error' });
         setTimeout(() => setStatus({ text: '', type: '' }), 3000);
         return;
     }
     
     setIsEditorOpen(true); 
     window.scrollTo({top:0,behavior:'smooth'});
-    setStatus({ text: '⏳ Đang nạp HTML từ GitHub...', type: 'loading' });
+    setStatus({ text: 'Đang nạp HTML từ GitHub...', type: 'loading' });
     
     try {
       const res = await fetchText(`https://api.github.com/repos/${username}/${rName}/contents/${safeEnc(f)}?t=${Date.now()}`, token);
@@ -368,18 +400,18 @@ export default function App() {
         setUploadLinks(db.links[fileKey] ? JSON.parse(JSON.stringify(db.links[fileKey])) : []);
 
         setEditorOriginal({ repo: rp, filename: f, sha: sha });
-        setStatus({ text: '✅ Đã nạp thành công!', type: 'success' }); 
+        setStatus({ text: 'Đã nạp thành công!', type: 'success' }); 
         setTimeout(() => setStatus({ text: '', type: '' }), 2000);
       } else throw new Error("Không tìm thấy file");
     } catch(e) { 
-        setStatus({ text: `❌ Lỗi nạp bài: ${e.message}`, type: 'error' }); 
+        setStatus({ text: `Lỗi nạp bài: ${e.message}`, type: 'error' }); 
         setTimeout(() => setStatus({ text: '', type: '' }), 4000);
     }
   };
 
   const togglePin = async (r, f) => {
     if(!token) {
-        setStatus({ text: '⚠️ Cần Token GitHub để ghim bài!', type: 'error' });
+        setStatus({ text: 'Cần Token GitHub để ghim bài!', type: 'error' });
         setTimeout(() => setStatus({ text: '', type: '' }), 3000);
         return;
     }
