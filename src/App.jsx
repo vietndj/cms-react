@@ -1,63 +1,12 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { 
+  username, SECRET_PIN, safeEnc, encodeBase64UTF8Async, getContrastYIQ, 
+  fetchRawJSON, fetchText, getFileShaSafe, getLastContextFromDB, 
+  removeAccents, getStringColor, getTimelineLabel, generateSlug 
+} from './utils.js'; // Import toàn bộ logic từ file utils.js
 
 // ==========================================
-// 1. TIỆN ÍCH GITHUB API & CORE LOGIC
-// ==========================================
-const username = 'vietndj';
-const SECRET_PIN = "0070";
-const safeEnc = (fn) => { try { fn = decodeURIComponent(fn); } catch(e){} return encodeURIComponent(fn); };
-const encodeBase64UTF8Async = async (str) => { const bytes = new TextEncoder().encode(str); let binary = ''; for (let i = 0; i < bytes.byteLength; i += 16384) binary += String.fromCharCode.apply(null, bytes.subarray(i, i + 16384)); return btoa(binary); };
-const getHeaders = (token) => token ? { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github.v3+json' } : { 'Accept': 'application/vnd.github.v3+json' };
-const getContrastYIQ = hex => { if(!hex)return '#1D1D1F'; hex=hex.replace("#",""); const yiq=((parseInt(hex.substr(0,2),16)*299)+(parseInt(hex.substr(2,2),16)*587)+(parseInt(hex.substr(4,2),16)*114))/1000; return (yiq>=128)?'#1D1D1F':'#FFFFFF'; };
-
-const fetchRawJSON = async (repoPath, file, token) => {
-  try { const res = await fetch(`https://api.github.com/repos/${repoPath}/contents/${safeEnc(file)}?t=${Date.now()}`, { headers: { ...getHeaders(token), 'Accept': 'application/vnd.github.v3.raw' } }); if (res.ok) return await res.json(); } catch(e) {}
-  try { const r2 = await fetch(`https://${repoPath.split('/')[0]}.github.io/${file}?t=${Date.now()}`); if(r2.ok) return await r2.json(); } catch(e){} return null;
-};
-const fetchText = async (url, token) => { try { const res = await fetch(url, { headers: { ...getHeaders(token), 'Accept': 'application/vnd.github.v3.raw' }}); return res.ok ? await res.text() : null; } catch(e) { return null; } };
-const getFileShaSafe = async (repoPath, file, token) => { 
-  try { let d = await fetch(`https://api.github.com/repos/${repoPath}/contents/${safeEnc(file)}?t=${Date.now()}`, { headers: getHeaders(token) }).then(r => r.ok ? r.json() : null); if(d && !Array.isArray(d)) return d.sha; 
-  let d2 = await fetch(`https://api.github.com/repos/${repoPath}/contents/?t=${Date.now()}`, { headers: getHeaders(token) }).then(r => r.ok ? r.json() : null); if(d2 && Array.isArray(d2)) { const f = d2.find(x => x.name === file); if(f) return f.sha; } return null; } catch(e) { return null; }
-};
-
-const getLastContextFromDB = (currentDb) => {
-    const files = currentDb.files || [];
-    const tagsDb = currentDb.tags || {};
-    const latestNormal = files.find(f => f.repoName !== `${username}.github.io` && f.repoName !== username);
-    if (latestNormal) {
-        return { repo: `${username}/${latestNormal.repoName}`, tags: (tagsDb[`${latestNormal.repoName}/${latestNormal.fileName}`] || []).join(', ') };
-    }
-    return { repo: `${username}/${username}.github.io`, tags: '' };
-};
-
-const removeAccents = (str) => {
-    if (!str) return "";
-    return str.toString().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/gi, "d").toLowerCase();
-};
-
-const getStringColor = (str) => {
-    if (!str) return '#86868B'; 
-    const colors = ['#EF4444', '#F97316', '#F59E0B', '#10B981', '#06B6D4', '#3B82F6', '#8B5CF6', '#D946EF', '#F43F5E', '#14B8A6'];
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
-    return colors[Math.abs(hash) % colors.length];
-};
-
-// Thuật toán gán nhãn thời gian cho bài viết
-const getTimelineLabel = (timestamp) => {
-    if (!timestamp) return 'Khác';
-    const now = new Date();
-    const date = new Date(timestamp);
-    const diffTime = Math.abs(now.getTime() - date.getTime());
-    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-    
-    if (diffDays <= 7) return '🔥 Tuần này';
-    if (diffDays <= 14) return '📅 Tuần trước';
-    return `Tháng ${date.getMonth() + 1}/${date.getFullYear()}`;
-};
-
-// ==========================================
-// 2. COMPONENT SVG
+// COMPONENT SVG ICONS
 // ==========================================
 const SVGIcons = () => (
   <svg style={{ display: 'none' }}>
@@ -97,7 +46,6 @@ export default function App() {
   const [isTasksOpen, setIsTasksOpen] = useState(false);
   const [isToolsOpen, setIsToolsOpen] = useState(false);
   const [nativeTaskInput, setNativeTaskInput] = useState('');
-
   const [activeColorPickerCard, setActiveColorPickerCard] = useState(null); 
 
   const [isEditorOpen, setIsEditorOpen] = useState(false);
@@ -176,10 +124,7 @@ export default function App() {
         const loadedDb = { files: cleanFiles, repos: reposMap, tags: meta?.tags || {}, pinned: meta?.pinned || [], links: meta?.links || {}, colors: meta?.colors || {}, titles: meta?.titles || {}, tasks: meta?.tasks || [], customCol: meta?.customCol || [] };
         
         saveLocalDb(loadedDb);
-        
-        if (!title && !content && !editorOriginal.sha) {
-            const ctx = getLastContextFromDB(loadedDb); setRepo(ctx.repo); setTags(ctx.tags);
-        }
+        if (!title && !content && !editorOriginal.sha) { const ctx = getLastContextFromDB(loadedDb); setRepo(ctx.repo); setTags(ctx.tags); }
 
         if (cleanFiles.length < dbData.allFiles.length) {
             const dbContent = await encodeBase64UTF8Async(JSON.stringify({ allFiles: cleanFiles }));
@@ -209,13 +154,6 @@ export default function App() {
       setDb(newState); await syncMetaAndDB(newState); saveLocalDb(newState); setActiveColorPickerCard(null); 
   };
 
-  const generateSlug = (val, currentTags) => {
-    let s = val.toLowerCase().replace(/[áàảạãăắằẳẵặâấầẩẫậ]/gi,'a').replace(/[éèẻẽẹêếềểễệ]/gi,'e').replace(/[iíìỉĩị]/gi,'i').replace(/[óòỏõọôốồổỗộơớờởỡợ]/gi,'o').replace(/[úùủũụưứừửữự]/gi,'u').replace(/[ýỳỷỹỵ]/gi,'y').replace(/đ/gi,'d').replace(/\s+/g,'-').replace(/[^\w\-]+/g,'').replace(/\-\-+/g,'-').replace(/^-+|-+$/g,'');
-    let tagArr = currentTags.split(',').map(x=>x.trim()).filter(Boolean);
-    if(tagArr.length && s) { let ts = tagArr.join('-').toLowerCase().replace(/\s+/g,'-'); if(!s.includes(ts)) s += '-' + ts; }
-    return s;
-  };
-
   const handleTitleChange = (e) => { setTitle(e.target.value); if (!isSlugEdited) setSlug(generateSlug(e.target.value, tags)); };
   const handleSlugChange = (e) => { setSlug(e.target.value); setIsSlugEdited(true); };
   const toggleTagEditor = (t) => {
@@ -229,10 +167,7 @@ export default function App() {
     const val = e.target.value; setContent(val);
     if (!title.trim() && val.includes('<title>')) {
         const match = val.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
-        if (match && match[1]) {
-            const extractedTitle = match[1].trim(); setTitle(extractedTitle);
-            if (!isSlugEdited) setSlug(generateSlug(extractedTitle, tags));
-        }
+        if (match && match[1]) { const extractedTitle = match[1].trim(); setTitle(extractedTitle); if (!isSlugEdited) setSlug(generateSlug(extractedTitle, tags)); }
     }
   };
 
@@ -246,7 +181,7 @@ export default function App() {
   };
 
   const handleSaveArticle = async () => {
-    if (!token) { setStatus({ text: 'Cần Token GitHub để Lưu Bài!', type: 'error' }); setTimeout(() => setStatus({ text: '', type: '' }), 3000); return; }
+    if (!token) { setStatus({ text: 'Cần Token GitHub!', type: 'error' }); setTimeout(() => setStatus({ text: '', type: '' }), 3000); return; }
     if (!repo || !title || !slug || !content) return alert("Thiếu dữ liệu (Kho, Tiêu đề, Slug, Nội dung)!");
     setIsSaving(true); setStatus({ text: 'Đang lưu lên GitHub...', type: 'loading' });
     
@@ -271,14 +206,14 @@ export default function App() {
         const oldOwner = editorOriginal.repo.split('/')[0] || username;
         let currentOldSha = await getFileShaSafe(`${oldOwner}/${oldRepoName}`, editorOriginal.filename, token);
         if (currentOldSha) {
-            await fetch(`https://api.github.com/repos/${oldOwner}/${oldRepoName}/contents/${safeEnc(editorOriginal.filename)}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ message: `Xóa file cũ do chuyển/đổi tên`, sha: currentOldSha }) });
+            await fetch(`https://api.github.com/repos/${oldOwner}/${oldRepoName}/contents/${safeEnc(editorOriginal.filename)}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ message: `Xóa file cũ`, sha: currentOldSha }) });
             const oldKey = `${oldRepoName}/${editorOriginal.filename}`;
             delete db.tags[oldKey]; delete db.titles[oldKey]; delete db.colors[oldKey]; delete db.links[oldKey];
             db.pinned = db.pinned.filter(x => x !== oldKey);
         }
       }
 
-      setStatus({ text: 'Đang đồng bộ Metadata & DB...', type: 'loading' });
+      setStatus({ text: 'Đang đồng bộ Metadata...', type: 'loading' });
       
       let newTags = { ...db.tags }; let tagArr = tags.split(',').map(x => x.trim()).filter(Boolean);
       if (tagArr.length) newTags[fileKey] = tagArr; else delete newTags[fileKey];
@@ -332,7 +267,7 @@ export default function App() {
   };
 
   // ==========================================
-  // XỬ LÝ VIEW MODE & LỌC TÌM KIẾM
+  // XỬ LÝ VIEW & FILTER
   // ==========================================
   const repoKeysList = useMemo(() => { const keys = Object.keys(db.repos || {}); if (!keys.includes(`${username}.github.io`)) keys.unshift(`${username}.github.io`); return keys; }, [db.repos]);
   const allUniqueTags = useMemo(() => { const s = new Set(); Object.values(db.tags).forEach(a => a.forEach(t => s.add(t))); return Array.from(s).sort(); }, [db.tags]);
@@ -363,23 +298,16 @@ export default function App() {
     const sortedGroups = {}; 
     
     sortedRepoNames.forEach(r => {
-        // Chỉ chia nhóm phụ nếu ở chế độ GRID và có trên 20 bài viết trong repo
-        if (currentView === 'grid' && groups[r].length > 20) {
+        if (currentView === 'grid' && groups[r].length > 10) { // Giảm xuống 10 bài là kích hoạt gom nhóm Grid cho dễ nhìn
             const subGroups = {};
             groups[r].forEach(f => {
                 const tlLabel = getTimelineLabel(f.timestamp);
                 if (!subGroups[tlLabel]) subGroups[tlLabel] = [];
                 subGroups[tlLabel].push(f);
             });
-            // Duy trì thứ tự Tuần này -> Tuần trước -> Các tháng cũ hơn
             const orderedSubGroups = {};
-            ['🔥 Tuần này', '📅 Tuần trước'].forEach(k => {
-                if (subGroups[k]) orderedSubGroups[k] = subGroups[k];
-            });
-            Object.keys(subGroups).forEach(k => {
-                if (k !== '🔥 Tuần này' && k !== '📅 Tuần trước') orderedSubGroups[k] = subGroups[k];
-            });
-
+            ['📍 Hôm nay', '🔥 Tuần này', '📅 Tuần trước'].forEach(k => { if (subGroups[k]) orderedSubGroups[k] = subGroups[k]; });
+            Object.keys(subGroups).forEach(k => { if (!['📍 Hôm nay', '🔥 Tuần này', '📅 Tuần trước'].includes(k)) orderedSubGroups[k] = subGroups[k]; });
             sortedGroups[r] = { isSubGrouped: true, data: orderedSubGroups };
         } else {
             sortedGroups[r] = { isSubGrouped: false, data: groups[r] };
@@ -389,9 +317,8 @@ export default function App() {
   }, [unpinnedFiles, currentView]);
 
   // ==========================================
-  // RENDER CÁC CHẾ ĐỘ XEM (VIEW MODES COMPONENTIZATION)
+  // RENDER CÁC CHẾ ĐỘ XEM
   // ==========================================
-  
   const renderActionIcons = (fileKey, rName, fName, sha, isP, textMutedColor) => {
     const isColorPickerOpen = activeColorPickerCard === fileKey;
     return (
@@ -415,7 +342,7 @@ export default function App() {
   );
 
   const renderListView = (files) => (
-      <div className="flex flex-col gap-[1px] bg-[var(--border)] border cms-border rounded-xl overflow-hidden shadow-sm">
+      <div className="flex flex-col gap-[1px] bg-[var(--border)] border cms-border rounded-xl overflow-hidden shadow-sm w-full">
           {files.map(f => {
               const fileKey = `${f.repoName}/${f.fileName}`;
               const isP = db.pinned.includes(fileKey);
@@ -430,12 +357,9 @@ export default function App() {
                     <div className="flex items-center gap-3 min-w-0 flex-1">
                         <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{backgroundColor: isP ? '#FF9500' : 'transparent'}}></span>
                         <h4 className="font-bold text-sm truncate">{f.name}</h4>
-                        <div className="hidden sm:flex flex-wrap gap-1 opacity-0 group-hover:opacity-100 transition-opacity absolute right-[150px] bg-gradient-to-l from-[var(--bg-card)] pr-4">
-                             {(db.tags[fileKey]||[]).slice(0,2).map(t => <span key={t} className="text-[9px] px-1.5 py-0.5 rounded border border-[var(--border)] uppercase" style={{color: textColor}}>{t}</span>)}
-                        </div>
                     </div>
                     <div className="flex items-center gap-4 shrink-0">
-                        <span className="text-[10px] font-mono opacity-60 hidden md:block">{f.fullDate?.split(' ')[1] || f.fullDate}</span>
+                        <span className="text-[10px] font-mono opacity-60 hidden md:block">{f.fullDate?.split(' ')[0]}</span>
                         <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-[var(--bg-card)] rounded shadow-sm border border-[var(--border)] px-1">
                             {renderActionIcons(fileKey, f.repoName, f.fileName, f.sha, isP, textMutedColor)}
                         </div>
@@ -447,7 +371,7 @@ export default function App() {
   );
 
   const renderGridView = (files) => (
-      <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-5 w-full">
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-5 w-full">
           {files.map(f => {
               const fileKey = `${f.repoName}/${f.fileName}`;
               const isP = db.pinned.includes(fileKey);
@@ -468,7 +392,7 @@ export default function App() {
                       <div className="mt-auto pt-3 border-t flex justify-between items-center gap-2" style={{borderColor: borderColor}}>
                           <div className="flex flex-col gap-1 min-w-0">
                               <span className="text-[9px] font-black uppercase tracking-widest flex items-center gap-1" style={{color: textMutedColor}}><svg className="w-3 h-3"><use href="#icon-folder"></use></svg> {f.repoName}</span>
-                              <span className="text-[9px] font-mono opacity-60" style={{color: textMutedColor}}>{f.fullDate?.split(' ')[1] || f.fullDate}</span>
+                              <span className="text-[9px] font-mono opacity-60" style={{color: textMutedColor}}>{f.fullDate?.split(' ')[0]}</span>
                           </div>
                           {renderActionIcons(fileKey, f.repoName, f.fileName, f.sha, isP, textMutedColor)}
                       </div>
@@ -487,7 +411,7 @@ export default function App() {
   );
 
   const renderTableView = (files) => (
-      <div className="cms-card overflow-x-auto border cms-border rounded-xl shadow-sm">
+      <div className="cms-card overflow-x-auto border cms-border rounded-xl shadow-sm w-full">
           <table className="w-full text-left text-sm min-w-[800px]">
               <thead>
                   <tr className="bg-[var(--bg-hover)] text-[var(--text-muted)] text-[10px] uppercase tracking-wider border-b cms-border">
@@ -519,7 +443,7 @@ export default function App() {
                                   </div>
                               </td>
                               <td className="p-3 text-xs opacity-80 uppercase font-bold tracking-widest text-[10px]">{f.repoName}</td>
-                              <td className="p-3 text-xs opacity-70 whitespace-nowrap font-mono">{f.fullDate?.split(' ')[1] || f.fullDate}</td>
+                              <td className="p-3 text-xs opacity-70 whitespace-nowrap font-mono">{f.fullDate?.split(' ')[0]}</td>
                               <td className="p-3" onClick={e=>e.stopPropagation()}>
                                   <div className="flex justify-center bg-[var(--bg-card)] rounded-lg shadow-sm border border-[var(--border)]">
                                       {renderActionIcons(fileKey, f.repoName, f.fileName, f.sha, isP, textMutedColor)}
@@ -533,6 +457,39 @@ export default function App() {
       </div>
   );
 
+  const renderFeedView = (files) => (
+      <div className="flex flex-col max-w-3xl mx-auto gap-10 w-full">
+          {files.map(f => {
+              const fileKey = `${f.repoName}/${f.fileName}`;
+              const isP = db.pinned.includes(fileKey);
+              const col = db.colors[fileKey];
+              const isDark = col && getContrastYIQ(col) === '#FFFFFF';
+              const textColor = col ? (isDark ? '#FFF' : '#1D1D1F') : 'var(--text-main)';
+              const borderColor = col ? (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)') : 'var(--border)';
+              
+              return (
+                  <article key={f.sha} className="cms-card p-6 md:p-8 flex flex-col relative border cms-border shadow-md rounded-2xl bg-[var(--bg-card)]" style={{backgroundColor: col || 'var(--bg-card)', color: textColor, border: `1px solid ${borderColor}`}}>
+                      <div className="flex items-center gap-3 mb-6">
+                          <div className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-xl bg-[var(--bg-hover)] border cms-border text-[var(--text-main)]"><svg className="w-5 h-5 opacity-70"><use href="#icon-folder"></use></svg></div>
+                          <div>
+                              <p className="text-xs font-black uppercase tracking-widest opacity-80">{f.repoName}</p>
+                              <p className="text-[11px] font-mono opacity-60 mt-0.5">{f.fullDate}</p>
+                          </div>
+                      </div>
+                      <h2 className="text-3xl font-bold leading-tight mb-4">{f.name}</h2>
+                      {renderTagsAndLinks(getFileTags(f.repoName, f.fileName), getFileLinks(f.repoName, f.fileName), 'var(--bg-hover)', textColor)}
+                      <div className="mt-6 mb-8 text-[16px] leading-relaxed opacity-90 whitespace-pre-line border-l-4 pl-4" style={{borderColor: isDark ? 'rgba(255,255,255,0.2)' : 'var(--border)'}}>{f.preview}</div>
+                      <div className="flex flex-wrap gap-2 pt-6 border-t" style={{borderColor: borderColor}}>
+                          <a href={f.url} target="_blank" rel="noreferrer" className="px-6 py-2.5 bg-[var(--bg-hover)] rounded-xl text-sm font-bold shadow-sm border cms-border hover:opacity-80 transition" style={{color: textColor}}>Đọc bài</a>
+                          <button onClick={() => editFileContent(f.repoName, f.fileName, f.sha)} className="px-6 py-2.5 bg-[var(--accent)] text-white rounded-xl text-sm font-bold shadow-sm flex items-center gap-2 hover:opacity-90 transition ml-auto"><svg className="w-4 h-4"><use href="#icon-edit"></use></svg> Sửa bài</button>
+                          <button onClick={() => togglePin(f.repoName, f.fileName)} className="px-4 py-2.5 bg-[var(--bg-hover)] rounded-xl border cms-border transition flex items-center gap-2 text-sm font-bold hover:opacity-80" style={{color: isP ? '#FF9500' : textColor}}><svg className="w-4 h-4"><use href={isP ? "#icon-pin-filled" : "#icon-pin"}></use></svg> Ghim</button>
+                      </div>
+                  </article>
+              )
+          })}
+      </div>
+  );
+
   const renderKanbanView = () => {
     const columns = Object.keys(groupedFilesByRepo);
     if (columns.length === 0 && pinnedFiles.length === 0) return <div className="text-center py-20 text-[var(--text-muted)] font-bold text-sm">Trống</div>;
@@ -540,39 +497,29 @@ export default function App() {
     return (
         <div className="flex overflow-x-auto gap-6 pb-6 w-full items-start kanban-scroll min-h-[70vh]">
             {pinnedFiles.length > 0 && (
-                <div className="w-[320px] shrink-0 bg-[var(--bg-body)] border cms-border rounded-2xl flex flex-col max-h-[75vh] p-2">
-                    <div className="px-3 py-2 flex justify-between items-center font-bold text-sm mb-2 text-[#FF9500]">
-                        <span className="flex items-center gap-1.5"><svg className="w-4 h-4"><use href="#icon-pin-filled"></use></svg> Đã ghim</span>
-                        <span className="bg-[var(--bg-card)] text-[var(--text-main)] text-[10px] px-2 py-0.5 rounded-full shadow-sm">{pinnedFiles.length}</span>
+                <div className="w-[320px] shrink-0 bg-[#F9FAFB] dark:bg-[#121212] border cms-border rounded-2xl flex flex-col max-h-[80vh]">
+                    <div className="p-4 flex justify-between items-center font-bold text-sm text-[#FF9500]">
+                        <span className="flex items-center gap-2"><svg className="w-4 h-4"><use href="#icon-pin-filled"></use></svg> Đã ghim</span>
+                        <span className="bg-[var(--bg-card)] text-[var(--text-main)] text-xs px-2 py-0.5 rounded-full border cms-border shadow-sm">{pinnedFiles.length}</span>
                     </div>
-                    <div className="overflow-y-auto px-1 pb-2 space-y-3 kanban-scroll flex-1">
+                    <div className="overflow-y-auto px-3 pb-3 space-y-3 kanban-scroll flex-1">
                         {pinnedFiles.map(f => {
                             const fileKey = `${f.repoName}/${f.fileName}`;
-                            const isP = true;
-                            const col = db.colors[fileKey];
-                            const isDark = col && getContrastYIQ(col) === '#FFFFFF';
-                            const textColor = col ? (isDark ? '#FFF' : '#1D1D1F') : 'var(--text-main)';
-                            const textMutedColor = col ? (isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)') : 'var(--text-muted)';
-                            const borderColor = col ? (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)') : 'var(--border)';
-                            const btnBg = col ? (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)') : 'var(--bg-hover)';
-
+                            const col = db.colors[fileKey] || 'var(--bg-card)';
+                            const isDark = col !== 'var(--bg-card)' && getContrastYIQ(col) === '#FFFFFF';
+                            const textColor = isDark ? '#FFF' : 'var(--text-main)';
+                            
                             return (
-                                <div key={f.sha} className="cms-card p-4 flex flex-col relative group hover:scale-[1.01] transition border cms-border bg-[var(--bg-card)] cursor-pointer" onClick={() => window.open(f.url, '_blank')} style={{backgroundColor: col || 'var(--bg-card)', color: textColor, border: `1px solid ${borderColor}`}}>
-                                    <h4 className="font-bold text-[15px] hover:underline mb-2 line-clamp-2" style={{color: textColor}}>{f.name}</h4>
-                                    {renderTagsAndLinks(getFileTags(f.repoName, f.fileName), getFileLinks(f.repoName, f.fileName), btnBg, textColor)}
-                                    <div className="flex justify-between items-center mt-auto pt-3 border-t cms-border" style={{borderColor: borderColor}}>
-                                        <span className="text-[10px] opacity-60 font-mono" style={{color: textMutedColor}}>{f.fullDate?.split(' ')[0]}</span>
-                                        <div className="flex gap-0.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition">
-                                           {renderActionIcons(fileKey, f.repoName, f.fileName, f.sha, isP, textMutedColor)}
+                                <div key={f.sha} className="p-4 rounded-xl shadow-sm border cms-border cursor-pointer hover:shadow-md transition group bg-[var(--bg-card)]" onClick={() => window.open(f.url, '_blank')} style={{backgroundColor: col, color: textColor}}>
+                                    <h4 className="font-bold text-[14px] leading-[1.4] mb-3 line-clamp-3">{f.name}</h4>
+                                    {renderTagsAndLinks(getFileTags(f.repoName, f.fileName), getFileLinks(f.repoName, f.fileName), isDark?'rgba(255,255,255,0.1)':'var(--bg-hover)', textColor)}
+                                    <div className="flex justify-between items-center mt-4 pt-3 border-t cms-border opacity-60 group-hover:opacity-100 transition">
+                                        <span className="text-[10px] font-mono">{f.fullDate?.split(' ')[0]}</span>
+                                        <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition">
+                                           <button onClick={(e)=>{e.stopPropagation(); togglePin(f.repoName, f.fileName);}} className="p-1.5 hover:bg-black/10 dark:hover:bg-white/10 rounded" style={{color: '#FF9500'}}><svg className="w-3.5 h-3.5"><use href="#icon-pin-filled"></use></svg></button>
+                                           <button onClick={(e)=>{e.stopPropagation(); editFileContent(f.repoName, f.fileName, f.sha);}} className="p-1.5 hover:bg-black/10 dark:hover:bg-white/10 rounded"><svg className="w-3.5 h-3.5"><use href="#icon-edit"></use></svg></button>
                                         </div>
                                     </div>
-                                    {activeColorPickerCard === fileKey && (
-                                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[var(--bg-body)] border cms-border p-2 rounded-xl shadow-xl flex gap-1 z-50 fade-in" onClick={e => e.stopPropagation()}>
-                                            {[null, '#F2F2F7', '#FFD8BF', '#FFE58F', '#D9F7BE', '#BAE7FF', '#D6E4FF', '#EFDBFF', '#FFD6E7', '#1D1D1F'].map((c, i) => (
-                                              <button key={i} onClick={() => handleSetColor(fileKey, c)} className="w-5 h-5 rounded-full border hover:scale-125 transition" style={{ backgroundColor: c || 'var(--bg-card)', borderColor: c ? 'transparent' : 'var(--border)' }}></button>
-                                            ))}
-                                        </div>
-                                    )}
                                 </div>
                             )
                         })} 
@@ -585,39 +532,29 @@ export default function App() {
                 const files = groupInfo.isSubGrouped ? Object.values(groupInfo.data).flat() : groupInfo.data;
                 
                 return (
-                    <div key={repoName} className="w-[320px] shrink-0 bg-[var(--bg-body)] border cms-border rounded-2xl flex flex-col max-h-[75vh] p-2">
-                        <div className="px-3 py-2 flex justify-between items-center font-bold text-sm mb-2 text-[var(--text-main)]">
-                            <span className="flex items-center gap-1.5 uppercase"><svg className="w-4 h-4 opacity-70"><use href="#icon-folder"></use></svg> {repoName}</span>
-                            <span className="bg-[var(--bg-card)] text-[var(--text-main)] text-[10px] px-2 py-0.5 rounded-full shadow-sm">{files.length}</span>
+                    <div key={repoName} className="w-[320px] shrink-0 bg-[#F9FAFB] dark:bg-[#121212] border cms-border rounded-2xl flex flex-col max-h-[80vh]">
+                        <div className="p-4 flex justify-between items-center font-bold text-sm text-[var(--text-main)]">
+                            <span className="flex items-center gap-2 uppercase tracking-widest"><svg className="w-4 h-4 opacity-50"><use href="#icon-folder"></use></svg> {repoName}</span>
+                            <span className="bg-[var(--bg-card)] text-[var(--text-main)] text-xs px-2 py-0.5 rounded-full border cms-border shadow-sm">{files.length}</span>
                         </div>
-                        <div className="overflow-y-auto px-1 pb-2 space-y-3 kanban-scroll flex-1">
+                        <div className="overflow-y-auto px-3 pb-3 space-y-3 kanban-scroll flex-1">
                             {files.map(f => {
                                 const fileKey = `${f.repoName}/${f.fileName}`;
-                                const isP = false;
-                                const col = db.colors[fileKey];
-                                const isDark = col && getContrastYIQ(col) === '#FFFFFF';
-                                const textColor = col ? (isDark ? '#FFF' : '#1D1D1F') : 'var(--text-main)';
-                                const textMutedColor = col ? (isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)') : 'var(--text-muted)';
-                                const borderColor = col ? (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)') : 'var(--border)';
-                                const btnBg = col ? (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)') : 'var(--bg-hover)';
+                                const col = db.colors[fileKey] || 'var(--bg-card)';
+                                const isDark = col !== 'var(--bg-card)' && getContrastYIQ(col) === '#FFFFFF';
+                                const textColor = isDark ? '#FFF' : 'var(--text-main)';
 
                                 return (
-                                    <div key={f.sha} className="cms-card p-4 flex flex-col relative group hover:scale-[1.01] transition border cms-border bg-[var(--bg-card)] cursor-pointer" onClick={() => window.open(f.url, '_blank')} style={{backgroundColor: col || 'var(--bg-card)', color: textColor, border: `1px solid ${borderColor}`}}>
-                                        <h4 className="font-bold text-[15px] hover:underline mb-2 line-clamp-2" style={{color: textColor}}>{f.name}</h4>
-                                        {renderTagsAndLinks(getFileTags(f.repoName, f.fileName), getFileLinks(f.repoName, f.fileName), btnBg, textColor)}
-                                        <div className="flex justify-between items-center mt-auto pt-3 border-t cms-border" style={{borderColor: borderColor}}>
-                                            <span className="text-[10px] opacity-60 font-mono" style={{color: textMutedColor}}>{f.fullDate?.split(' ')[0]}</span>
-                                            <div className="flex gap-0.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition">
-                                               {renderActionIcons(fileKey, f.repoName, f.fileName, f.sha, isP, textMutedColor)}
+                                    <div key={f.sha} className="p-4 rounded-xl shadow-sm border cms-border cursor-pointer hover:shadow-md transition group bg-[var(--bg-card)]" onClick={() => window.open(f.url, '_blank')} style={{backgroundColor: col, color: textColor}}>
+                                        <h4 className="font-bold text-[14px] leading-[1.4] mb-3 line-clamp-3">{f.name}</h4>
+                                        {renderTagsAndLinks(getFileTags(f.repoName, f.fileName), getFileLinks(f.repoName, f.fileName), isDark?'rgba(255,255,255,0.1)':'var(--bg-hover)', textColor)}
+                                        <div className="flex justify-between items-center mt-4 pt-3 border-t cms-border opacity-60 group-hover:opacity-100 transition">
+                                            <span className="text-[10px] font-mono">{f.fullDate?.split(' ')[0]}</span>
+                                            <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition">
+                                               <button onClick={(e)=>{e.stopPropagation(); togglePin(f.repoName, f.fileName);}} className="p-1.5 hover:bg-black/10 dark:hover:bg-white/10 rounded"><svg className="w-3.5 h-3.5"><use href="#icon-pin"></use></svg></button>
+                                               <button onClick={(e)=>{e.stopPropagation(); editFileContent(f.repoName, f.fileName, f.sha);}} className="p-1.5 hover:bg-black/10 dark:hover:bg-white/10 rounded"><svg className="w-3.5 h-3.5"><use href="#icon-edit"></use></svg></button>
                                             </div>
                                         </div>
-                                        {activeColorPickerCard === fileKey && (
-                                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[var(--bg-body)] border cms-border p-2 rounded-xl shadow-xl flex gap-1 z-50 fade-in" onClick={e => e.stopPropagation()}>
-                                                {[null, '#F2F2F7', '#FFD8BF', '#FFE58F', '#D9F7BE', '#BAE7FF', '#D6E4FF', '#EFDBFF', '#FFD6E7', '#1D1D1F'].map((c, i) => (
-                                                  <button key={i} onClick={() => handleSetColor(fileKey, c)} className="w-5 h-5 rounded-full border hover:scale-125 transition" style={{ backgroundColor: c || 'var(--bg-card)', borderColor: c ? 'transparent' : 'var(--border)' }}></button>
-                                                ))}
-                                            </div>
-                                        )}
                                     </div>
                                 )
                             })}
@@ -629,99 +566,47 @@ export default function App() {
     )
   };
 
-  const renderFeedView = (files) => (
-      <div className="flex flex-col max-w-3xl mx-auto gap-10 w-full">
-          {files.map(f => {
-              const fileKey = `${f.repoName}/${f.fileName}`;
-              const isP = db.pinned.includes(fileKey);
-              const col = db.colors[fileKey];
-              const isDark = col && getContrastYIQ(col) === '#FFFFFF';
-              const textColor = col ? (isDark ? '#FFF' : '#1D1D1F') : 'var(--text-main)';
-              const textMutedColor = col ? (isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)') : 'var(--text-muted)';
-              const borderColor = col ? (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)') : 'var(--border)';
-              
-              return (
-                  <article key={f.sha} className="cms-card p-6 md:p-8 flex flex-col relative border cms-border shadow-md rounded-2xl bg-[var(--bg-card)]" style={{backgroundColor: col || 'var(--bg-card)', color: textColor, border: `1px solid ${borderColor}`}}>
-                      <div className="flex items-center gap-3 mb-6">
-                          <div className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-xl bg-[var(--bg-hover)] border cms-border text-[var(--text-main)]">
-                              <svg className="w-5 h-5 opacity-70"><use href="#icon-folder"></use></svg>
-                          </div>
-                          <div>
-                              <p className="text-xs font-black uppercase tracking-widest opacity-80">{f.repoName}</p>
-                              <p className="text-[11px] font-mono opacity-60 mt-0.5">{f.fullDate}</p>
-                          </div>
-                      </div>
-                      
-                      <h2 className="text-3xl font-bold leading-tight mb-4">{f.name}</h2>
-                      {renderTagsAndLinks(getFileTags(f.repoName, f.fileName), getFileLinks(f.repoName, f.fileName), 'var(--bg-hover)', textColor)}
-                      
-                      <div className="mt-6 mb-8 text-[16px] leading-relaxed opacity-90 whitespace-pre-line border-l-4 pl-4" style={{borderColor: isDark ? 'rgba(255,255,255,0.2)' : 'var(--border)'}}>
-                          {f.preview}
-                      </div>
-                      
-                      <div className="flex flex-wrap gap-2 pt-6 border-t" style={{borderColor: borderColor}}>
-                          <a href={f.url} target="_blank" rel="noreferrer" className="px-6 py-2.5 bg-[var(--bg-hover)] rounded-xl text-sm font-bold shadow-sm border cms-border hover:opacity-80 transition" style={{color: textColor}}>Đọc bài</a>
-                          <button onClick={() => editFileContent(f.repoName, f.fileName, f.sha)} className="px-6 py-2.5 bg-[var(--accent)] text-white rounded-xl text-sm font-bold shadow-sm flex items-center gap-2 hover:opacity-90 transition ml-auto"><svg className="w-4 h-4"><use href="#icon-edit"></use></svg> Sửa bài</button>
-                          <button onClick={() => togglePin(f.repoName, f.fileName)} className="px-4 py-2.5 bg-[var(--bg-hover)] rounded-xl border cms-border transition flex items-center gap-2 text-sm font-bold hover:opacity-80" style={{color: isP ? '#FF9500' : textColor}}><svg className="w-4 h-4"><use href={isP ? "#icon-pin-filled" : "#icon-pin"}></use></svg> Ghim</button>
-                          <div className="relative">
-                              <button onClick={() => setActiveColorPickerCard(activeColorPickerCard === fileKey ? null : fileKey)} className="px-4 py-2.5 bg-[var(--bg-hover)] rounded-xl border cms-border transition flex items-center gap-2 text-sm font-bold hover:opacity-80" style={{color: textColor}}><svg className="w-4 h-4"><use href="#icon-palette"></use></svg> Màu</button>
-                              {activeColorPickerCard === fileKey && (
-                                  <div className="absolute bottom-full mb-2 right-0 bg-[var(--bg-body)] border cms-border p-2 rounded-xl shadow-xl flex gap-1 z-50 fade-in w-max">
-                                      {[null, '#F2F2F7', '#FFD8BF', '#FFE58F', '#D9F7BE', '#BAE7FF', '#D6E4FF', '#EFDBFF', '#FFD6E7', '#1D1D1F'].map((c, i) => (
-                                        <button key={i} onClick={() => handleSetColor(fileKey, c)} className="w-6 h-6 rounded-full border hover:scale-125 transition" style={{ backgroundColor: c || 'var(--bg-card)', borderColor: c ? 'transparent' : 'var(--border)' }}></button>
-                                      ))}
-                                  </div>
-                              )}
-                          </div>
-                      </div>
-                  </article>
-              )
-          })}
-      </div>
-  );
-
   const renderViews = () => {
     if (processedFiles.length === 0) return <div className="text-center py-20 text-[var(--text-muted)] font-bold text-sm">Trống</div>;
-    
     if (currentView === 'kanban') return renderKanbanView();
 
     return (
       <div className="flex flex-col gap-8 w-full">
         {pinnedFiles.length > 0 && (
-            <details open className="mb-2 outline-none">
-                <summary className="font-bold text-lg mb-4 border-b border-[var(--border)] pb-2 cursor-pointer outline-none text-[#FF9500] flex items-center gap-2">
-                    <svg className="w-5 h-5"><use href="#icon-pin-filled"></use></svg> Đã ghim <span className="text-xs px-2 py-0.5 rounded-full border cms-border text-[var(--text-main)] ml-2">{pinnedFiles.length}</span>
-                </summary>
+            <div className="mb-2 outline-none">
+                <h3 className="font-bold text-lg mb-4 border-b border-[var(--border)] pb-2 flex items-center gap-2 text-[#FF9500]">
+                    <svg className="w-5 h-5"><use href="#icon-pin-filled"></use></svg> Đã ghim <span className="text-xs px-2 py-0.5 rounded-full border cms-border text-[var(--text-main)] ml-2 bg-[var(--bg-hover)]">{pinnedFiles.length}</span>
+                </h3>
                 {currentView === 'list' && renderListView(pinnedFiles)}
                 {currentView === 'grid' && renderGridView(pinnedFiles)}
                 {currentView === 'table' && renderTableView(pinnedFiles)}
                 {currentView === 'feed' && renderFeedView(pinnedFiles)}
-            </details>
+            </div>
         )}
         
         {Object.keys(groupedFilesByRepo).map(r => {
             const groupInfo = groupedFilesByRepo[r];
             return (
-                <details key={r} open className="mb-6 outline-none">
-                    <summary className="font-bold text-xl mb-4 border-b border-[var(--border)] pb-2 cursor-pointer outline-none flex items-center gap-2 text-[var(--text-main)]">
+                <div key={r} className="mb-6 outline-none w-full">
+                    <h3 className="font-bold text-xl mb-4 border-b border-[var(--border)] pb-2 flex items-center gap-2 text-[var(--text-main)]">
                         <svg className="w-6 h-6 opacity-70"><use href="#icon-folder"></use></svg> {r} 
-                        <span className="text-xs px-2 py-0.5 rounded-full border cms-border text-[var(--text-muted)] ml-2">
+                        <span className="text-xs px-2 py-0.5 rounded-full border cms-border text-[var(--text-muted)] ml-2 bg-[var(--bg-hover)]">
                             {groupInfo.isSubGrouped ? Object.values(groupInfo.data).flat().length : groupInfo.data.length}
                         </span>
-                    </summary>
+                    </h3>
                     
-                    {/* Render Sub-groups theo Tháng/Năm nếu đang ở Grid và có nhiều bài */}
+                    {/* Gom nhóm Timeline chỉ cho Grid */}
                     {groupInfo.isSubGrouped ? (
                         <div className="flex flex-col gap-6">
-                            {['🔥 Tuần này', '📅 Tuần trước'].concat(Object.keys(groupInfo.data).filter(k => k !== '🔥 Tuần này' && k !== '📅 Tuần trước')).map(timeline => {
-                                if (!groupInfo.data[timeline]) return null;
+                            {['📍 Hôm nay', '🔥 Tuần này', '📅 Tuần trước'].concat(Object.keys(groupInfo.data).filter(k => !['📍 Hôm nay','🔥 Tuần này','📅 Tuần trước'].includes(k))).map(timeline => {
+                                if (!groupInfo.data[timeline] || groupInfo.data[timeline].length === 0) return null;
                                 return (
-                                    <details key={timeline} open className="ml-2 border-l-2 border-[var(--border)] pl-4 outline-none">
-                                        <summary className="font-bold text-sm text-[var(--text-muted)] cursor-pointer outline-none mb-4 flex items-center gap-2 py-1 transition hover:text-[var(--text-main)]">
+                                    <div key={timeline} className="ml-2 md:ml-4 border-l-2 border-[var(--border)] pl-4">
+                                        <h4 className="font-bold text-sm text-[var(--text-muted)] mb-4 flex items-center gap-2 py-1">
                                             {timeline} <span className="text-[10px] bg-[var(--bg-hover)] px-2 py-0.5 rounded-full text-[var(--text-main)] border cms-border">{groupInfo.data[timeline].length}</span>
-                                        </summary>
-                                        {currentView === 'grid' && renderGridView(groupInfo.data[timeline])}
-                                    </details>
+                                        </h4>
+                                        {renderGridView(groupInfo.data[timeline])}
+                                    </div>
                                 );
                             })}
                         </div>
@@ -733,14 +618,13 @@ export default function App() {
                             {currentView === 'feed' && renderFeedView(groupInfo.data)}
                         </>
                     )}
-                </details>
+                </div>
             )
         })}
       </div>
     );
   };
 
-  // MÀN HÌNH LOGIN
   if (!isAuthenticated) return ( 
     <div className="flex fixed inset-0 flex-col items-center justify-center z-[99999] bg-[var(--bg-body)]">
         <div className="cms-card p-10 max-w-sm w-full mx-4 text-center rounded-3xl shadow-2xl border cms-border">
@@ -755,13 +639,12 @@ export default function App() {
     <>
       <div className="flex-col w-full min-h-screen fade-in flex bg-[var(--bg-body)]" onClick={() => setActiveColorPickerCard(null)}>
         <SVGIcons />
-        {/* HEADER */}
         <header className="bg-[var(--bg-card)] border-b border-[var(--border)] pt-4 pb-3 px-4 md:px-8 flex flex-col md:flex-row items-center gap-4">
           <h1 className="text-2xl font-bold tracking-tight text-[var(--accent)]">vietndj</h1>
           <div className="flex-1 flex w-full items-center gap-2">
               <div className="flex-1 flex items-center bg-[var(--bg-hover)] rounded-xl px-4 py-2 border cms-border">
                   <svg className="w-4 h-4 text-[var(--text-muted)]"><use href="#icon-search"></use></svg>
-                  <input id="search-input-main" type="text" value={searchQuery} onChange={(e)=>setSearchQuery(e.target.value)} placeholder="Tìm kiếm... (Ctrl K)" className="bg-transparent border-none outline-none text-sm w-full ml-3 font-bold text-[var(--text-main)] placeholder-[var(--text-muted)]" />
+                  <input id="search-input-main" type="text" value={searchQuery} onChange={(e)=>setSearchQuery(e.target.value)} placeholder="Tìm kiếm không dấu... (Ctrl K)" className="bg-transparent border-none outline-none text-sm w-full ml-3 font-bold text-[var(--text-main)] placeholder-[var(--text-muted)]" />
               </div>
               <button onClick={() => setIsDeepSearch(!isDeepSearch)} className={`shrink-0 px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border ${isDeepSearch ? 'bg-[var(--accent)] text-white border-transparent' : 'bg-[var(--bg-hover)] text-[var(--text-main)] cms-border hover:opacity-80'}`} title="Bật/Tắt tìm kiếm sâu trong nội dung">
                   <svg className="w-4 h-4"><use href="#icon-search"></use></svg> <span className="hidden sm:inline-block">Sâu</span>
@@ -786,14 +669,13 @@ export default function App() {
           </div>
         </header>
 
-        {/* BỘ LỌC VIEW VÀ TAGS */}
         <div className="bg-[var(--bg-body)] border-b border-[var(--border)] py-2 px-4 md:px-8 sticky top-0 z-40 flex flex-col gap-2 shadow-sm">
             <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-1">
                 <span className="text-[9px] font-bold text-[var(--text-muted)] uppercase shrink-0 mr-2">VIEW</span>
                 <div className="flex bg-[var(--bg-hover)] p-1 rounded-lg border cms-border gap-1 mr-4">
-                    {[ { id: 'list', icon: '#icon-list', title: 'Danh sách' }, { id: 'grid', icon: '#icon-grid', title: 'Lưới' }, { id: 'kanban', icon: '#icon-kanban', title: 'Kanban' }, { id: 'table', icon: '#icon-list', title: 'Table' }, { id: 'feed', icon: '#icon-feed', title: 'Feed' } ].map(v => (
+                    {[ { id: 'list', icon: '#icon-list', title: 'List' }, { id: 'grid', icon: '#icon-grid', title: 'Grid' }, { id: 'kanban', icon: '#icon-kanban', title: 'Kanban' }, { id: 'table', icon: '#icon-list', title: 'Table' }, { id: 'feed', icon: '#icon-feed', title: 'Feed' } ].map(v => (
                         <button key={v.id} onClick={() => setCurrentView(v.id)} className={`px-3 py-1 rounded-md transition text-xs font-bold flex items-center gap-1.5 ${currentView === v.id ? 'bg-[var(--bg-card)] text-[var(--text-main)] shadow-sm border border-[var(--border)]' : 'text-[var(--text-muted)] hover:text-[var(--text-main)] border border-transparent'}`} title={v.title}>
-                            <svg className="w-3.5 h-3.5"><use href={v.icon}></use></svg> <span className="hidden md:block">{v.title}</span>
+                            <svg className="w-3.5 h-3.5"><use href={v.icon}></use></svg> <span className="hidden md:block capitalize">{v.title}</span>
                         </button>
                     ))}
                 </div>
@@ -805,7 +687,7 @@ export default function App() {
         
         <div className="flex flex-col lg:flex-row gap-6 px-4 md:px-6 lg:px-8 max-w-[1600px] mx-auto items-start w-full relative pb-20 mt-6">
           <main className="flex-1 w-full min-w-0 flex flex-col gap-8">
-            <section className="cms-card overflow-hidden border border-[var(--border)] shadow-sm">
+            <section className="cms-card overflow-hidden border border-[var(--border)] shadow-sm rounded-xl">
               <button onClick={() => {
                   setIsEditorOpen(!isEditorOpen); 
                   if (!isEditorOpen && !title && !content && !editorOriginal.sha) {
@@ -851,6 +733,31 @@ export default function App() {
               )}
             </section>
 
+            {/* KHỐI VỪA THAO TÁC GẦN ĐÂY */}
+            {recentFiles.length > 0 && (
+              <div className="mb-8 mt-4 pl-1">
+                  <div className="flex items-center mb-5 gap-2">
+                      <div className="w-3 h-3 bg-[var(--text-main)] rounded-full"></div>
+                      <h3 className="font-bold text-lg text-[var(--accent)]">Vừa thao tác gần đây</h3>
+                  </div>
+                  <div className="flex overflow-x-auto gap-4 pb-4 scrollbar-hide snap-x">
+                    {recentFiles.map(f => (
+                      <div key={f.sha} onClick={() => window.open(f.url, '_blank')} className="bg-[var(--bg-card)] border cms-border p-4 rounded-2xl min-w-[280px] max-w-[280px] flex flex-col cursor-pointer hover:shadow-md transition snap-start">
+                         <div className="flex items-center gap-1.5 mb-2 opacity-60">
+                             <svg className="w-3 h-3"><use href="#icon-folder"></use></svg>
+                             <span className="text-[10px] font-bold uppercase">{f.repoName}</span>
+                         </div>
+                         <h4 className="font-bold text-[15px] leading-[1.4] mb-6 line-clamp-2 text-[var(--text-main)]">{f.name}</h4>
+                         <div className="mt-auto flex justify-between items-center pt-3 border-t cms-border">
+                             <span className="text-[11px] text-[var(--text-muted)] font-mono">{f.fullDate?.split(' ')[0]}</span>
+                             <button onClick={(e)=>{e.stopPropagation(); editFileContent(f.repoName, f.fileName, f.sha)}} className="bg-[#3B82F6]/10 text-[#3B82F6] font-bold text-xs px-4 py-1.5 rounded-lg hover:bg-[#3B82F6]/20 transition">Sửa</button>
+                         </div>
+                      </div>
+                    ))}
+                  </div>
+              </div>
+            )}
+
             {/* HIỂN THỊ DỮ LIỆU CHÍNH */}
             {renderViews()}
           </main>
@@ -869,9 +776,9 @@ export default function App() {
         </div>
       </div>
 
-      {/* TOAST THÔNG BÁO VỚI LỚP CHE NỔI BẬT LÊN CAO */}
+      {/* TOAST THÔNG BÁO TÁCH RỜI */}
       {status.text && (
-          <div className="fixed top-[80px] left-1/2 transform -translate-x-1/2 z-[9999999] pointer-events-none transition-all duration-300 w-max max-w-[90%]">
+          <div className="fixed top-[80px] left-1/2 transform -translate-x-1/2 z-[9999999] pointer-events-none transition-all duration-300 w-max max-w-[90%] fade-in">
               <div className={`bg-[var(--bg-card)] px-6 py-3.5 rounded-full shadow-2xl flex items-center gap-3 border-2 font-bold text-sm text-[var(--text-main)] ${status.type === 'error' ? 'border-red-500' : status.type === 'loading' ? 'border-[var(--accent)]' : 'border-green-500'}`}>
                   {status.type === 'loading' && <svg className="animate-spin h-5 w-5 text-[var(--accent)]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>}
                   {status.type === 'error' && <span className="text-red-500 text-lg">✕</span>}
