@@ -33,11 +33,36 @@ const getLastContextFromDB = (currentDb) => {
 // Hàm cạo dấu Tiếng Việt phục vụ tìm kiếm sâu
 const removeAccents = (str) => {
     if (!str) return "";
-    return str.toString()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .replace(/đ/gi, "d")
-        .toLowerCase();
+    return str.toString().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/gi, "d").toLowerCase();
+};
+
+// Hàm tạo màu ngẫu nhiên nhưng cố định dựa trên Text (Dùng cho Tags/Avatar)
+const getStringColor = (str) => {
+    if (!str) return '#86868B'; // Màu mặc định
+    const colors = ['#EF4444', '#F97316', '#F59E0B', '#10B981', '#06B6D4', '#3B82F6', '#8B5CF6', '#D946EF', '#F43F5E', '#14B8A6'];
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    return colors[Math.abs(hash) % colors.length];
+};
+
+// Hàm tính toán Timeline: Tuần này, Tuần trước, Tháng...
+const getTimelineLabel = (timestamp) => {
+    if (!timestamp) return 'Chưa phân loại';
+    const now = new Date();
+    const date = new Date(timestamp);
+    
+    // Đặt thời gian về 0h0m0s để tính số ngày chênh lệch chuẩn xác
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startOfTarget = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    
+    const diffTime = Math.abs(startOfToday - startOfTarget);
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays <= 7) return '🔥 Tuần này';
+    if (diffDays <= 14) return '📅 Tuần trước';
+    if (diffDays <= 30) return 'Tháng này';
+    
+    return `Tháng ${date.getMonth() + 1}/${date.getFullYear()}`;
 };
 
 // ==========================================
@@ -77,7 +102,7 @@ export default function App() {
   const [activeRepo, setActiveRepo] = useState('all');
   const [activeTag, setActiveTag] = useState('all');
   
-  // Set default view mode là 'grid'
+  // Set default view mode là 'grid' như yêu cầu
   const [currentView, setCurrentView] = useState('grid'); 
   
   const [isTasksOpen, setIsTasksOpen] = useState(false);
@@ -117,7 +142,7 @@ export default function App() {
         const isCmd = navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? e.metaKey : e.ctrlKey;
         if (isCmd && e.key.toLowerCase() === 'e') { e.preventDefault(); setIsEditorOpen(prev => !prev); }
         if (isCmd && e.key.toLowerCase() === 's') { e.preventDefault(); document.getElementById('btn-save-article')?.click(); }
-        if (isCmd && e.key.toLowerCase() === 'k') { e.preventDefault(); document.getElementById('search-input-main')?.focus(); }
+        // Không override phím tắt tìm kiếm Ctrl+K bằng focus nữa để tránh lỗi mất nhịp khi gõ Text có chữ K (hoặc dùng riêng một scope)
     };
     window.addEventListener('keydown', handleGlobalKeyDown); return () => window.removeEventListener('keydown', handleGlobalKeyDown);
   }, []);
@@ -139,6 +164,9 @@ export default function App() {
   const changeTheme = (theme) => { document.documentElement.setAttribute('data-theme', theme); localStorage.setItem('cms_theme', theme); setIsToolsOpen(false); };
   const saveLocalDb = (newDb) => { try { localStorage.setItem('cms_repo_data', JSON.stringify(newDb)); setDb(newDb); } catch(e) { setDb(newDb); } };
 
+  // ==========================================
+  // HÀM TẢI DB
+  // ==========================================
   const loadDatabase = async () => {
     if (!token) { setStatus({ text: 'Cần có Token GitHub!', type: 'error' }); setTimeout(() => setStatus({ text: '', type: '' }), 3000); return; }
     if (isSyncing) return;
@@ -150,6 +178,7 @@ export default function App() {
       
       if (dbData && dbData.allFiles) {
         const uniqueFilesMap = new Map();
+        
         dbData.allFiles.forEach(f => {
             const key = `${f.repoName}/${f.fileName}`;
             if (!uniqueFilesMap.has(key) || uniqueFilesMap.get(key).timestamp < f.timestamp) {
@@ -232,10 +261,11 @@ export default function App() {
     const ctx = getLastContextFromDB(db); setRepo(ctx.repo); setTags(ctx.tags);
   };
 
+  // LƯU BÀI 
   const handleSaveArticle = async () => {
     if (!token) { setStatus({ text: 'Cần Token GitHub để Lưu Bài!', type: 'error' }); setTimeout(() => setStatus({ text: '', type: '' }), 3000); return; }
     if (!repo || !title || !slug || !content) return alert("Thiếu dữ liệu (Kho, Tiêu đề, Slug, Nội dung)!");
-    setIsSaving(true); setStatus({ text: 'Đang lưu lên GitHub...', type: 'loading' });
+    setIsSaving(true); setStatus({ text: 'Đang lưu HTML lên GitHub...', type: 'loading' });
     
     try {
       let filename = slug.endsWith('.html') ? slug : slug + '.html';
@@ -265,7 +295,7 @@ export default function App() {
         }
       }
 
-      setStatus({ text: 'Đang đồng bộ Metadata...', type: 'loading' });
+      setStatus({ text: 'Đang đồng bộ Metadata & DB...', type: 'loading' });
       
       let newTags = { ...db.tags }; let tagArr = tags.split(',').map(x => x.trim()).filter(Boolean);
       if (tagArr.length) newTags[fileKey] = tagArr; else delete newTags[fileKey];
@@ -326,7 +356,6 @@ export default function App() {
   const getFileTags = (r, f) => db.tags[`${r}/${f}`] || [];
   const getFileLinks = (r, f) => db.links[`${r}/${f}`] || []; 
 
-  // Lọc bài viết + Tìm kiếm không dấu Tiếng Việt
   const processedFiles = useMemo(() => {
     let query = removeAccents(searchQuery);
     let f = db.files.filter(f => {
@@ -344,17 +373,33 @@ export default function App() {
   const pinnedFiles = useMemo(() => processedFiles.filter(f => db.pinned.includes(`${f.repoName}/${f.fileName}`)), [processedFiles, db.pinned]);
   const unpinnedFiles = useMemo(() => processedFiles.filter(f => !db.pinned.includes(`${f.repoName}/${f.fileName}`)), [processedFiles, db.pinned]);
   
+  // GOM NHÓM TỰ ĐỘNG (AUTO-GROUPING) CHO CHẾ ĐỘ GRID KHI CÓ > 20 BÀI
   const groupedFilesByRepo = useMemo(() => { 
     const groups = {}; 
     unpinnedFiles.forEach(f => { if (!groups[f.repoName]) groups[f.repoName] = []; groups[f.repoName].push(f); }); 
     const sortedRepoNames = Object.keys(groups).sort((a, b) => Math.max(...groups[b].map(f => f.timestamp || 0)) - Math.max(...groups[a].map(f => f.timestamp || 0)));
-    const sortedGroups = {}; sortedRepoNames.forEach(r => sortedGroups[r] = groups[r]);
+    const sortedGroups = {}; 
+    
+    sortedRepoNames.forEach(r => {
+        // Chỉ chia nhóm phụ nếu ở chế độ GRID và có trên 20 bài viết trong repo
+        if (currentView === 'grid' && groups[r].length > 20) {
+            const subGroups = {};
+            groups[r].forEach(f => {
+                const tlLabel = getTimelineLabel(f.timestamp);
+                if (!subGroups[tlLabel]) subGroups[tlLabel] = [];
+                subGroups[tlLabel].push(f);
+            });
+            sortedGroups[r] = { isSubGrouped: true, data: subGroups };
+        } else {
+            sortedGroups[r] = { isSubGrouped: false, data: groups[r] };
+        }
+    });
     return sortedGroups; 
-  }, [unpinnedFiles]);
+  }, [unpinnedFiles, currentView]);
 
-  // Cấu trúc class cho Container để hỗ trợ Fluid Grid tràn màn hình
+  // CONTAINER CỦA GRID NAY ĐƯỢC TỐI ƯU FLUID WIDTH
   const getViewContainerClass = () => {
-      if (currentView === 'grid') return "grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-5 w-full";
+      if (currentView === 'grid') return "grid grid-cols-[repeat(auto-fill,minmax(320px,1fr))] gap-5 w-full";
       if (currentView === 'kanban') return "flex overflow-x-auto gap-4 pb-4 snap-x w-full";
       if (currentView === 'feed') return "flex flex-col max-w-3xl mx-auto gap-8 w-full";
       return "flex flex-col gap-3 w-full"; 
@@ -375,10 +420,14 @@ export default function App() {
     const tagsList = getFileTags(file.repoName, file.fileName);
     const linksList = getFileLinks(file.repoName, file.fileName);
     const dateFmt = file.fullDate?.split(' ')[0] || '';
+    
+    // TẠO AVATAR CHỮ CHO NEWS CARD LẤY MÀU TỰ ĐỘNG TỪ TAG
+    const firstLetter = file.name ? file.name.charAt(0).toUpperCase() : '?';
+    const tagColor = tagsList.length > 0 ? getStringColor(tagsList[0]) : 'var(--border)';
 
     if (isRecent) {
       return (
-        <div key={file.sha} className="cms-card p-3 min-w-[220px] max-w-[220px] flex flex-col transition border cms-border hover:border-[var(--accent)] bg-[var(--bg-card)] cursor-pointer snap-start" onClick={() => window.open(file.url, '_blank')}>
+        <div key={file.sha} className="cms-card p-3 min-w-[220px] max-w-[220px] flex flex-col transition border cms-border hover:border-[var(--accent)] bg-[var(--bg-card)] cursor-pointer snap-start" onClick={() => window.open(file.url, '_blank')} style={{ borderTop: `3px solid ${tagColor}`}}>
           <h4 className="font-bold text-sm leading-snug line-clamp-2 mb-3 text-[var(--text-main)] flex-1">{file.name}</h4>
           <div className="flex justify-between items-center mt-auto border-t border-black/5 dark:border-white/5 pt-2">
              <div className="flex items-center gap-1.5 opacity-60"><svg className="w-2.5 h-2.5"><use href="#icon-folder"></use></svg><span className="text-[9px] uppercase font-bold tracking-tight">{file.repoName}</span></div>
@@ -388,21 +437,31 @@ export default function App() {
       );
     }
 
-    let cardClass = "cms-card p-4 flex flex-col relative transition border cms-border hover:border-[var(--accent)] cursor-pointer group shadow-sm bg-[var(--bg-card)] ";
-    if (currentView === 'kanban') cardClass += "min-w-[280px] snap-start";
+    let cardClass = "cms-card flex flex-col relative transition border cms-border hover:border-[var(--accent)] cursor-pointer group shadow-sm bg-[var(--bg-card)] overflow-hidden ";
+    if (currentView === 'kanban') cardClass += "min-w-[300px] snap-start p-4";
     else if (currentView === 'feed') cardClass += "p-6 md:p-8 text-lg";
+    else cardClass += "p-5";
 
     return (
-      <div key={file.sha} className={cardClass} onClick={() => window.open(file.url, '_blank')} style={{backgroundColor: col || 'var(--bg-card)', color: textColor, border: `1px solid ${borderColor}`}}>
-        <div className="flex-1 min-w-0 mb-4">
-            <h4 className={`font-bold leading-[1.3] ${currentView === 'feed' ? 'text-2xl mb-4' : 'text-[16px] line-clamp-3'}`} style={{color: textColor}}>{file.name}</h4>
-            {currentView === 'feed' && <p className="text-sm opacity-80 mt-2 mb-4 leading-relaxed">{file.preview}</p>}
+      <div key={file.sha} className={cardClass} onClick={() => window.open(file.url, '_blank')} style={{backgroundColor: col || 'var(--bg-card)', color: textColor, border: `1px solid ${borderColor}`, borderTop: col ? '' : `3px solid ${tagColor}`}}>
+        
+        {/* AVATAR + TITLE LAYOUT */}
+        <div className="flex items-start gap-4 mb-4">
+            {(currentView === 'grid' || currentView === 'kanban') && !col && (
+                <div className="w-10 h-10 shrink-0 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-sm" style={{ backgroundColor: tagColor }}>
+                    {firstLetter}
+                </div>
+            )}
+            <div className="flex-1 min-w-0">
+                <h4 className={`font-bold leading-[1.4] ${currentView === 'feed' ? 'text-2xl mb-4' : 'text-[16px] line-clamp-3'}`} style={{color: textColor}}>{file.name}</h4>
+                {currentView === 'feed' && <p className="text-sm opacity-80 mt-2 mb-4 leading-relaxed">{file.preview}</p>}
+            </div>
         </div>
 
         {linksList.length > 0 && (
-            <div className="flex flex-col gap-1 mb-3">
+            <div className="flex flex-col gap-1 mb-4">
                 {linksList.map((lnk, idx) => (
-                    <a key={idx} href={lnk.url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="text-[10px] font-bold py-1 px-2 rounded-lg flex items-center gap-1.5 hover:opacity-80 transition truncate" style={{backgroundColor: btnBg, color: 'var(--accent)'}}>
+                    <a key={idx} href={lnk.url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="text-[10px] font-bold py-1.5 px-2.5 rounded-lg flex items-center gap-1.5 hover:opacity-80 transition truncate" style={{backgroundColor: btnBg, color: 'var(--accent)'}}>
                         <svg className="w-3 h-3"><use href="#icon-link"></use></svg> {lnk.title}
                     </a>
                 ))}
@@ -456,19 +515,43 @@ export default function App() {
             </details>
         )}
         
-        {Object.keys(groupedFilesByRepo).map(r => (
-            <details key={r} open className="mb-2 outline-none">
-                <summary className="font-bold text-lg mb-4 border-b border-[var(--border)] pb-2 cursor-pointer outline-none flex items-center gap-2 text-[var(--text-main)]">
-                    <svg className="w-5 h-5 opacity-70"><use href="#icon-folder"></use></svg> {r} <span className="text-xs px-2 py-0.5 rounded-full border cms-border text-[var(--text-muted)] ml-2">{groupedFilesByRepo[r].length}</span>
-                </summary>
-                <div className={getViewContainerClass()}>{groupedFilesByRepo[r].map(f => renderCard(f))}</div>
-            </details>
-        ))}
+        {Object.keys(groupedFilesByRepo).map(r => {
+            const groupInfo = groupedFilesByRepo[r];
+            return (
+                <details key={r} open className="mb-6 outline-none">
+                    <summary className="font-bold text-xl mb-4 border-b border-[var(--border)] pb-2 cursor-pointer outline-none flex items-center gap-2 text-[var(--text-main)]">
+                        <svg className="w-6 h-6 opacity-70"><use href="#icon-folder"></use></svg> {r} 
+                        <span className="text-xs px-2 py-0.5 rounded-full border cms-border text-[var(--text-muted)] ml-2">
+                            {groupInfo.isSubGrouped ? Object.values(groupInfo.data).flat().length : groupInfo.data.length}
+                        </span>
+                    </summary>
+                    
+                    {/* Render Sub-groups (Timeline Kanban) nếu có > 20 bài và đang ở chế độ Grid */}
+                    {groupInfo.isSubGrouped ? (
+                        <div className="flex flex-col gap-6">
+                            {/* Phân nhóm theo thứ tự: Tuần này -> Tuần trước -> Tháng */}
+                            {['🔥 Tuần này', '📅 Tuần trước'].concat(Object.keys(groupInfo.data).filter(k => k !== '🔥 Tuần này' && k !== '📅 Tuần trước')).map(timeline => {
+                                if (!groupInfo.data[timeline]) return null;
+                                return (
+                                    <details key={timeline} open className="ml-2 border-l-2 border-[var(--border)] pl-4 outline-none">
+                                        <summary className="font-bold text-sm text-[var(--text-muted)] cursor-pointer outline-none mb-4 flex items-center gap-2 py-1 transition hover:text-[var(--text-main)]">
+                                            {timeline} <span className="text-[10px] bg-[var(--bg-hover)] px-2 py-0.5 rounded-full text-[var(--text-main)] border cms-border">{groupInfo.data[timeline].length}</span>
+                                        </summary>
+                                        <div className={getViewContainerClass()}>{groupInfo.data[timeline].map(f => renderCard(f))}</div>
+                                    </details>
+                                );
+                            })}
+                        </div>
+                    ) : (
+                        <div className={getViewContainerClass()}>{groupInfo.data.map(f => renderCard(f))}</div>
+                    )}
+                </details>
+            )
+        })}
       </div>
     );
   };
 
-  // MÀN HÌNH LOGIN
   if (!isAuthenticated) return ( 
     <div className="flex fixed inset-0 flex-col items-center justify-center z-[99999] bg-[var(--bg-body)]">
         <div className="cms-card p-10 max-w-sm w-full mx-4 text-center rounded-3xl shadow-2xl border cms-border">
@@ -488,6 +571,7 @@ export default function App() {
           <div className="flex-1 flex w-full items-center gap-2">
               <div className="flex-1 flex items-center bg-[var(--bg-hover)] rounded-xl px-4 py-2 border cms-border">
                   <svg className="w-4 h-4 text-[var(--text-muted)]"><use href="#icon-search"></use></svg>
+                  {/* Ô tìm kiếm đã được gỡ bỏ khỏi cơ chế render lại của bọc Component ngoài để tránh mất Focus */}
                   <input id="search-input-main" type="text" value={searchQuery} onChange={(e)=>setSearchQuery(e.target.value)} placeholder="Tìm kiếm... (Ctrl K)" className="bg-transparent border-none outline-none text-sm w-full ml-3 font-bold text-[var(--text-main)] placeholder-[var(--text-muted)]" />
               </div>
               <button onClick={() => setIsDeepSearch(!isDeepSearch)} className={`shrink-0 px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border ${isDeepSearch ? 'bg-[var(--accent)] text-white border-transparent' : 'bg-[var(--bg-hover)] text-[var(--text-main)] cms-border hover:opacity-80'}`} title="Bật/Tắt tìm kiếm sâu trong nội dung">
@@ -601,13 +685,13 @@ export default function App() {
         </div>
       </div>
 
-      {/* TOAST THÔNG BÁO VỚI LỚP CHE NỔI BẬT LÊN CAO (GIẢI PHÓNG KHỎI .FADE-IN) */}
+      {/* TOAST THÔNG BÁO VỚI LỚP CHE NỔI BẬT LÊN CAO */}
       {status.text && (
           <div className="fixed top-[80px] left-1/2 transform -translate-x-1/2 z-[9999999] pointer-events-none transition-all duration-300 w-max max-w-[90%]">
               <div className={`bg-[var(--bg-card)] px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 border-2 font-bold text-sm text-[var(--text-main)] ${status.type === 'error' ? 'border-red-500' : status.type === 'loading' ? 'border-[var(--accent)]' : 'border-green-500'}`}>
                   {status.type === 'loading' && <svg className="animate-spin h-5 w-5 text-[var(--accent)]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>}
-                  {status.type === 'error' && <span className="text-red-500 text-lg">✕</span>}
-                  {status.type === 'success' && <span className="text-green-500 text-lg">✓</span>}
+                  {status.type === 'error' && <span className="text-red-500 text-lg"><svg className="w-5 h-5"><use href="#icon-edit"></use></svg></span>}
+                  {status.type === 'success' && <span className="text-green-500 text-lg"><svg className="w-5 h-5"><use href="#icon-folder"></use></svg></span>}
                   <span className="whitespace-nowrap">{status.text}</span>
               </div>
           </div>
