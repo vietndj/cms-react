@@ -1,7 +1,3 @@
-// ==========================================
-// FILE: utils.js - CHUYÊN XỬ LÝ LOGIC & API
-// ==========================================
-
 export const username = 'vietndj';
 export const SECRET_PIN = "0070";
 
