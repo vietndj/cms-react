@@ -121,7 +121,7 @@ export default function App() {
   const saveLocalDb = (newDb) => { try { localStorage.setItem('cms_repo_data', JSON.stringify(newDb)); setDb(newDb); } catch(e) { setDb(newDb); } };
 
   // ==========================================
-  // HÀM TẢI DB & KHỬ TRÙNG LẶP (ĐÃ FIX THEO ĐÚNG Ý BẠN)
+  // HÀM TẢI DB (ĐÃ BỎ MÀNG LỌC ẨN FILE, CHỈ KHỬ TRÙNG LẶP)
   // ==========================================
   const loadDatabase = async () => {
     if (!token) {
@@ -137,20 +137,21 @@ export default function App() {
     try {
       const meta = await fetchRawJSON(`${username}/${username}.github.io`, 'metadata.json', token);
       const dbData = await fetchRawJSON(`${username}/${username}.github.io`, 'cms_db.json', token);
+      
       if (dbData && dbData.allFiles) {
         
-        // DÙNG MAP ĐỂ CHẶN NHÂN BẢN: Key là Tên Repo + Tên File
+        // -------------------------------------------------------------
+        // CHỈ KHỬ TRÙNG LẶP - KHÔNG ẨN BẤT CỨ FILE NÀO (export, index...)
+        // -------------------------------------------------------------
         const uniqueFilesMap = new Map();
         
         dbData.allFiles.forEach(f => {
             const key = `${f.repoName}/${f.fileName}`;
-            // Nếu chưa có file này, hoặc file này mới hơn bản đã lưu -> Ghi đè vào Map
             if (!uniqueFilesMap.has(key) || uniqueFilesMap.get(key).timestamp < f.timestamp) {
                 uniqueFilesMap.set(key, f);
             }
         });
         
-        // Chuyển Map thành Array và sắp xếp lại
         const cleanFiles = Array.from(uniqueFilesMap.values()).sort((a, b) => b.timestamp - a.timestamp);
 
         const reposMap = {}; cleanFiles.forEach(f => { if(!reposMap[f.repoName]) reposMap[f.repoName] = []; reposMap[f.repoName].push(f); });
@@ -164,9 +165,9 @@ export default function App() {
             setTags(ctx.tags);
         }
 
-        // ĐẨY BẢN DB ĐÃ KHỬ TRÙNG LẶP LÊN GITHUB ĐỂ DỌN RÁC VĨNH VIỄN
+        // TỰ ĐỘNG GHI ĐÈ LÊN GITHUB NẾU CÓ RÁC TRÙNG LẶP
         if (cleanFiles.length < dbData.allFiles.length) {
-            setStatus({ text: 'Đang dọn dẹp các thẻ trùng lặp trên GitHub...', type: 'loading' });
+            setStatus({ text: 'Đang dọn dẹp thẻ trùng lặp trên GitHub...', type: 'loading' });
             const dbContent = await encodeBase64UTF8Async(JSON.stringify({ allFiles: cleanFiles }));
             const dbSha = await getFileShaSafe(`${username}/${username}.github.io`, 'cms_db.json', token);
             await fetch(`https://api.github.com/repos/${username}/${username}.github.io/contents/cms_db.json`, { 
@@ -176,8 +177,7 @@ export default function App() {
             });
         }
 
-        setStatus({ text: '✅ Đã tải và đồng bộ xong!', type: 'success' }); 
-        setTimeout(() => setStatus({ text: '', type: '' }), 3000);
+        setStatus({ text: '✅ Đã tải và đồng bộ xong!', type: 'success' }); setTimeout(() => setStatus({ text: '', type: '' }), 3000);
       }
     } catch (e) { 
         setStatus({ text: `❌ Lỗi DB: ${e.message}`, type: 'error' }); 
@@ -268,7 +268,7 @@ export default function App() {
     applyLatestTagAndRepo();
   };
 
-  // --- LƯU BÀI (ĐÃ FIX: KIỂM TRA CHẶT TÊN BÀI ĐỂ KHÔNG NHÂN BẢN) ---
+  // --- LƯU BÀI TỐI ƯU ---
   const handleSaveArticle = async () => {
     if (!token) {
         setStatus({ text: '⚠️ Cần Token GitHub để Lưu Bài!', type: 'error' });
@@ -551,9 +551,7 @@ export default function App() {
                       <button onClick={() => changeTheme('dark')} className="flex-1 py-1.5 rounded text-[11px] font-bold border cms-border text-[var(--text-main)] hover:bg-[var(--bg-hover)] transition">Tối</button>
                   </div>
                   <button onClick={() => window.open('https://vietndj.github.io/tin.html', '_blank')} className="w-full text-left px-3 py-2 text-xs font-bold hover:bg-[var(--bg-hover)] rounded text-[var(--text-main)] transition">📖 Mở Reader</button>
-                  
                   <button onClick={() => { window.open('https://vietndj.github.io/export.html', '_blank'); setIsToolsOpen(false); }} className="w-full text-left px-3 py-2 text-xs font-bold text-[#8E44AD] hover:bg-[var(--bg-hover)] rounded transition">🤖 Xuất Sách AI</button>
-                  
                   <hr className="my-1 border-t cms-border"/>
                   <button onClick={() => {localStorage.removeItem("cms_auth"); setIsAuthenticated(false);}} className="w-full text-left px-3 py-2 text-xs font-bold text-red-500 hover:bg-[var(--bg-hover)] rounded transition">🔒 Khóa App</button>
               </div> 
