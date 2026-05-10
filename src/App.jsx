@@ -37,22 +37,6 @@ const SVGIcons = () => (
 );
 
 // ==========================================
-// Hàm hỗ trợ tự động bốc Repo & Tag gần nhất
-// ==========================================
-const getLastContextFromDB = (currentDb) => {
-    const files = currentDb.files || [];
-    const tagsDb = currentDb.tags || {};
-    const latestNormal = files.find(f => f.repoName !== `${username}.github.io` && f.repoName !== username);
-    if (latestNormal) {
-        return {
-            repo: `${username}/${latestNormal.repoName}`,
-            tags: (tagsDb[`${latestNormal.repoName}/${latestNormal.fileName}`] || []).join(', ')
-        };
-    }
-    return { repo: `${username}/${username}.github.io`, tags: '' };
-};
-
-// ==========================================
 // 3. MAIN APP
 // ==========================================
 export default function App() {
@@ -78,8 +62,10 @@ export default function App() {
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   
+  // Khởi tạo Repo & Tags mặc định bằng bộ nhớ cục bộ (nếu có)
   const [repo, setRepo] = useState(() => localStorage.getItem('cms_last_repo') || `${username}/${username}.github.io`);
   const [tags, setTags] = useState(() => localStorage.getItem('cms_last_tags') || ''); 
+  
   const [title, setTitle] = useState('');
   const [slug, setSlug] = useState('');
   const [isSlugEdited, setIsSlugEdited] = useState(false); 
@@ -120,71 +106,19 @@ export default function App() {
   const changeTheme = (theme) => { document.documentElement.setAttribute('data-theme', theme); localStorage.setItem('cms_theme', theme); setIsToolsOpen(false); };
   const saveLocalDb = (newDb) => { try { localStorage.setItem('cms_repo_data', JSON.stringify(newDb)); setDb(newDb); } catch(e) { setDb(newDb); } };
 
-  // ==========================================
-  // HÀM TẢI DB (ĐÃ BỎ MÀNG LỌC ẨN FILE, CHỈ KHỬ TRÙNG LẶP)
-  // ==========================================
   const loadDatabase = async () => {
-    if (!token) {
-        setStatus({ text: '⚠️ Cần có Token GitHub để tải DB!', type: 'error' });
-        setTimeout(() => setStatus({ text: '', type: '' }), 3000);
-        return;
-    }
-    if (isSyncing) return;
-    
-    setIsSyncing(true); 
-    setStatus({ text: 'Đang tải Database từ GitHub...', type: 'loading' });
-    
+    if (!token || isSyncing) return;
+    setIsSyncing(true); setStatus({ text: 'Đang tải Database...', type: 'loading' });
     try {
       const meta = await fetchRawJSON(`${username}/${username}.github.io`, 'metadata.json', token);
       const dbData = await fetchRawJSON(`${username}/${username}.github.io`, 'cms_db.json', token);
-      
       if (dbData && dbData.allFiles) {
-        
-        // -------------------------------------------------------------
-        // CHỈ KHỬ TRÙNG LẶP - KHÔNG ẨN BẤT CỨ FILE NÀO (export, index...)
-        // -------------------------------------------------------------
-        const uniqueFilesMap = new Map();
-        
-        dbData.allFiles.forEach(f => {
-            const key = `${f.repoName}/${f.fileName}`;
-            if (!uniqueFilesMap.has(key) || uniqueFilesMap.get(key).timestamp < f.timestamp) {
-                uniqueFilesMap.set(key, f);
-            }
-        });
-        
-        const cleanFiles = Array.from(uniqueFilesMap.values()).sort((a, b) => b.timestamp - a.timestamp);
-
-        const reposMap = {}; cleanFiles.forEach(f => { if(!reposMap[f.repoName]) reposMap[f.repoName] = []; reposMap[f.repoName].push(f); });
-        const loadedDb = { files: cleanFiles, repos: reposMap, tags: meta?.tags || {}, pinned: meta?.pinned || [], links: meta?.links || {}, colors: meta?.colors || {}, titles: meta?.titles || {}, tasks: meta?.tasks || [], customCol: meta?.customCol || [] };
-        
+        const reposMap = {}; dbData.allFiles.forEach(f => { if(!reposMap[f.repoName]) reposMap[f.repoName] = []; reposMap[f.repoName].push(f); });
+        const loadedDb = { files: dbData.allFiles, repos: reposMap, tags: meta?.tags || {}, pinned: meta?.pinned || [], links: meta?.links || {}, colors: meta?.colors || {}, titles: meta?.titles || {}, tasks: meta?.tasks || [], customCol: meta?.customCol || [] };
         saveLocalDb(loadedDb);
-        
-        if (!title && !content && !editorOriginal.sha) {
-            const ctx = getLastContextFromDB(loadedDb);
-            setRepo(ctx.repo);
-            setTags(ctx.tags);
-        }
-
-        // TỰ ĐỘNG GHI ĐÈ LÊN GITHUB NẾU CÓ RÁC TRÙNG LẶP
-        if (cleanFiles.length < dbData.allFiles.length) {
-            setStatus({ text: 'Đang dọn dẹp thẻ trùng lặp trên GitHub...', type: 'loading' });
-            const dbContent = await encodeBase64UTF8Async(JSON.stringify({ allFiles: cleanFiles }));
-            const dbSha = await getFileShaSafe(`${username}/${username}.github.io`, 'cms_db.json', token);
-            await fetch(`https://api.github.com/repos/${username}/${username}.github.io/contents/cms_db.json`, { 
-                method: 'PUT', 
-                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, 
-                body: JSON.stringify({ message: 'Auto-Clean Duplicates', content: dbContent, sha: dbSha || undefined }) 
-            });
-        }
-
-        setStatus({ text: '✅ Đã tải và đồng bộ xong!', type: 'success' }); setTimeout(() => setStatus({ text: '', type: '' }), 3000);
+        setStatus({ text: '✅ Đã đồng bộ!', type: 'success' }); setTimeout(() => setStatus({ text: '', type: '' }), 3000);
       }
-    } catch (e) { 
-        setStatus({ text: `❌ Lỗi DB: ${e.message}`, type: 'error' }); 
-        setTimeout(() => setStatus({ text: '', type: '' }), 5000);
-    } finally { 
-        setIsSyncing(false); 
-    }
+    } catch (e) { setStatus({ text: `❌ Lỗi DB: ${e.message}`, type: 'error' }); } finally { setIsSyncing(false); }
   };
 
   const syncMetaAndDB = async (dbState) => {
@@ -258,6 +192,7 @@ export default function App() {
   const handleRemoveLink = (index) => setUploadLinks(uploadLinks.filter((_, i) => i !== index));
   const handleAddLink = () => setUploadLinks([...uploadLinks, { title: `Link ${uploadLinks.length + 1}`, url: '' }]);
 
+  // --- HỦY SỬA BÀI (TRỞ VỀ TRẠNG THÁI RỖNG, NHƯNG PHỤC HỒI TAG & REPO TỪ BỘ NHỚ) ---
   const cancelEdit = () => {
     setTitle('');
     setSlug('');
@@ -265,21 +200,15 @@ export default function App() {
     setUploadLinks([]);
     setIsSlugEdited(false);
     setEditorOriginal({ repo: '', filename: '', sha: '' });
-    applyLatestTagAndRepo();
+    
+    // Khôi phục cứng lại Tag và Repo đã lưu
+    setRepo(localStorage.getItem('cms_last_repo') || `${username}/${username}.github.io`);
+    setTags(localStorage.getItem('cms_last_tags') || '');
   };
 
-  // --- LƯU BÀI TỐI ƯU ---
   const handleSaveArticle = async () => {
-    if (!token) {
-        setStatus({ text: '⚠️ Cần Token GitHub để Lưu Bài!', type: 'error' });
-        setTimeout(() => setStatus({ text: '', type: '' }), 3000);
-        return;
-    }
-    if (!repo || !title || !slug || !content) return alert("Thiếu dữ liệu (Kho, Tiêu đề, Slug, Nội dung)!");
-    
-    setIsSaving(true); 
-    setStatus({ text: '⏳ Đang lưu HTML lên GitHub...', type: 'loading' });
-    
+    if (!token || !repo || !title || !slug || !content) return alert("Thiếu dữ liệu (Kho, Tiêu đề, Slug, Nội dung)!");
+    setIsSaving(true); setStatus({ text: '⏳ Đang lưu HTML...', type: 'loading' });
     try {
       let filename = slug.endsWith('.html') ? slug : slug + '.html';
       let rName = repo.includes('/') ? repo.split('/')[1] : repo;
@@ -300,7 +229,7 @@ export default function App() {
         db.pinned = db.pinned.filter(x => x !== oldKey);
       }
 
-      setStatus({ text: '⏳ Đang đồng bộ Metadata & DB...', type: 'loading' });
+      setStatus({ text: 'Đang đồng bộ Metadata & CMS DB...', type: 'loading' });
       
       let newTags = { ...db.tags }; let tagArr = tags.split(',').map(x => x.trim()).filter(Boolean);
       if (tagArr.length) newTags[fileKey] = tagArr; else delete newTags[fileKey];
@@ -311,48 +240,38 @@ export default function App() {
       let validLinks = uploadLinks.filter(l => l.title.trim() && l.url.trim());
       if (validLinks.length) newLinksDb[fileKey] = validLinks; else delete newLinksDb[fileKey];
       
-      // BỘ LỌC CHẶN THẺ ẢO: Chém tất cả thẻ nào trùng tên file & repo hoặc trùng SHA cũ
-      let newFiles = [...db.files].filter(f => {
-          const isSameNewFile = f.repoName === rName && f.fileName === filename;
-          const isSameOldFile = editorOriginal.filename && f.repoName === (editorOriginal.repo.split('/')[1] || editorOriginal.repo.split('/')[0]) && f.fileName === editorOriginal.filename;
-          const isSameOldSha = editorOriginal.sha && f.sha === editorOriginal.sha;
-          return !(isSameNewFile || isSameOldFile || isSameOldSha);
-      });
-
+      let newFiles = [...db.files].filter(f => f.sha !== (resHTMLData.content?.sha || fileSha));
       const dDate = new Date();
       newFiles.unshift({ repoName: rName, name: title, fileName: filename, sha: resHTMLData.content?.sha || fileSha, url: `https://${rOwner}.github.io/${rName === `${rOwner}.github.io` ? '' : rName + '/'}${filename}`, timestamp: dDate.getTime(), fullDate: dDate.toLocaleString('vi-VN') });
 
       const newState = { ...db, files: newFiles, tags: newTags, titles: newTitles, links: newLinksDb };
       await syncMetaAndDB(newState); saveLocalDb(newState);
 
-      localStorage.setItem('cms_last_repo', `${rOwner}/${rName}`);
-      localStorage.setItem('cms_last_tags', tags);
+      // CẬP NHẬT BỘ NHỚ LƯU VẾT
+      const savedRepo = `${rOwner}/${rName}`;
+      const savedTags = tags;
+      localStorage.setItem('cms_last_repo', savedRepo);
+      localStorage.setItem('cms_last_tags', savedTags);
 
       setStatus({ text: '✅ Đăng bài thành công!', type: 'success' });
       
-      setTitle(''); setSlug(''); setContent(''); setUploadLinks([]); setIsSlugEdited(false); setEditorOriginal({ repo:'', filename:'', sha:'' });
-      applyLatestTagAndRepo(newState); 
+      // Xóa form bài viết NHƯNG ÉP GIỮ LẠI REPO & TAGS vửa lưu
+      setTitle(''); 
+      setSlug(''); 
+      setContent(''); 
+      setUploadLinks([]); 
+      setIsSlugEdited(false); 
+      setEditorOriginal({ repo:'', filename:'', sha:'' });
+      setRepo(savedRepo);
+      setTags(savedTags);
       
       setTimeout(() => setStatus({ text: '', type: '' }), 4000);
-    } catch (error) { 
-        setStatus({ text: `❌ Lỗi lưu bài: ${error.message}`, type: 'error' }); 
-        setTimeout(() => setStatus({ text: '', type: '' }), 5000);
-    } finally { 
-        setIsSaving(false); 
-    }
+    } catch (error) { setStatus({ text: `❌ Lỗi lưu bài`, type: 'error' }); } finally { setIsSaving(false); }
   };
 
   const editFileContent = async (rName, f, sha) => {
-    if(!token) {
-        setStatus({ text: '⚠️ Cần Token GitHub để sửa bài!', type: 'error' });
-        setTimeout(() => setStatus({ text: '', type: '' }), 3000);
-        return;
-    }
-    
-    setIsEditorOpen(true); 
-    window.scrollTo({top:0,behavior:'smooth'});
-    setStatus({ text: '⏳ Đang nạp HTML từ GitHub...', type: 'loading' });
-    
+    if(!token) return alert("Cần Token ở mục Cài đặt nâng cao!"); setIsEditorOpen(true); window.scrollTo({top:0,behavior:'smooth'});
+    setStatus({ text: 'Đang nạp file...', type: 'loading' });
     try {
       const res = await fetchText(`https://api.github.com/repos/${username}/${rName}/contents/${safeEnc(f)}?t=${Date.now()}`, token);
       if(res) {
@@ -368,22 +287,13 @@ export default function App() {
         setUploadLinks(db.links[fileKey] ? JSON.parse(JSON.stringify(db.links[fileKey])) : []);
 
         setEditorOriginal({ repo: rp, filename: f, sha: sha });
-        setStatus({ text: '✅ Đã nạp thành công!', type: 'success' }); 
-        setTimeout(() => setStatus({ text: '', type: '' }), 2000);
+        setStatus({ text: '✅ Đã nạp thành công!', type: 'success' }); setTimeout(() => setStatus({ text: '', type: '' }), 2000);
       } else throw new Error("Không tìm thấy file");
-    } catch(e) { 
-        setStatus({ text: `❌ Lỗi nạp bài: ${e.message}`, type: 'error' }); 
-        setTimeout(() => setStatus({ text: '', type: '' }), 4000);
-    }
+    } catch(e) { setStatus({ text: `❌ Lỗi: ${e.message}`, type: 'error' }); }
   };
 
   const togglePin = async (r, f) => {
-    if(!token) {
-        setStatus({ text: '⚠️ Cần Token GitHub để ghim bài!', type: 'error' });
-        setTimeout(() => setStatus({ text: '', type: '' }), 3000);
-        return;
-    }
-    const k = `${r}/${f}`; let newPinned = [...db.pinned];
+    if(!token) return; const k = `${r}/${f}`; let newPinned = [...db.pinned];
     if(newPinned.includes(k)) newPinned = newPinned.filter(x => x !== k); else newPinned.push(k);
     const newDb = { ...db, pinned: newPinned }; saveLocalDb(newDb); syncMetaAndDB(newDb);
   };
@@ -551,7 +461,10 @@ export default function App() {
                       <button onClick={() => changeTheme('dark')} className="flex-1 py-1.5 rounded text-[11px] font-bold border cms-border text-[var(--text-main)] hover:bg-[var(--bg-hover)] transition">Tối</button>
                   </div>
                   <button onClick={() => window.open('https://vietndj.github.io/tin.html', '_blank')} className="w-full text-left px-3 py-2 text-xs font-bold hover:bg-[var(--bg-hover)] rounded text-[var(--text-main)] transition">📖 Mở Reader</button>
-                  <button onClick={() => { window.open('https://vietndj.github.io/export.html', '_blank'); setIsToolsOpen(false); }} className="w-full text-left px-3 py-2 text-xs font-bold text-[#8E44AD] hover:bg-[var(--bg-hover)] rounded transition">🤖 Xuất Sách AI</button>
+                  
+                  {/* NÚT MỞ TAB XUẤT SÁCH MỚI */}
+                  <button onClick={() => { window.open('export.html', '_blank'); setIsToolsOpen(false); }} className="w-full text-left px-3 py-2 text-xs font-bold text-[#8E44AD] hover:bg-[var(--bg-hover)] rounded transition">🤖 Xuất Sách AI</button>
+                  
                   <hr className="my-1 border-t cms-border"/>
                   <button onClick={() => {localStorage.removeItem("cms_auth"); setIsAuthenticated(false);}} className="w-full text-left px-3 py-2 text-xs font-bold text-red-500 hover:bg-[var(--bg-hover)] rounded transition">🔒 Khóa App</button>
               </div> 
@@ -570,12 +483,7 @@ export default function App() {
           
           {/* EDITOR SOẠN THẢO */}
           <section className="cms-card overflow-hidden border border-[var(--border)]">
-            <button onClick={() => {
-                setIsEditorOpen(!isEditorOpen); 
-                if (!isEditorOpen && !title && !content && !editorOriginal.sha) {
-                    applyLatestTagAndRepo();
-                }
-            }} className="w-full px-6 py-3 flex justify-between items-center bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] font-bold text-[var(--accent)] outline-none">
+            <button onClick={() => { setIsEditorOpen(!isEditorOpen); }} className="w-full px-6 py-3 flex justify-between items-center bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] font-bold text-[var(--accent)] outline-none">
                 <span className="flex items-center gap-2">
                     <svg className="svg-icon"><use href="#icon-edit"></use></svg> Soạn thảo HTML <span className="text-[9px] text-[var(--text-muted)] border border-[var(--border)] px-1.5 py-0.5 rounded font-mono ml-2 uppercase bg-[var(--bg-body)]">Ctrl E</span>
                 </span>
@@ -679,15 +587,11 @@ export default function App() {
         )}
       </div>
 
-      {/* TOAST THÔNG BÁO VỚI LỚP CHE NỔI BẬT LÊN CAO */}
+      {/* TOAST THÔNG BÁO CHUNG */}
       {status.text && (
-          <div className="fixed top-[80px] left-1/2 transform -translate-x-1/2 z-[9999999] pointer-events-none transition-all duration-300 w-max max-w-[90%]">
-              <div className={`bg-[var(--bg-card)] px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 border-2 font-bold text-sm text-[var(--text-main)] ${status.type === 'error' ? 'border-red-500' : status.type === 'loading' ? 'border-[var(--accent)]' : 'border-green-500'}`}>
-                  <span className={`text-lg ${status.type === 'loading' ? 'animate-spin' : ''}`}>
-                      {status.type === 'loading' ? '⏳' : status.type === 'error' ? '❌' : '✅'}
-                  </span>
-                  <span className="whitespace-nowrap">{status.text}</span>
-              </div>
+          <div className={`fixed bottom-6 left-6 z-[999999] cms-card px-5 py-4 shadow-2xl flex items-center gap-3 border-l-4 font-bold text-sm text-[var(--text-main)] fade-in ${status.type === 'error' ? 'border-l-red-500' : 'border-l-[var(--accent)]'}`}>
+              <span className="text-lg">{status.type === 'loading' ? '⏳' : status.type === 'error' ? '❌' : '✅'}</span>
+              <span>{status.text}</span>
           </div>
       )}
     </div>
