@@ -121,38 +121,36 @@ export default function App() {
   const saveLocalDb = (newDb) => { try { localStorage.setItem('cms_repo_data', JSON.stringify(newDb)); setDb(newDb); } catch(e) { setDb(newDb); } };
 
   // ==========================================
-  // HÀM TẢI DB - CÓ TÍCH HỢP MÀNG LỌC FILE HỆ THỐNG
+  // HÀM TẢI DB & KHỬ TRÙNG LẶP (ĐÃ FIX THEO ĐÚNG Ý BẠN)
   // ==========================================
   const loadDatabase = async () => {
-    if (!token || isSyncing) return;
-    setIsSyncing(true); setStatus({ text: 'Đang tải Database...', type: 'loading' });
+    if (!token) {
+        setStatus({ text: '⚠️ Cần có Token GitHub để tải DB!', type: 'error' });
+        setTimeout(() => setStatus({ text: '', type: '' }), 3000);
+        return;
+    }
+    if (isSyncing) return;
+    
+    setIsSyncing(true); 
+    setStatus({ text: 'Đang tải Database từ GitHub...', type: 'loading' });
+    
     try {
       const meta = await fetchRawJSON(`${username}/${username}.github.io`, 'metadata.json', token);
       const dbData = await fetchRawJSON(`${username}/${username}.github.io`, 'cms_db.json', token);
       if (dbData && dbData.allFiles) {
         
-        // -------------------------------------------------------------
-        // BỘ LỌC CỨNG: Xóa thẻ trùng lặp & Diệt tận gốc file Hệ thống
-        // -------------------------------------------------------------
+        // DÙNG MAP ĐỂ CHẶN NHÂN BẢN: Key là Tên Repo + Tên File
         const uniqueFilesMap = new Map();
         
-        // Danh sách các file KHÔNG BAO GIỜ ĐƯỢC HIỆN thành bài viết
-        const SYSTEM_FILES = ['index.html', 'tin.html', 'export.html', '404.html'];
-
         dbData.allFiles.forEach(f => {
-            // Loại bỏ hoàn toàn nếu nằm ở Root Repo và có tên là file hệ thống
-            if (f.repoName === `${username}.github.io` || f.repoName === username) {
-                if (SYSTEM_FILES.includes(f.fileName) || f.fileName.startsWith('export')) {
-                    return; // BỎ QUA, KHÔNG LƯU VÀO DB SẠCH
-                }
-            }
-
             const key = `${f.repoName}/${f.fileName}`;
+            // Nếu chưa có file này, hoặc file này mới hơn bản đã lưu -> Ghi đè vào Map
             if (!uniqueFilesMap.has(key) || uniqueFilesMap.get(key).timestamp < f.timestamp) {
                 uniqueFilesMap.set(key, f);
             }
         });
         
+        // Chuyển Map thành Array và sắp xếp lại
         const cleanFiles = Array.from(uniqueFilesMap.values()).sort((a, b) => b.timestamp - a.timestamp);
 
         const reposMap = {}; cleanFiles.forEach(f => { if(!reposMap[f.repoName]) reposMap[f.repoName] = []; reposMap[f.repoName].push(f); });
@@ -166,21 +164,27 @@ export default function App() {
             setTags(ctx.tags);
         }
 
-        // TỰ ĐỘNG GHI ĐÈ LÊN GITHUB ĐỂ DỌN RÁC VĨNH VIỄN
+        // ĐẨY BẢN DB ĐÃ KHỬ TRÙNG LẶP LÊN GITHUB ĐỂ DỌN RÁC VĨNH VIỄN
         if (cleanFiles.length < dbData.allFiles.length) {
-            setStatus({ text: 'Đang dọn dẹp rác vĩnh viễn trên GitHub...', type: 'loading' });
+            setStatus({ text: 'Đang dọn dẹp các thẻ trùng lặp trên GitHub...', type: 'loading' });
             const dbContent = await encodeBase64UTF8Async(JSON.stringify({ allFiles: cleanFiles }));
             const dbSha = await getFileShaSafe(`${username}/${username}.github.io`, 'cms_db.json', token);
             await fetch(`https://api.github.com/repos/${username}/${username}.github.io/contents/cms_db.json`, { 
                 method: 'PUT', 
                 headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, 
-                body: JSON.stringify({ message: 'Auto-Clean System Files & Duplicates', content: dbContent, sha: dbSha || undefined }) 
+                body: JSON.stringify({ message: 'Auto-Clean Duplicates', content: dbContent, sha: dbSha || undefined }) 
             });
         }
 
-        setStatus({ text: '✅ Đã đồng bộ & Dọn sạch rác!', type: 'success' }); setTimeout(() => setStatus({ text: '', type: '' }), 3000);
+        setStatus({ text: '✅ Đã tải và đồng bộ xong!', type: 'success' }); 
+        setTimeout(() => setStatus({ text: '', type: '' }), 3000);
       }
-    } catch (e) { setStatus({ text: `❌ Lỗi DB: ${e.message}`, type: 'error' }); } finally { setIsSyncing(false); }
+    } catch (e) { 
+        setStatus({ text: `❌ Lỗi DB: ${e.message}`, type: 'error' }); 
+        setTimeout(() => setStatus({ text: '', type: '' }), 5000);
+    } finally { 
+        setIsSyncing(false); 
+    }
   };
 
   const syncMetaAndDB = async (dbState) => {
@@ -264,9 +268,18 @@ export default function App() {
     applyLatestTagAndRepo();
   };
 
+  // --- LƯU BÀI (ĐÃ FIX: KIỂM TRA CHẶT TÊN BÀI ĐỂ KHÔNG NHÂN BẢN) ---
   const handleSaveArticle = async () => {
-    if (!token || !repo || !title || !slug || !content) return alert("Thiếu dữ liệu (Kho, Tiêu đề, Slug, Nội dung)!");
-    setIsSaving(true); setStatus({ text: '⏳ Đang lưu HTML...', type: 'loading' });
+    if (!token) {
+        setStatus({ text: '⚠️ Cần Token GitHub để Lưu Bài!', type: 'error' });
+        setTimeout(() => setStatus({ text: '', type: '' }), 3000);
+        return;
+    }
+    if (!repo || !title || !slug || !content) return alert("Thiếu dữ liệu (Kho, Tiêu đề, Slug, Nội dung)!");
+    
+    setIsSaving(true); 
+    setStatus({ text: '⏳ Đang lưu HTML lên GitHub...', type: 'loading' });
+    
     try {
       let filename = slug.endsWith('.html') ? slug : slug + '.html';
       let rName = repo.includes('/') ? repo.split('/')[1] : repo;
@@ -287,7 +300,7 @@ export default function App() {
         db.pinned = db.pinned.filter(x => x !== oldKey);
       }
 
-      setStatus({ text: 'Đang đồng bộ Metadata & CMS DB...', type: 'loading' });
+      setStatus({ text: '⏳ Đang đồng bộ Metadata & DB...', type: 'loading' });
       
       let newTags = { ...db.tags }; let tagArr = tags.split(',').map(x => x.trim()).filter(Boolean);
       if (tagArr.length) newTags[fileKey] = tagArr; else delete newTags[fileKey];
@@ -298,6 +311,7 @@ export default function App() {
       let validLinks = uploadLinks.filter(l => l.title.trim() && l.url.trim());
       if (validLinks.length) newLinksDb[fileKey] = validLinks; else delete newLinksDb[fileKey];
       
+      // BỘ LỌC CHẶN THẺ ẢO: Chém tất cả thẻ nào trùng tên file & repo hoặc trùng SHA cũ
       let newFiles = [...db.files].filter(f => {
           const isSameNewFile = f.repoName === rName && f.fileName === filename;
           const isSameOldFile = editorOriginal.filename && f.repoName === (editorOriginal.repo.split('/')[1] || editorOriginal.repo.split('/')[0]) && f.fileName === editorOriginal.filename;
@@ -320,12 +334,25 @@ export default function App() {
       applyLatestTagAndRepo(newState); 
       
       setTimeout(() => setStatus({ text: '', type: '' }), 4000);
-    } catch (error) { setStatus({ text: `❌ Lỗi lưu bài`, type: 'error' }); } finally { setIsSaving(false); }
+    } catch (error) { 
+        setStatus({ text: `❌ Lỗi lưu bài: ${error.message}`, type: 'error' }); 
+        setTimeout(() => setStatus({ text: '', type: '' }), 5000);
+    } finally { 
+        setIsSaving(false); 
+    }
   };
 
   const editFileContent = async (rName, f, sha) => {
-    if(!token) return alert("Cần Token ở mục Cài đặt nâng cao!"); setIsEditorOpen(true); window.scrollTo({top:0,behavior:'smooth'});
-    setStatus({ text: 'Đang nạp file...', type: 'loading' });
+    if(!token) {
+        setStatus({ text: '⚠️ Cần Token GitHub để sửa bài!', type: 'error' });
+        setTimeout(() => setStatus({ text: '', type: '' }), 3000);
+        return;
+    }
+    
+    setIsEditorOpen(true); 
+    window.scrollTo({top:0,behavior:'smooth'});
+    setStatus({ text: '⏳ Đang nạp HTML từ GitHub...', type: 'loading' });
+    
     try {
       const res = await fetchText(`https://api.github.com/repos/${username}/${rName}/contents/${safeEnc(f)}?t=${Date.now()}`, token);
       if(res) {
@@ -341,13 +368,22 @@ export default function App() {
         setUploadLinks(db.links[fileKey] ? JSON.parse(JSON.stringify(db.links[fileKey])) : []);
 
         setEditorOriginal({ repo: rp, filename: f, sha: sha });
-        setStatus({ text: '✅ Đã nạp thành công!', type: 'success' }); setTimeout(() => setStatus({ text: '', type: '' }), 2000);
+        setStatus({ text: '✅ Đã nạp thành công!', type: 'success' }); 
+        setTimeout(() => setStatus({ text: '', type: '' }), 2000);
       } else throw new Error("Không tìm thấy file");
-    } catch(e) { setStatus({ text: `❌ Lỗi: ${e.message}`, type: 'error' }); }
+    } catch(e) { 
+        setStatus({ text: `❌ Lỗi nạp bài: ${e.message}`, type: 'error' }); 
+        setTimeout(() => setStatus({ text: '', type: '' }), 4000);
+    }
   };
 
   const togglePin = async (r, f) => {
-    if(!token) return; const k = `${r}/${f}`; let newPinned = [...db.pinned];
+    if(!token) {
+        setStatus({ text: '⚠️ Cần Token GitHub để ghim bài!', type: 'error' });
+        setTimeout(() => setStatus({ text: '', type: '' }), 3000);
+        return;
+    }
+    const k = `${r}/${f}`; let newPinned = [...db.pinned];
     if(newPinned.includes(k)) newPinned = newPinned.filter(x => x !== k); else newPinned.push(k);
     const newDb = { ...db, pinned: newPinned }; saveLocalDb(newDb); syncMetaAndDB(newDb);
   };
@@ -515,7 +551,9 @@ export default function App() {
                       <button onClick={() => changeTheme('dark')} className="flex-1 py-1.5 rounded text-[11px] font-bold border cms-border text-[var(--text-main)] hover:bg-[var(--bg-hover)] transition">Tối</button>
                   </div>
                   <button onClick={() => window.open('https://vietndj.github.io/tin.html', '_blank')} className="w-full text-left px-3 py-2 text-xs font-bold hover:bg-[var(--bg-hover)] rounded text-[var(--text-main)] transition">📖 Mở Reader</button>
+                  
                   <button onClick={() => { window.open('https://vietndj.github.io/export.html', '_blank'); setIsToolsOpen(false); }} className="w-full text-left px-3 py-2 text-xs font-bold text-[#8E44AD] hover:bg-[var(--bg-hover)] rounded transition">🤖 Xuất Sách AI</button>
+                  
                   <hr className="my-1 border-t cms-border"/>
                   <button onClick={() => {localStorage.removeItem("cms_auth"); setIsAuthenticated(false);}} className="w-full text-left px-3 py-2 text-xs font-bold text-red-500 hover:bg-[var(--bg-hover)] rounded transition">🔒 Khóa App</button>
               </div> 
@@ -532,7 +570,7 @@ export default function App() {
       <div className="flex flex-col lg:flex-row gap-6 px-4 md:px-6 lg:px-8 max-w-[1600px] mx-auto items-start w-full relative pb-20 mt-6">
         <main className="flex-1 w-full min-w-0 flex flex-col gap-8">
           
-          {/* EDITOR */}
+          {/* EDITOR SOẠN THẢO */}
           <section className="cms-card overflow-hidden border border-[var(--border)]">
             <button onClick={() => {
                 setIsEditorOpen(!isEditorOpen); 
@@ -643,11 +681,15 @@ export default function App() {
         )}
       </div>
 
-      {/* TOAST THÔNG BÁO CHUNG */}
+      {/* TOAST THÔNG BÁO VỚI LỚP CHE NỔI BẬT LÊN CAO */}
       {status.text && (
-          <div className={`fixed bottom-6 left-6 z-[999999] cms-card px-5 py-4 shadow-2xl flex items-center gap-3 border-l-4 font-bold text-sm text-[var(--text-main)] fade-in ${status.type === 'error' ? 'border-l-red-500' : 'border-l-[var(--accent)]'}`}>
-              <span className="text-lg">{status.type === 'loading' ? '⏳' : status.type === 'error' ? '❌' : '✅'}</span>
-              <span>{status.text}</span>
+          <div className="fixed top-[80px] left-1/2 transform -translate-x-1/2 z-[9999999] pointer-events-none transition-all duration-300 w-max max-w-[90%]">
+              <div className={`bg-[var(--bg-card)] px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 border-2 font-bold text-sm text-[var(--text-main)] ${status.type === 'error' ? 'border-red-500' : status.type === 'loading' ? 'border-[var(--accent)]' : 'border-green-500'}`}>
+                  <span className={`text-lg ${status.type === 'loading' ? 'animate-spin' : ''}`}>
+                      {status.type === 'loading' ? '⏳' : status.type === 'error' ? '❌' : '✅'}
+                  </span>
+                  <span className="whitespace-nowrap">{status.text}</span>
+              </div>
           </div>
       )}
     </div>
