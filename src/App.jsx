@@ -120,6 +120,9 @@ export default function App() {
   const changeTheme = (theme) => { document.documentElement.setAttribute('data-theme', theme); localStorage.setItem('cms_theme', theme); setIsToolsOpen(false); };
   const saveLocalDb = (newDb) => { try { localStorage.setItem('cms_repo_data', JSON.stringify(newDb)); setDb(newDb); } catch(e) { setDb(newDb); } };
 
+  // ==========================================
+  // HÀM TẢI DB - CÓ TÍCH HỢP MÀNG LỌC FILE HỆ THỐNG
+  // ==========================================
   const loadDatabase = async () => {
     if (!token || isSyncing) return;
     setIsSyncing(true); setStatus({ text: 'Đang tải Database...', type: 'loading' });
@@ -129,19 +132,32 @@ export default function App() {
       if (dbData && dbData.allFiles) {
         
         // -------------------------------------------------------------
-        // BỘ LỌC DỌN RÁC: Xóa các file bị nhân bản do lỗi thuật toán cũ
+        // BỘ LỌC CỨNG: Xóa thẻ trùng lặp & Diệt tận gốc file Hệ thống
         // -------------------------------------------------------------
         const uniqueFilesMap = new Map();
+        
+        // Danh sách các file KHÔNG BAO GIỜ ĐƯỢC HIỆN thành bài viết
+        const SYSTEM_FILES = ['index.html', 'tin.html', 'export.html', '404.html'];
+
         dbData.allFiles.forEach(f => {
+            // Loại bỏ hoàn toàn nếu nằm ở Root Repo và có tên là file hệ thống
+            if (f.repoName === `${username}.github.io` || f.repoName === username) {
+                if (SYSTEM_FILES.includes(f.fileName) || f.fileName.startsWith('export')) {
+                    return; // BỎ QUA, KHÔNG LƯU VÀO DB SẠCH
+                }
+            }
+
             const key = `${f.repoName}/${f.fileName}`;
             if (!uniqueFilesMap.has(key) || uniqueFilesMap.get(key).timestamp < f.timestamp) {
                 uniqueFilesMap.set(key, f);
             }
         });
+        
         const cleanFiles = Array.from(uniqueFilesMap.values()).sort((a, b) => b.timestamp - a.timestamp);
 
         const reposMap = {}; cleanFiles.forEach(f => { if(!reposMap[f.repoName]) reposMap[f.repoName] = []; reposMap[f.repoName].push(f); });
         const loadedDb = { files: cleanFiles, repos: reposMap, tags: meta?.tags || {}, pinned: meta?.pinned || [], links: meta?.links || {}, colors: meta?.colors || {}, titles: meta?.titles || {}, tasks: meta?.tasks || [], customCol: meta?.customCol || [] };
+        
         saveLocalDb(loadedDb);
         
         if (!title && !content && !editorOriginal.sha) {
@@ -150,7 +166,7 @@ export default function App() {
             setTags(ctx.tags);
         }
 
-        // TỰ ĐỘNG GHI ĐÈ LÊN GITHUB NẾU PHÁT HIỆN CÓ RÁC ĐÃ BỊ XÓA BỞI BỘ LỌC
+        // TỰ ĐỘNG GHI ĐÈ LÊN GITHUB ĐỂ DỌN RÁC VĨNH VIỄN
         if (cleanFiles.length < dbData.allFiles.length) {
             setStatus({ text: 'Đang dọn dẹp rác vĩnh viễn trên GitHub...', type: 'loading' });
             const dbContent = await encodeBase64UTF8Async(JSON.stringify({ allFiles: cleanFiles }));
@@ -158,11 +174,11 @@ export default function App() {
             await fetch(`https://api.github.com/repos/${username}/${username}.github.io/contents/cms_db.json`, { 
                 method: 'PUT', 
                 headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, 
-                body: JSON.stringify({ message: 'Auto-Clean DB Duplicates', content: dbContent, sha: dbSha || undefined }) 
+                body: JSON.stringify({ message: 'Auto-Clean System Files & Duplicates', content: dbContent, sha: dbSha || undefined }) 
             });
         }
 
-        setStatus({ text: '✅ Đã đồng bộ & dọn rác!', type: 'success' }); setTimeout(() => setStatus({ text: '', type: '' }), 3000);
+        setStatus({ text: '✅ Đã đồng bộ & Dọn sạch rác!', type: 'success' }); setTimeout(() => setStatus({ text: '', type: '' }), 3000);
       }
     } catch (e) { setStatus({ text: `❌ Lỗi DB: ${e.message}`, type: 'error' }); } finally { setIsSyncing(false); }
   };
@@ -238,7 +254,6 @@ export default function App() {
   const handleRemoveLink = (index) => setUploadLinks(uploadLinks.filter((_, i) => i !== index));
   const handleAddLink = () => setUploadLinks([...uploadLinks, { title: `Link ${uploadLinks.length + 1}`, url: '' }]);
 
-  // --- HỦY SỬA BÀI ---
   const cancelEdit = () => {
     setTitle('');
     setSlug('');
@@ -249,7 +264,6 @@ export default function App() {
     applyLatestTagAndRepo();
   };
 
-  // --- LƯU BÀI (ĐÃ FIX LỖI NHÂN BẢN) ---
   const handleSaveArticle = async () => {
     if (!token || !repo || !title || !slug || !content) return alert("Thiếu dữ liệu (Kho, Tiêu đề, Slug, Nội dung)!");
     setIsSaving(true); setStatus({ text: '⏳ Đang lưu HTML...', type: 'loading' });
@@ -284,7 +298,6 @@ export default function App() {
       let validLinks = uploadLinks.filter(l => l.title.trim() && l.url.trim());
       if (validLinks.length) newLinksDb[fileKey] = validLinks; else delete newLinksDb[fileKey];
       
-      // BỘ LỌC CỨNG FIX LỖI NHÂN BẢN: Chém đứt các thẻ cũ cùng tên hoặc cùng SHA
       let newFiles = [...db.files].filter(f => {
           const isSameNewFile = f.repoName === rName && f.fileName === filename;
           const isSameOldFile = editorOriginal.filename && f.repoName === (editorOriginal.repo.split('/')[1] || editorOriginal.repo.split('/')[0]) && f.fileName === editorOriginal.filename;
@@ -502,9 +515,7 @@ export default function App() {
                       <button onClick={() => changeTheme('dark')} className="flex-1 py-1.5 rounded text-[11px] font-bold border cms-border text-[var(--text-main)] hover:bg-[var(--bg-hover)] transition">Tối</button>
                   </div>
                   <button onClick={() => window.open('https://vietndj.github.io/tin.html', '_blank')} className="w-full text-left px-3 py-2 text-xs font-bold hover:bg-[var(--bg-hover)] rounded text-[var(--text-main)] transition">📖 Mở Reader</button>
-                  
                   <button onClick={() => { window.open('https://vietndj.github.io/export.html', '_blank'); setIsToolsOpen(false); }} className="w-full text-left px-3 py-2 text-xs font-bold text-[#8E44AD] hover:bg-[var(--bg-hover)] rounded transition">🤖 Xuất Sách AI</button>
-                  
                   <hr className="my-1 border-t cms-border"/>
                   <button onClick={() => {localStorage.removeItem("cms_auth"); setIsAuthenticated(false);}} className="w-full text-left px-3 py-2 text-xs font-bold text-red-500 hover:bg-[var(--bg-hover)] rounded transition">🔒 Khóa App</button>
               </div> 
@@ -521,7 +532,7 @@ export default function App() {
       <div className="flex flex-col lg:flex-row gap-6 px-4 md:px-6 lg:px-8 max-w-[1600px] mx-auto items-start w-full relative pb-20 mt-6">
         <main className="flex-1 w-full min-w-0 flex flex-col gap-8">
           
-          {/* EDITOR SOẠN THẢO */}
+          {/* EDITOR */}
           <section className="cms-card overflow-hidden border border-[var(--border)]">
             <button onClick={() => {
                 setIsEditorOpen(!isEditorOpen); 
@@ -606,7 +617,7 @@ export default function App() {
                    <button id="btn-save-article" onClick={handleSaveArticle} disabled={isSaving} className="bg-[var(--accent)] text-white px-8 py-3.5 rounded-xl font-bold shadow-lg text-sm transition hover:scale-105 disabled:opacity-50 border border-transparent">
                       {isSaving?'⏳ Đang lưu...':'🚀 LƯU BÀI LÊN GITHUB (Ctrl S)'}
                    </button>
-                   {editorOriginal.sha && <button onClick={cancelEdit} className="text-red-500 text-xs font-bold px-4 py-2 hover:bg-[var(--bg-hover)] rounded-lg transition">✕ HỦY SỬA (BÀI MỚI)</button>}
+                   {editorOriginal.sha && <button onClick={cancelEdit} className="text-red-500 text-xs font-bold px-4 py-2 hover:bg-[var(--bg-hover)] rounded-lg transition">✕ HỦY SỬA (VIẾT BÀI MỚI)</button>}
                 </div>
               </div>
             )}
