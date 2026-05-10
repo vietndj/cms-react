@@ -31,7 +31,7 @@ const getLastContextFromDB = (currentDb) => {
 };
 
 // ==========================================
-// 2. COMPONENT SVG (Bổ sung View Icons)
+// 2. COMPONENT SVG
 // ==========================================
 const SVGIcons = () => (
   <svg style={{ display: 'none' }}>
@@ -43,7 +43,6 @@ const SVGIcons = () => (
     <symbol id="icon-tag" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z" /><path fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" d="M7 7h.01" /></symbol>
     <symbol id="icon-palette" viewBox="0 0 24 24"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2Z" /></symbol>
     <symbol id="icon-link" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></symbol>
-    {/* VIEW ICONS */}
     <symbol id="icon-list" viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><line x1="8" y1="12" x2="21" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><line x1="8" y1="18" x2="21" y2="18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><line x1="3" y1="6" x2="3.01" y2="6" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/><line x1="3" y1="12" x2="3.01" y2="12" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/><line x1="3" y1="18" x2="3.01" y2="18" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/></symbol>
     <symbol id="icon-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1" fill="none" stroke="currentColor" strokeWidth="2"/><rect x="14" y="3" width="7" height="7" rx="1" fill="none" stroke="currentColor" strokeWidth="2"/><rect x="14" y="14" width="7" height="7" rx="1" fill="none" stroke="currentColor" strokeWidth="2"/><rect x="3" y="14" width="7" height="7" rx="1" fill="none" stroke="currentColor" strokeWidth="2"/></symbol>
     <symbol id="icon-kanban" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2" fill="none" stroke="currentColor" strokeWidth="2"/><line x1="9" y1="3" x2="9" y2="21" stroke="currentColor" strokeWidth="2"/><line x1="15" y1="3" x2="15" y2="21" stroke="currentColor" strokeWidth="2"/></symbol>
@@ -64,10 +63,10 @@ export default function App() {
   const [isSyncing, setIsSyncing] = useState(false);
   
   const [searchQuery, setSearchQuery] = useState('');
-  const [isDeepSearch, setIsDeepSearch] = useState(false); // Thêm state tìm kiếm sâu
+  const [isDeepSearch, setIsDeepSearch] = useState(false); 
   const [activeRepo, setActiveRepo] = useState('all');
   const [activeTag, setActiveTag] = useState('all');
-  const [currentView, setCurrentView] = useState('list'); // Thêm state View Mode
+  const [currentView, setCurrentView] = useState('list'); 
   
   const [isTasksOpen, setIsTasksOpen] = useState(false);
   const [isToolsOpen, setIsToolsOpen] = useState(false);
@@ -129,28 +128,38 @@ export default function App() {
   const saveLocalDb = (newDb) => { try { localStorage.setItem('cms_repo_data', JSON.stringify(newDb)); setDb(newDb); } catch(e) { setDb(newDb); } };
 
   // ==========================================
-  // HÀM TẢI DB
+  // HÀM TẢI DB VÀ KHỬ TRÙNG LẶP
   // ==========================================
   const loadDatabase = async () => {
     if (!token) { setStatus({ text: 'Cần có Token GitHub!', type: 'error' }); setTimeout(() => setStatus({ text: '', type: '' }), 3000); return; }
     if (isSyncing) return;
     setIsSyncing(true); setStatus({ text: 'Đang tải Database...', type: 'loading' });
+    
     try {
       const meta = await fetchRawJSON(`${username}/${username}.github.io`, 'metadata.json', token);
       const dbData = await fetchRawJSON(`${username}/${username}.github.io`, 'cms_db.json', token);
+      
       if (dbData && dbData.allFiles) {
         const uniqueFilesMap = new Map();
+        const SYSTEM_FILES = ['index.html', 'tin.html', 'export.html', '404.html'];
+
         dbData.allFiles.forEach(f => {
+            if (f.repoName === `${username}.github.io` || f.repoName === username) {
+                if (SYSTEM_FILES.includes(f.fileName) || f.fileName.startsWith('export')) return; 
+            }
             const key = `${f.repoName}/${f.fileName}`;
             if (!uniqueFilesMap.has(key) || uniqueFilesMap.get(key).timestamp < f.timestamp) {
                 uniqueFilesMap.set(key, f);
             }
         });
+        
         const cleanFiles = Array.from(uniqueFilesMap.values()).sort((a, b) => b.timestamp - a.timestamp);
         const reposMap = {}; cleanFiles.forEach(f => { if(!reposMap[f.repoName]) reposMap[f.repoName] = []; reposMap[f.repoName].push(f); });
+        
         const loadedDb = { files: cleanFiles, repos: reposMap, tags: meta?.tags || {}, pinned: meta?.pinned || [], links: meta?.links || {}, colors: meta?.colors || {}, titles: meta?.titles || {}, tasks: meta?.tasks || [], customCol: meta?.customCol || [] };
         
         saveLocalDb(loadedDb);
+        
         if (!title && !content && !editorOriginal.sha) {
             const ctx = getLastContextFromDB(loadedDb); setRepo(ctx.repo); setTags(ctx.tags);
         }
@@ -160,6 +169,7 @@ export default function App() {
             const dbSha = await getFileShaSafe(`${username}/${username}.github.io`, 'cms_db.json', token);
             await fetch(`https://api.github.com/repos/${username}/${username}.github.io/contents/cms_db.json`, { method: 'PUT', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ message: 'Auto-Clean Duplicates', content: dbContent, sha: dbSha || undefined }) });
         }
+
         setStatus({ text: 'Đã đồng bộ xong!', type: 'success' }); setTimeout(() => setStatus({ text: '', type: '' }), 3000);
       }
     } catch (e) { setStatus({ text: `Lỗi DB: ${e.message}`, type: 'error' }); setTimeout(() => setStatus({ text: '', type: '' }), 5000); } finally { setIsSyncing(false); }
@@ -218,6 +228,9 @@ export default function App() {
     const ctx = getLastContextFromDB(db); setRepo(ctx.repo); setTags(ctx.tags);
   };
 
+  // ==========================================
+  // LƯU BÀI (BAO GỒM CHUYỂN REPO & KHỬ TRÙNG)
+  // ==========================================
   const handleSaveArticle = async () => {
     if (!token) { setStatus({ text: 'Cần Token GitHub!', type: 'error' }); setTimeout(() => setStatus({ text: '', type: '' }), 3000); return; }
     if (!repo || !title || !slug || !content) return alert("Thiếu dữ liệu (Kho, Tiêu đề, Slug, Nội dung)!");
@@ -244,7 +257,7 @@ export default function App() {
         const oldOwner = editorOriginal.repo.split('/')[0] || username;
         let currentOldSha = await getFileShaSafe(`${oldOwner}/${oldRepoName}`, editorOriginal.filename, token);
         if (currentOldSha) {
-            await fetch(`https://api.github.com/repos/${oldOwner}/${oldRepoName}/contents/${safeEnc(editorOriginal.filename)}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ message: `Xóa file cũ`, sha: currentOldSha }) });
+            await fetch(`https://api.github.com/repos/${oldOwner}/${oldRepoName}/contents/${safeEnc(editorOriginal.filename)}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ message: `Xóa file cũ do chuyển/đổi tên`, sha: currentOldSha }) });
             const oldKey = `${oldRepoName}/${editorOriginal.filename}`;
             delete db.tags[oldKey]; delete db.titles[oldKey]; delete db.colors[oldKey]; delete db.links[oldKey];
             db.pinned = db.pinned.filter(x => x !== oldKey);
@@ -266,7 +279,7 @@ export default function App() {
       });
 
       const dDate = new Date();
-      newFiles.unshift({ repoName: rName, name: title, fileName: filename, sha: resHTMLData.content?.sha || fileSha, url: `https://${rOwner}.github.io/${rName === `${rOwner}.github.io` ? '' : rName + '/'}${filename}`, timestamp: dDate.getTime(), fullDate: dDate.toLocaleString('vi-VN'), preview: content.substring(0, 150).replace(/<[^>]*>?/gm, '') }); // Giả lập preview text
+      newFiles.unshift({ repoName: rName, name: title, fileName: filename, sha: resHTMLData.content?.sha || fileSha, url: `https://${rOwner}.github.io/${rName === `${rOwner}.github.io` ? '' : rName + '/'}${filename}`, timestamp: dDate.getTime(), fullDate: dDate.toLocaleString('vi-VN'), preview: content.substring(0, 150).replace(/<[^>]*>?/gm, '') });
 
       const newState = { ...db, files: newFiles, tags: newTags, titles: newTitles, links: newLinksDb };
       await syncMetaAndDB(newState); saveLocalDb(newState);
@@ -305,7 +318,7 @@ export default function App() {
   };
 
   // ==========================================
-  // VIEW MODE & FILTER LOGIC (Đã tích hợp Deep Search)
+  // XỬ LÝ VIEW MODE & DEEP SEARCH
   // ==========================================
   const repoKeysList = useMemo(() => { const keys = Object.keys(db.repos || {}); if (!keys.includes(`${username}.github.io`)) keys.unshift(`${username}.github.io`); return keys; }, [db.repos]);
   const allUniqueTags = useMemo(() => { const s = new Set(); Object.values(db.tags).forEach(a => a.forEach(t => s.add(t))); return Array.from(s).sort(); }, [db.tags]);
@@ -329,31 +342,12 @@ export default function App() {
   const pinnedFiles = useMemo(() => processedFiles.filter(f => db.pinned.includes(`${f.repoName}/${f.fileName}`)), [processedFiles, db.pinned]);
   const unpinnedFiles = useMemo(() => processedFiles.filter(f => !db.pinned.includes(`${f.repoName}/${f.fileName}`)), [processedFiles, db.pinned]);
   
-  // ==========================================
-  // AUTO-GROUPING CHO REPO LỚN (> 20 BÀI)
-  // ==========================================
+  // Trả về thiết kế gom nhóm 1 cấp gốc
   const groupedFilesByRepo = useMemo(() => { 
     const groups = {}; 
     unpinnedFiles.forEach(f => { if (!groups[f.repoName]) groups[f.repoName] = []; groups[f.repoName].push(f); }); 
     const sortedRepoNames = Object.keys(groups).sort((a, b) => Math.max(...groups[b].map(f => f.timestamp || 0)) - Math.max(...groups[a].map(f => f.timestamp || 0)));
-    const sortedGroups = {}; 
-    
-    // Nếu repo có > 20 bài, chẻ nhỏ theo Tháng/Năm
-    sortedRepoNames.forEach(r => {
-        if (groups[r].length > 20) {
-            const subGroups = {};
-            groups[r].forEach(f => {
-                const parts = (f.fullDate || "").split(' ')[0].split('/');
-                const monthYear = parts.length >= 3 ? `Tháng ${parts[1]}/${parts[2]}` : 'Khác';
-                if (!subGroups[monthYear]) subGroups[monthYear] = [];
-                subGroups[monthYear].push(f);
-            });
-            // Sắp xếp các nhóm phụ theo thời gian giảm dần
-            sortedGroups[r] = { isSubGrouped: true, data: subGroups };
-        } else {
-            sortedGroups[r] = { isSubGrouped: false, data: groups[r] };
-        }
-    });
+    const sortedGroups = {}; sortedRepoNames.forEach(r => sortedGroups[r] = groups[r]);
     return sortedGroups; 
   }, [unpinnedFiles]);
 
@@ -361,7 +355,7 @@ export default function App() {
       if (currentView === 'grid') return "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4";
       if (currentView === 'kanban') return "flex overflow-x-auto gap-4 pb-4 snap-x";
       if (currentView === 'feed') return "flex flex-col max-w-3xl mx-auto gap-8";
-      return "flex flex-col gap-3"; // list default
+      return "flex flex-col gap-3"; 
   };
 
   const renderCard = (file, isRecent = false) => {
@@ -380,7 +374,6 @@ export default function App() {
     const linksList = getFileLinks(file.repoName, file.fileName);
     const dateFmt = file.fullDate?.split(' ')[0] || '';
 
-    // Card thu gọn (Recent)
     if (isRecent) {
       return (
         <div key={file.sha} className="cms-card p-3 min-w-[220px] max-w-[220px] flex flex-col transition border cms-border hover:border-[var(--accent)] bg-[var(--bg-card)] cursor-pointer snap-start" onClick={() => window.open(file.url, '_blank')}>
@@ -393,7 +386,6 @@ export default function App() {
       );
     }
 
-    // Tùy biến Card theo View Mode
     let cardClass = "cms-card p-4 flex flex-col relative transition border cms-border hover:border-[var(--accent)] cursor-pointer group shadow-sm bg-[var(--bg-card)] ";
     if (currentView === 'kanban') cardClass += "min-w-[280px] snap-start";
     else if (currentView === 'feed') cardClass += "p-6 md:p-8 text-lg";
@@ -462,171 +454,18 @@ export default function App() {
             </details>
         )}
         
-        {Object.keys(groupedFilesByRepo).map(r => {
-            const groupInfo = groupedFilesByRepo[r];
-            return (
-                <details key={r} open className="mb-2 outline-none">
-                    <summary className="font-bold text-lg mb-4 border-b border-[var(--border)] pb-2 cursor-pointer outline-none flex items-center gap-2 text-[var(--text-main)]">
-                        <svg className="w-5 h-5 opacity-70"><use href="#icon-folder"></use></svg> {r} 
-                        <span className="text-xs px-2 py-0.5 rounded-full border cms-border text-[var(--text-muted)] ml-2">
-                            {groupInfo.isSubGrouped ? Object.values(groupInfo.data).flat().length : groupInfo.data.length}
-                        </span>
-                    </summary>
-                    
-                    {/* Render Sub-groups (Theo Tháng) nếu có > 20 bài */}
-                    {groupInfo.isSubGrouped ? (
-                        <div className="flex flex-col gap-4">
-                            {Object.keys(groupInfo.data).map(month => (
-                                <details key={month} className="ml-2 md:ml-4 border-l-2 border-[var(--border)] pl-4 outline-none">
-                                    <summary className="font-bold text-sm text-[var(--text-muted)] cursor-pointer outline-none mb-4 flex items-center gap-2 py-2">
-                                        🗓 {month} <span className="text-[10px] bg-[var(--bg-hover)] px-2 py-0.5 rounded-full text-[var(--text-main)]">{groupInfo.data[month].length}</span>
-                                    </summary>
-                                    <div className={getViewContainerClass()}>{groupInfo.data[month].map(f => renderCard(f))}</div>
-                                </details>
-                            ))}
-                        </div>
-                    ) : (
-                        <div className={getViewContainerClass()}>{groupInfo.data.map(f => renderCard(f))}</div>
-                    )}
-                </details>
-            )
-        })}
+        {Object.keys(groupedFilesByRepo).map(r => (
+            <details key={r} open className="mb-2 outline-none">
+                <summary className="font-bold text-lg mb-4 border-b border-[var(--border)] pb-2 cursor-pointer outline-none flex items-center gap-2 text-[var(--text-main)]">
+                    <svg className="w-5 h-5 opacity-70"><use href="#icon-folder"></use></svg> {r} <span className="text-xs px-2 py-0.5 rounded-full border cms-border text-[var(--text-muted)] ml-2">{groupedFilesByRepo[r].length}</span>
+                </summary>
+                <div className={getViewContainerClass()}>{groupedFilesByRepo[r].map(f => renderCard(f))}</div>
+            </details>
+        ))}
       </div>
     );
   };
 
-  // --- TRÍCH XUẤT COMPONENT LÕI ĐỂ BỌC TRONG FRAGMENT ---
-  const MainApp = () => (
-    <div className="flex-col w-full min-h-screen fade-in flex bg-[var(--bg-body)]" onClick={() => setActiveColorPickerCard(null)}>
-      <SVGIcons />
-      {/* HEADER */}
-      <header className="bg-[var(--bg-card)] border-b border-[var(--border)] pt-4 pb-3 px-4 md:px-8 flex flex-col md:flex-row items-center gap-4">
-        <h1 className="text-2xl font-bold tracking-tight text-[var(--accent)]">vietndj</h1>
-        <div className="flex-1 flex w-full items-center gap-2">
-            <div className="flex-1 flex items-center bg-[var(--bg-hover)] rounded-xl px-4 py-2 border cms-border">
-                <svg className="w-4 h-4 text-[var(--text-muted)]"><use href="#icon-search"></use></svg>
-                <input id="search-input-main" type="text" value={searchQuery} onChange={(e)=>setSearchQuery(e.target.value)} placeholder="Tìm kiếm... (Ctrl K)" className="bg-transparent border-none outline-none text-sm w-full ml-3 font-bold text-[var(--text-main)] placeholder-[var(--text-muted)]" />
-            </div>
-            {/* NÚT TÌM KIẾM SÂU */}
-            <button onClick={() => setIsDeepSearch(!isDeepSearch)} className={`shrink-0 px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border ${isDeepSearch ? 'bg-[var(--accent)] text-white border-transparent' : 'bg-[var(--bg-hover)] text-[var(--text-main)] cms-border hover:opacity-80'}`} title="Bật/Tắt tìm kiếm sâu trong nội dung">
-                <svg className="w-4 h-4"><use href="#icon-search"></use></svg> <span className="hidden sm:inline-block">Sâu</span>
-            </button>
-        </div>
-        <div className="flex items-center gap-2 relative" ref={toolsMenuRef}>
-          <button onClick={loadDatabase} className="px-3 py-2 rounded-xl text-xs font-bold transition text-[var(--text-main)] bg-[var(--bg-hover)] border border-transparent hover:border-[var(--border)] flex items-center gap-1">Tải DB</button>
-          <button onClick={()=>setIsTasksOpen(!isTasksOpen)} className="px-3 py-2 rounded-xl text-xs font-bold transition text-[var(--text-main)] bg-[var(--bg-hover)] border border-transparent hover:border-[var(--border)] flex items-center gap-1">Việc</button>
-          <button onClick={() => setIsToolsOpen(!isToolsOpen)} className="px-3 py-2 rounded-xl text-xs font-bold transition text-[var(--text-main)] bg-[var(--bg-hover)] border border-transparent hover:border-[var(--border)] flex items-center gap-1">Công cụ ▾</button>
-          {isToolsOpen && ( 
-              <div className="absolute right-0 top-full mt-2 w-56 p-2 z-[100] cms-card rounded-xl shadow-2xl border cms-border fade-in">
-                  <div className="flex gap-1 px-1 mb-3">
-                      <button onClick={() => changeTheme('light')} className="flex-1 py-1.5 rounded text-[11px] font-bold border cms-border text-[var(--text-main)] hover:bg-[var(--bg-hover)] transition">Sáng</button>
-                      <button onClick={() => changeTheme('dark')} className="flex-1 py-1.5 rounded text-[11px] font-bold border cms-border text-[var(--text-main)] hover:bg-[var(--bg-hover)] transition">Tối</button>
-                  </div>
-                  <button onClick={() => window.open('https://vietndj.github.io/tin.html', '_blank')} className="w-full text-left px-3 py-2 text-xs font-bold hover:bg-[var(--bg-hover)] rounded text-[var(--text-main)] transition">Mở Reader</button>
-                  <button onClick={() => { window.open('https://vietndj.github.io/export.html', '_blank'); setIsToolsOpen(false); }} className="w-full text-left px-3 py-2 text-xs font-bold text-[#8E44AD] hover:bg-[var(--bg-hover)] rounded transition">Xuất Sách AI</button>
-                  <hr className="my-1 border-t cms-border"/>
-                  <button onClick={() => {localStorage.removeItem("cms_auth"); setIsAuthenticated(false);}} className="w-full text-left px-3 py-2 text-xs font-bold text-red-500 hover:bg-[var(--bg-hover)] rounded transition">Khóa App</button>
-              </div> 
-          )}
-        </div>
-      </header>
-
-      {/* THANH VIEW MODE & FILTER */}
-      <div className="bg-[var(--bg-body)] border-b border-[var(--border)] py-2 px-4 md:px-8 sticky top-0 z-40 flex flex-col gap-2">
-          {/* VIEW MODE TOGGLE */}
-          <div className="flex items-center gap-1 overflow-x-auto scrollbar-hide pb-1">
-              <span className="text-[9px] font-bold text-[var(--text-muted)] uppercase shrink-0 mr-2">VIEW</span>
-              <div className="flex bg-[var(--bg-hover)] p-1 rounded-lg border cms-border">
-                  {[
-                      { id: 'list', icon: '#icon-list', title: 'Danh sách' },
-                      { id: 'grid', icon: '#icon-grid', title: 'Lưới' },
-                      { id: 'kanban', icon: '#icon-kanban', title: 'Bảng' },
-                      { id: 'feed', icon: '#icon-feed', title: 'Đọc' }
-                  ].map(v => (
-                      <button key={v.id} onClick={() => setCurrentView(v.id)} className={`p-1.5 rounded-md transition ${currentView === v.id ? 'bg-[var(--bg-card)] text-[var(--text-main)] shadow-sm border border-[var(--border)]' : 'text-[var(--text-muted)] hover:text-[var(--text-main)] border border-transparent'}`} title={v.title}>
-                          <svg className="w-4 h-4"><use href={v.icon}></use></svg>
-                      </button>
-                  ))}
-              </div>
-          </div>
-          
-          <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide"><span className="text-[9px] font-bold text-[var(--text-muted)] uppercase shrink-0">KHO</span>{repoKeysList.map(r => <button key={r} onClick={() => setActiveRepo(activeRepo===r?'all':r)} className={`shrink-0 px-2.5 py-1 text-[10px] font-bold rounded-lg transition ${activeRepo===r?'bg-[var(--accent)] text-white shadow-sm border border-transparent':'bg-[var(--bg-hover)] text-[var(--text-main)] border cms-border hover:opacity-80'}`}>{r}</button>)}</div>
-          <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide"><span className="text-[9px] font-bold text-[var(--text-muted)] uppercase shrink-0">TAG</span>{allUniqueTags.map(t => <button key={t} onClick={() => setActiveTag(activeTag===t?'all':t)} className={`shrink-0 px-2.5 py-1 text-[10px] font-bold rounded-lg transition ${activeTag===t?'bg-[var(--accent)] text-white shadow-sm border border-transparent':'bg-[var(--bg-hover)] text-[var(--text-main)] border cms-border hover:opacity-80'}`}>{t}</button>)}</div>
-      </div>
-      
-      <div className="flex flex-col lg:flex-row gap-6 px-4 md:px-6 lg:px-8 max-w-[1600px] mx-auto items-start w-full relative pb-20 mt-6">
-        <main className="flex-1 w-full min-w-0 flex flex-col gap-8">
-          
-          {/* EDITOR */}
-          <section className="cms-card overflow-hidden border border-[var(--border)]">
-            <button onClick={() => {
-                setIsEditorOpen(!isEditorOpen); 
-                if (!isEditorOpen && !title && !content && !editorOriginal.sha) {
-                    const ctx = getLastContextFromDB(db); setRepo(ctx.repo); setTags(ctx.tags);
-                }
-            }} className="w-full px-6 py-3 flex justify-between items-center bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] font-bold text-[var(--accent)] outline-none">
-                <span className="flex items-center gap-2">
-                    <svg className="w-4 h-4"><use href="#icon-edit"></use></svg> Soạn thảo HTML <span className="text-[9px] text-[var(--text-muted)] border border-[var(--border)] px-1.5 py-0.5 rounded font-mono ml-2 uppercase bg-[var(--bg-body)]">Ctrl E</span>
-                </span>
-                <span>{isEditorOpen?'▲':'▼'}</span>
-            </button>
-            {isEditorOpen && (
-              <div className="p-5 flex flex-col gap-4 border-t border-[var(--border)] bg-[var(--bg-card)]">
-                <div className="flex flex-wrap gap-2">{repoKeysList.map(r => <button key={r} onClick={() => setRepo(`${username}/${r}`)} className={`px-3 py-1.5 text-[10px] font-bold rounded-lg border ${repo===`${username}/${r}`?'bg-[var(--accent)] text-white border-transparent':'bg-[var(--bg-hover)] text-[var(--text-muted)] border-[var(--border)] hover:opacity-80'}`}>{r}</button>)}</div>
-                
-                <textarea ref={editorInputRef} rows="10" value={content} onChange={handleContentChange} className="w-full p-4 bg-[#1D1D1F] text-[#34C759] rounded-xl font-mono text-sm outline-none shadow-inner" placeholder="Mở soạn thảo (Ctrl E) -> Dán HTML (Ctrl V) -> Lưu (Ctrl S)..."></textarea>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="flex flex-col gap-1.5"><label className="text-[10px] font-bold uppercase text-[var(--text-muted)] ml-1">Tiêu đề</label><input type="text" value={title} onChange={handleTitleChange} className="px-4 py-3 bg-[var(--bg-hover)] rounded-xl text-sm font-bold outline-none text-[var(--text-main)] border cms-border placeholder-[var(--text-muted)]" placeholder="Tiêu đề bài viết..." /></div>
-                    <div className="flex flex-col gap-1.5"><label className="text-[10px] font-bold uppercase text-[var(--text-muted)] ml-1">Slug (URL)</label><input type="text" value={slug} onChange={handleSlugChange} className="px-4 py-3 bg-[var(--bg-hover)] rounded-xl text-sm font-bold font-mono outline-none text-[var(--accent)] border cms-border placeholder-[var(--text-muted)]" placeholder="slug-cua-bai-viet..." /></div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="flex flex-col gap-1.5 p-3 rounded-xl border cms-border bg-[var(--bg-body)]">
-                        <label className="text-[10px] font-bold uppercase text-[var(--text-muted)] ml-1">Nhãn (Tags)</label>
-                        <input type="text" value={tags} onChange={(e)=>{setTags(e.target.value); if(!isSlugEdited) setSlug(generateSlug(title, e.target.value));}} className="px-3 py-2 bg-[var(--bg-hover)] rounded-lg text-sm font-bold text-[var(--text-main)] outline-none border cms-border placeholder-[var(--text-muted)]" />
-                        {allUniqueTags.length > 0 && (<div className="mt-2"><span className="text-[9px] font-bold text-[var(--text-muted)] uppercase mb-1 block px-1">Gợi ý nhãn có sẵn:</span><div className="flex flex-wrap gap-1.5 overflow-y-auto max-h-24 pr-1">{allUniqueTags.map(t => { const isSelected = tags.split(',').map(x=>x.trim()).includes(t); return <button key={t} type="button" onClick={() => toggleTagEditor(t)} className={`px-2 py-1 text-[10px] font-bold rounded-md transition border ${isSelected ? 'bg-[var(--accent)] text-white border-transparent shadow-sm' : 'bg-[var(--bg-card)] text-[var(--text-muted)] border-[var(--border)] hover:border-[var(--accent)]'}`}>{t}</button>})}</div></div>)}
-                    </div>
-                    
-                    <div className="flex flex-col gap-1.5 p-3 rounded-xl border cms-border bg-[var(--bg-body)]">
-                        <div className="flex justify-between items-center mb-1"><label className="text-[10px] font-bold uppercase text-[var(--text-muted)] ml-1 flex items-center gap-1"><svg className="w-3 h-3"><use href="#icon-link"></use></svg> Link tham khảo</label><button onClick={handleAddLink} className="text-[10px] font-bold text-[var(--accent)] bg-[var(--bg-hover)] px-2 py-1 rounded border cms-border hover:bg-[var(--bg-card)]">+ Thêm Link</button></div>
-                        {uploadLinks.length === 0 ? <div className="text-xs text-[var(--text-muted)] italic text-center py-4 opacity-70">Chưa có link đính kèm</div> : (<div className="flex flex-col gap-2 max-h-32 overflow-y-auto pr-1">{uploadLinks.map((link, idx) => (<div key={idx} className="flex items-center gap-2 bg-[var(--bg-card)] border cms-border p-1.5 rounded-lg"><input type="text" value={link.title} onChange={e => handleUpdateLink(idx, 'title', e.target.value)} placeholder="Tên Link" className="w-1/3 bg-transparent text-xs font-bold outline-none text-[var(--text-main)] px-1" /><input type="text" value={link.url} onChange={e => handleUpdateLink(idx, 'url', e.target.value)} placeholder="https://..." className="flex-1 bg-transparent text-xs outline-none text-[var(--text-muted)] px-1 border-l cms-border" /><button onClick={() => handleRemoveLink(idx)} className="text-red-500 font-bold px-2 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition">✕</button></div>))}</div>)}
-                    </div>
-                </div>
-                
-                <div className="flex justify-between items-center pt-2">
-                   <button id="btn-save-article" onClick={handleSaveArticle} disabled={isSaving} className="bg-[var(--accent)] text-white px-8 py-3.5 rounded-xl font-bold shadow-lg text-sm transition hover:scale-105 disabled:opacity-50 border border-transparent">
-                      {isSaving?'Đang lưu...':'LƯU BÀI (Ctrl S)'}
-                   </button>
-                   {editorOriginal.sha && <button onClick={cancelEdit} className="text-red-500 text-xs font-bold px-4 py-2 hover:bg-[var(--bg-hover)] rounded-lg transition">✕ HỦY SỬA</button>}
-                </div>
-              </div>
-            )}
-          </section>
-
-          {/* MAIN GRID */}
-          {recentFiles.length > 0 && <div className="mb-2"><h3 className="text-[10px] font-black text-[var(--text-muted)] uppercase tracking-widest mb-3 ml-1">Vừa Thao Tác</h3><div className="flex overflow-x-auto gap-3 pb-2 scrollbar-hide snap-x">{recentFiles.map(f => renderCard(f, true))}</div></div>}
-
-          {renderViews()}
-        </main>
-
-        {/* CỘT TASK */}
-        {isTasksOpen && (
-          <aside className="w-full lg:w-[300px] shrink-0 sticky top-[120px] h-[calc(100vh-140px)] fade-in">
-             <div className="bg-[var(--bg-card)] p-4 flex flex-col h-full border border-[var(--border)] rounded-2xl shadow-sm">
-                <div className="flex justify-between items-center mb-4"><h2 className="text-[11px] font-black text-[var(--accent)] uppercase tracking-widest">Ghi chú</h2><button onClick={()=>setIsTasksOpen(false)} className="text-[var(--text-muted)] font-bold hover:text-red-500 transition">✕</button></div>
-                <div className="flex gap-2 mb-4"><input type="text" value={nativeTaskInput} onChange={e=>setNativeTaskInput(e.target.value)} onKeyDown={e=>{if(e.key==='Enter' && nativeTaskInput){const n=[{id:Date.now(),title:nativeTaskInput,completed:false},...db.tasks]; saveLocalDb({...db,tasks:n}); syncMetaAndDB({...db,tasks:n}); setNativeTaskInput('');}}} className="flex-1 bg-[var(--bg-hover)] border cms-border text-[var(--text-main)] px-3 py-2 rounded-lg text-xs outline-none" placeholder="Nhập ghi chú nhanh..." /></div>
-                <div className="flex-1 overflow-y-auto space-y-2 pr-1">
-                  {db.tasks.map(t => <div key={t.id} className="p-2.5 flex gap-2 rounded-xl text-[11px] font-medium leading-snug bg-[var(--bg-hover)] border cms-border text-[var(--text-main)] group hover:border-[var(--accent)] transition"><input type="checkbox" checked={t.completed} onChange={()=>{const n=db.tasks.map(x=>x.id===t.id?{...x,completed:!x.completed}:x); saveLocalDb({...db,tasks:n}); syncMetaAndDB({...db,tasks:n});}} className="mt-0.5 accent-[var(--accent)] w-3.5 h-3.5 cursor-pointer" /><span className={`flex-1 ${t.completed ? 'opacity-50 line-through' : ''}`}>{t.title}</span><button onClick={()=>{const n=db.tasks.filter(x=>x.id!==t.id); saveLocalDb({...db,tasks:n}); syncMetaAndDB({...db,tasks:n});}} className="text-red-500 font-bold opacity-0 group-hover:opacity-100 px-1 transition">✕</button></div>)}
-                </div>
-             </div>
-          </aside>
-        )}
-      </div>
-    </div>
-  );
-
-  // MÀN HÌNH LOGIN
   if (!isAuthenticated) return ( 
     <div className="flex fixed inset-0 flex-col items-center justify-center z-[99999] bg-[var(--bg-body)]">
         <div className="cms-card p-10 max-w-sm w-full mx-4 text-center rounded-3xl shadow-2xl border cms-border">
@@ -637,22 +476,141 @@ export default function App() {
     </div> 
   );
 
-  // KẾT HỢP CHUẨN ĐỂ FIX STACKING CONTEXT THEO LỜI KHUYÊN CỦA CHUYÊN GIA BÊN NGOÀI
   return (
     <>
-      <MainApp />
+        {/* TOÀN BỘ APP CHÍNH TRONG .FADE-IN */}
+        <div className="flex-col w-full min-h-screen fade-in flex bg-[var(--bg-body)]" onClick={() => setActiveColorPickerCard(null)}>
+          <SVGIcons />
+          <header className="bg-[var(--bg-card)] border-b border-[var(--border)] pt-4 pb-3 px-4 md:px-8 flex flex-col md:flex-row items-center gap-4">
+            <h1 className="text-2xl font-bold tracking-tight text-[var(--accent)]">vietndj</h1>
+            <div className="flex-1 flex w-full items-center gap-2">
+                <div className="flex-1 flex items-center bg-[var(--bg-hover)] rounded-xl px-4 py-2 border cms-border">
+                    <svg className="w-4 h-4 text-[var(--text-muted)]"><use href="#icon-search"></use></svg>
+                    <input id="search-input-main" type="text" value={searchQuery} onChange={(e)=>setSearchQuery(e.target.value)} placeholder="Tìm kiếm... (Ctrl K)" className="bg-transparent border-none outline-none text-sm w-full ml-3 font-bold text-[var(--text-main)] placeholder-[var(--text-muted)]" />
+                </div>
+                <button onClick={() => setIsDeepSearch(!isDeepSearch)} className={`shrink-0 px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border ${isDeepSearch ? 'bg-[var(--accent)] text-white border-transparent' : 'bg-[var(--bg-hover)] text-[var(--text-main)] cms-border hover:opacity-80'}`} title="Bật/Tắt tìm kiếm sâu trong nội dung">
+                    <svg className="w-4 h-4"><use href="#icon-search"></use></svg> <span className="hidden sm:inline-block">Sâu</span>
+                </button>
+            </div>
+            <div className="flex items-center gap-2 relative" ref={toolsMenuRef}>
+              <button onClick={loadDatabase} className="px-3 py-2 rounded-xl text-xs font-bold transition text-[var(--text-main)] bg-[var(--bg-hover)] border border-transparent hover:border-[var(--border)] flex items-center gap-1">Tải DB</button>
+              <button onClick={()=>setIsTasksOpen(!isTasksOpen)} className="px-3 py-2 rounded-xl text-xs font-bold transition text-[var(--text-main)] bg-[var(--bg-hover)] border border-transparent hover:border-[var(--border)] flex items-center gap-1">Việc</button>
+              <button onClick={() => setIsToolsOpen(!isToolsOpen)} className="px-3 py-2 rounded-xl text-xs font-bold transition text-[var(--text-main)] bg-[var(--bg-hover)] border border-transparent hover:border-[var(--border)] flex items-center gap-1">Công cụ ▾</button>
+              {isToolsOpen && ( 
+                  <div className="absolute right-0 top-full mt-2 w-56 p-2 z-[100] cms-card rounded-xl shadow-2xl border cms-border fade-in">
+                      <div className="flex gap-1 px-1 mb-3">
+                          <button onClick={() => changeTheme('light')} className="flex-1 py-1.5 rounded text-[11px] font-bold border cms-border text-[var(--text-main)] hover:bg-[var(--bg-hover)] transition">Sáng</button>
+                          <button onClick={() => changeTheme('dark')} className="flex-1 py-1.5 rounded text-[11px] font-bold border cms-border text-[var(--text-main)] hover:bg-[var(--bg-hover)] transition">Tối</button>
+                      </div>
+                      <button onClick={() => window.open('https://vietndj.github.io/tin.html', '_blank')} className="w-full text-left px-3 py-2 text-xs font-bold hover:bg-[var(--bg-hover)] rounded text-[var(--text-main)] transition">Mở Reader</button>
+                      <button onClick={() => { window.open('https://vietndj.github.io/export.html', '_blank'); setIsToolsOpen(false); }} className="w-full text-left px-3 py-2 text-xs font-bold text-[#8E44AD] hover:bg-[var(--bg-hover)] rounded transition">Xuất Sách AI</button>
+                      <hr className="my-1 border-t cms-border"/>
+                      <button onClick={() => {localStorage.removeItem("cms_auth"); setIsAuthenticated(false);}} className="w-full text-left px-3 py-2 text-xs font-bold text-red-500 hover:bg-[var(--bg-hover)] rounded transition">Khóa App</button>
+                  </div> 
+              )}
+            </div>
+          </header>
 
-      {/* TOAST THÔNG BÁO VỚI LỚP CHE NỔI BẬT LÊN CAO (GIẢI PHÓNG KHỎI .FADE-IN) */}
-      {status.text && (
-          <div className="fixed top-[80px] left-1/2 transform -translate-x-1/2 z-[9999999] pointer-events-none transition-all duration-300 w-max max-w-[90%]">
-              <div className={`bg-[var(--bg-card)] px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 border-2 font-bold text-sm text-[var(--text-main)] ${status.type === 'error' ? 'border-red-500' : status.type === 'loading' ? 'border-[var(--accent)]' : 'border-green-500'}`}>
-                  {status.type === 'loading' && <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>}
-                  {status.type === 'error' && <span className="text-red-500 text-lg">✕</span>}
-                  {status.type === 'success' && <span className="text-green-500 text-lg">✓</span>}
-                  <span className="whitespace-nowrap">{status.text}</span>
+          <div className="bg-[var(--bg-body)] border-b border-[var(--border)] py-2 px-4 md:px-8 sticky top-0 z-40 flex flex-col gap-2">
+              <div className="flex items-center gap-1 overflow-x-auto scrollbar-hide pb-1">
+                  <span className="text-[9px] font-bold text-[var(--text-muted)] uppercase shrink-0 mr-2">VIEW</span>
+                  <div className="flex bg-[var(--bg-hover)] p-1 rounded-lg border cms-border">
+                      {[
+                          { id: 'list', icon: '#icon-list', title: 'Danh sách' },
+                          { id: 'grid', icon: '#icon-grid', title: 'Lưới' },
+                          { id: 'kanban', icon: '#icon-kanban', title: 'Bảng' },
+                          { id: 'feed', icon: '#icon-feed', title: 'Đọc' }
+                      ].map(v => (
+                          <button key={v.id} onClick={() => setCurrentView(v.id)} className={`p-1.5 rounded-md transition ${currentView === v.id ? 'bg-[var(--bg-card)] text-[var(--text-main)] shadow-sm border border-[var(--border)]' : 'text-[var(--text-muted)] hover:text-[var(--text-main)] border border-transparent'}`} title={v.title}>
+                              <svg className="w-4 h-4"><use href={v.icon}></use></svg>
+                          </button>
+                      ))}
+                  </div>
               </div>
+              <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide"><span className="text-[9px] font-bold text-[var(--text-muted)] uppercase shrink-0">KHO</span>{repoKeysList.map(r => <button key={r} onClick={() => setActiveRepo(activeRepo===r?'all':r)} className={`shrink-0 px-2.5 py-1 text-[10px] font-bold rounded-lg transition ${activeRepo===r?'bg-[var(--accent)] text-white shadow-sm border border-transparent':'bg-[var(--bg-hover)] text-[var(--text-main)] border cms-border hover:opacity-80'}`}>{r}</button>)}</div>
+              <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide"><span className="text-[9px] font-bold text-[var(--text-muted)] uppercase shrink-0">TAG</span>{allUniqueTags.map(t => <button key={t} onClick={() => setActiveTag(activeTag===t?'all':t)} className={`shrink-0 px-2.5 py-1 text-[10px] font-bold rounded-lg transition ${activeTag===t?'bg-[var(--accent)] text-white shadow-sm border border-transparent':'bg-[var(--bg-hover)] text-[var(--text-main)] border cms-border hover:opacity-80'}`}>{t}</button>)}</div>
           </div>
-      )}
+          
+          <div className="flex flex-col lg:flex-row gap-6 px-4 md:px-6 lg:px-8 max-w-[1600px] mx-auto items-start w-full relative pb-20 mt-6">
+            <main className="flex-1 w-full min-w-0 flex flex-col gap-8">
+              <section className="cms-card overflow-hidden border border-[var(--border)]">
+                <button onClick={() => {
+                    setIsEditorOpen(!isEditorOpen); 
+                    if (!isEditorOpen && !title && !content && !editorOriginal.sha) {
+                        const ctx = getLastContextFromDB(db); setRepo(ctx.repo); setTags(ctx.tags);
+                    }
+                }} className="w-full px-6 py-3 flex justify-between items-center bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] font-bold text-[var(--accent)] outline-none">
+                    <span className="flex items-center gap-2">
+                        <svg className="w-4 h-4"><use href="#icon-edit"></use></svg> Soạn thảo HTML <span className="text-[9px] text-[var(--text-muted)] border border-[var(--border)] px-1.5 py-0.5 rounded font-mono ml-2 uppercase bg-[var(--bg-body)]">Ctrl E</span>
+                    </span>
+                    <span>{isEditorOpen?'▲':'▼'}</span>
+                </button>
+                {isEditorOpen && (
+                  <div className="p-5 flex flex-col gap-4 border-t border-[var(--border)] bg-[var(--bg-card)]">
+                    <div className="flex flex-wrap gap-2">{repoKeysList.map(r => <button key={r} onClick={() => setRepo(`${username}/${r}`)} className={`px-3 py-1.5 text-[10px] font-bold rounded-lg border ${repo===`${username}/${r}`?'bg-[var(--accent)] text-white border-transparent':'bg-[var(--bg-hover)] text-[var(--text-muted)] border-[var(--border)] hover:opacity-80'}`}>{r}</button>)}</div>
+                    
+                    <textarea ref={editorInputRef} rows="10" value={content} onChange={handleContentChange} className="w-full p-4 bg-[#1D1D1F] text-[#34C759] rounded-xl font-mono text-sm outline-none shadow-inner" placeholder="Mở soạn thảo (Ctrl E) -> Dán HTML (Ctrl V) -> Lưu (Ctrl S)..."></textarea>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="flex flex-col gap-1.5"><label className="text-[10px] font-bold uppercase text-[var(--text-muted)] ml-1">Tiêu đề</label><input type="text" value={title} onChange={handleTitleChange} className="px-4 py-3 bg-[var(--bg-hover)] rounded-xl text-sm font-bold outline-none text-[var(--text-main)] border cms-border placeholder-[var(--text-muted)]" placeholder="Tiêu đề bài viết..." /></div>
+                        <div className="flex flex-col gap-1.5"><label className="text-[10px] font-bold uppercase text-[var(--text-muted)] ml-1">Slug (URL)</label><input type="text" value={slug} onChange={handleSlugChange} className="px-4 py-3 bg-[var(--bg-hover)] rounded-xl text-sm font-bold font-mono outline-none text-[var(--accent)] border cms-border placeholder-[var(--text-muted)]" placeholder="slug-cua-bai-viet..." /></div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="flex flex-col gap-1.5 p-3 rounded-xl border cms-border bg-[var(--bg-body)]">
+                            <label className="text-[10px] font-bold uppercase text-[var(--text-muted)] ml-1">Nhãn (Tags)</label>
+                            <input type="text" value={tags} onChange={(e)=>{setTags(e.target.value); if(!isSlugEdited) setSlug(generateSlug(title, e.target.value));}} className="px-3 py-2 bg-[var(--bg-hover)] rounded-lg text-sm font-bold text-[var(--text-main)] outline-none border cms-border placeholder-[var(--text-muted)]" />
+                            {allUniqueTags.length > 0 && (<div className="mt-2"><span className="text-[9px] font-bold text-[var(--text-muted)] uppercase mb-1 block px-1">Gợi ý nhãn có sẵn:</span><div className="flex flex-wrap gap-1.5 overflow-y-auto max-h-24 pr-1">{allUniqueTags.map(t => { const isSelected = tags.split(',').map(x=>x.trim()).includes(t); return <button key={t} type="button" onClick={() => toggleTagEditor(t)} className={`px-2 py-1 text-[10px] font-bold rounded-md transition border ${isSelected ? 'bg-[var(--accent)] text-white border-transparent shadow-sm' : 'bg-[var(--bg-card)] text-[var(--text-muted)] border-[var(--border)] hover:border-[var(--accent)]'}`}>{t}</button>})}</div></div>)}
+                        </div>
+                        
+                        <div className="flex flex-col gap-1.5 p-3 rounded-xl border cms-border bg-[var(--bg-body)]">
+                            <div className="flex justify-between items-center mb-1"><label className="text-[10px] font-bold uppercase text-[var(--text-muted)] ml-1 flex items-center gap-1"><svg className="w-3 h-3"><use href="#icon-link"></use></svg> Link tham khảo</label><button onClick={handleAddLink} className="text-[10px] font-bold text-[var(--accent)] bg-[var(--bg-hover)] px-2 py-1 rounded border cms-border hover:bg-[var(--bg-card)]">+ Thêm Link</button></div>
+                            {uploadLinks.length === 0 ? <div className="text-xs text-[var(--text-muted)] italic text-center py-4 opacity-70">Chưa có link đính kèm</div> : (<div className="flex flex-col gap-2 max-h-32 overflow-y-auto pr-1">{uploadLinks.map((link, idx) => (<div key={idx} className="flex items-center gap-2 bg-[var(--bg-card)] border cms-border p-1.5 rounded-lg"><input type="text" value={link.title} onChange={e => handleUpdateLink(idx, 'title', e.target.value)} placeholder="Tên Link" className="w-1/3 bg-transparent text-xs font-bold outline-none text-[var(--text-main)] px-1" /><input type="text" value={link.url} onChange={e => handleUpdateLink(idx, 'url', e.target.value)} placeholder="https://..." className="flex-1 bg-transparent text-xs outline-none text-[var(--text-muted)] px-1 border-l cms-border" /><button onClick={() => handleRemoveLink(idx)} className="text-red-500 font-bold px-2 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition">✕</button></div>))}</div>)}
+                        </div>
+                    </div>
+                    
+                    <div className="flex justify-between items-center pt-2">
+                       <button id="btn-save-article" onClick={handleSaveArticle} disabled={isSaving} className="bg-[var(--accent)] text-white px-8 py-3.5 rounded-xl font-bold shadow-lg text-sm transition hover:scale-105 disabled:opacity-50 border border-transparent">
+                          {isSaving?'Đang lưu...':'LƯU BÀI (Ctrl S)'}
+                       </button>
+                       {editorOriginal.sha && <button onClick={cancelEdit} className="text-red-500 text-xs font-bold px-4 py-2 hover:bg-[var(--bg-hover)] rounded-lg transition">✕ HỦY SỬA</button>}
+                    </div>
+                  </div>
+                )}
+              </section>
+
+              {recentFiles.length > 0 && <div className="mb-2"><h3 className="text-[10px] font-black text-[var(--text-muted)] uppercase tracking-widest mb-3 ml-1">Vừa Thao Tác</h3><div className="flex overflow-x-auto gap-3 pb-2 scrollbar-hide snap-x">{recentFiles.map(f => renderCard(f, true))}</div></div>}
+
+              {renderViews()}
+            </main>
+
+            {isTasksOpen && (
+              <aside className="w-full lg:w-[300px] shrink-0 sticky top-[120px] h-[calc(100vh-140px)] fade-in">
+                 <div className="bg-[var(--bg-card)] p-4 flex flex-col h-full border border-[var(--border)] rounded-2xl shadow-sm">
+                    <div className="flex justify-between items-center mb-4"><h2 className="text-[11px] font-black text-[var(--accent)] uppercase tracking-widest">Ghi chú</h2><button onClick={()=>setIsTasksOpen(false)} className="text-[var(--text-muted)] font-bold hover:text-red-500 transition">✕</button></div>
+                    <div className="flex gap-2 mb-4"><input type="text" value={nativeTaskInput} onChange={e=>setNativeTaskInput(e.target.value)} onKeyDown={e=>{if(e.key==='Enter' && nativeTaskInput){const n=[{id:Date.now(),title:nativeTaskInput,completed:false},...db.tasks]; saveLocalDb({...db,tasks:n}); syncMetaAndDB({...db,tasks:n}); setNativeTaskInput('');}}} className="flex-1 bg-[var(--bg-hover)] border cms-border text-[var(--text-main)] px-3 py-2 rounded-lg text-xs outline-none" placeholder="Nhập ghi chú nhanh..." /></div>
+                    <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+                      {db.tasks.map(t => <div key={t.id} className="p-2.5 flex gap-2 rounded-xl text-[11px] font-medium leading-snug bg-[var(--bg-hover)] border cms-border text-[var(--text-main)] group hover:border-[var(--accent)] transition"><input type="checkbox" checked={t.completed} onChange={()=>{const n=db.tasks.map(x=>x.id===t.id?{...x,completed:!x.completed}:x); saveLocalDb({...db,tasks:n}); syncMetaAndDB({...db,tasks:n});}} className="mt-0.5 accent-[var(--accent)] w-3.5 h-3.5 cursor-pointer" /><span className={`flex-1 ${t.completed ? 'opacity-50 line-through' : ''}`}>{t.title}</span><button onClick={()=>{const n=db.tasks.filter(x=>x.id!==t.id); saveLocalDb({...db,tasks:n}); syncMetaAndDB({...db,tasks:n});}} className="text-red-500 font-bold opacity-0 group-hover:opacity-100 px-1 transition">✕</button></div>)}
+                    </div>
+                 </div>
+              </aside>
+            )}
+          </div>
+        </div>
+
+        {/* ======================================================== */}
+        {/* TOAST ĐỨNG ĐỘC LẬP BÊN NGOÀI ĐỂ KHÔNG BỊ TRAP BỞI .FADE-IN */}
+        {/* ======================================================== */}
+        {status.text && (
+            <div className="fixed top-[80px] left-1/2 transform -translate-x-1/2 z-[9999999] pointer-events-none transition-all duration-300 w-max max-w-[90%]">
+                <div className={`bg-[var(--bg-card)] px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 border-2 font-bold text-sm text-[var(--text-main)] ${status.type === 'error' ? 'border-red-500' : status.type === 'loading' ? 'border-[var(--accent)]' : 'border-green-500'}`}>
+                    {status.type === 'loading' && <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>}
+                    {status.type === 'error' && <span className="text-red-500 text-lg">✕</span>}
+                    {status.type === 'success' && <span className="text-green-500 text-lg">✓</span>}
+                    <span className="whitespace-nowrap">{status.text}</span>
+                </div>
+            </div>
+        )}
     </>
   );
 }
