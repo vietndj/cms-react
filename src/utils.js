@@ -1,3 +1,4 @@
+// utils.js
 export const username = 'vietndj';
 export const SECRET_PIN = "0070";
 
@@ -89,8 +90,21 @@ export const getTimelineLabel = (timestamp) => {
 };
 
 export const generateSlug = (val, currentTags) => {
-    let s = val.toLowerCase().replace(/[áàảạãăắằẳẵặâấầẩẫậ]/gi,'a').replace(/[éèẻẽẹêếềểễệ]/gi,'e').replace(/[iíìỉĩị]/gi,'i').replace(/[óòỏõọôốồổỗộơớờởỡợ]/gi,'o').replace(/[úùủũụưứừửữự]/gi,'u').replace(/[ýỳỷỹỵ]/gi,'y').replace(/đ/gi,'d').replace(/\s+/g,'-').replace(/[^\w\-]+/g,'').replace(/\-\-+/g,'-').replace(/^-+|-+$/g,'');
+    let s = val.toLowerCase()
+        .replace(/[áàảạãăắằẳẵặâấầẩẫậ]/gi,'a').replace(/[éèẻẽẹêếềểễệ]/gi,'e').replace(/[iíìỉĩị]/gi,'i')
+        .replace(/[óòỏõọôốồổỗộơớờởỡợ]/gi,'o').replace(/[úùủũụưứừửữự]/gi,'u').replace(/[ýỳỷỹỵ]/gi,'y')
+        .replace(/đ/gi,'d').replace(/\s+/g,'-').replace(/[^\w\-]+/g,'').replace(/\-\-+/g,'-').replace(/^-+|-+$/g,'');
     let tagArr = currentTags.split(',').map(x=>x.trim()).filter(Boolean);
-    if(tagArr.length && s) { let ts = tagArr.join('-').toLowerCase().replace(/\s+/g,'-'); if(!s.includes(ts)) s += '-' + ts; }
+    if(tagArr.length && s) { 
+        let ts = tagArr.join('-').toLowerCase().replace(/\s+/g,'-'); 
+        if(!s.includes(ts)) s += '-' + ts; 
+    }
+    
+    // Cắt tên file tối đa 140 ký tự để GitHub không bị sập Build
+    if (s.length > 140) {
+        s = s.substring(0, 140);
+        const lastDash = s.lastIndexOf('-');
+        if (lastDash > 100) s = s.substring(0, lastDash);
+    }
     return s;
 };
