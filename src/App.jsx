@@ -24,104 +24,17 @@ function useCMS() {
   const migrateFromGithub=async()=>{if(!token)return alert("Cần dán Token GitHub để kéo Data!");setStatus({text:'Đang chuyển data...',type:'loading'});try{const m=await fetchRawJSON(`${username}/${username}.github.io`,'metadata.json',token),d=await fetchRawJSON(`${username}/${username}.github.io`,'cms_db.json',token);if(d&&d.allFiles){const u=new Map();d.allFiles.forEach(f=>{const k=`${f.repoName}/${f.fileName}`;if(!u.has(k)||u.get(k).timestamp<f.timestamp)u.set(k,f);});const c=Array.from(u.values()).sort((a,b)=>b.timestamp-a.timestamp),rm={};c.forEach(f=>{if(!rm[f.repoName])rm[f.repoName]=[];rm[f.repoName].push(f);});const ld={files:c,repos:rm,tags:m?.tags||{},pinned:m?.pinned||[],links:m?.links||{},colors:m?.colors||{},titles:m?.titles||{},tasks:m?.tasks||[],views:{},deleted:[],lastAISync:m?.lastAISync||""};await syncMetaAndDB(ld);saveLocalDb(ld);setStatus({text:'Di cư thành công!',type:'success'});setTimeout(()=>window.location.reload(),1500);}}catch(e){setStatus({text:'Lỗi di cư',type:'error'});}};
 
   const handleReadArticle=async(f)=>{const k=`${f.repoName}/${f.fileName}`,nv={...(db.views||{}),[k]:((db.views||{})[k]||0)+1},nd={...db,views:nv};setDb(nd);syncMetaAndDB(nd);saveLocalDb(nd);window.open(f.url,'_blank');};
-  const handleSaveArticle=async()=>{if(!token)return alert("Cần nhập GitHub Token để xuất bản bài viết!");if(!repo||!title||!content)return alert("Thiếu dữ liệu bài viết!");setIsSaving(true);setStatus({text:'Đang lưu...',type:'loading'});try{let fn=slug.endsWith('.html')?slug:slug+'.html',rn=repo.includes('/')?repo.split('/')[1]:repo,ro=repo.includes('/')?repo.split('/')[0]:username,fk=`${rn}/${fn}`;const ec=await encodeBase64UTF8Async(content);let fs=await getFileShaSafe(`${ro}/${rn}`,fn,token);const rh=await fetch(`https://api.github.com/repos/${ro}/${rn}/contents/${safeEnc(fn)}`,{method:'PUT',headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify({message:`Save: ${title}`,content:ec,sha:fs||undefined})});if(!rh.ok)throw new Error("Ghi thất bại");const pT=content.replace(/<style[^>]*>[\s\S]*?<\/style>/gi,'').replace(/<script[^>]*>[\s\S]*?<\/script>/gi,'').replace(/<[^>]+>/g,'\n').replace(/\n\s*\n/g,'\n\n').trim();const aiDB=await fetchAIBookDB();aiDB[fk]=pT;await updateAIBookDB(aiDB);const rd=await rh.json(),or=editorOriginal.repo?(editorOriginal.repo.includes('/')?editorOriginal.repo.split('/')[1]:editorOriginal.repo):null;if(editorOriginal.filename&&(or!==rn||editorOriginal.filename!==fn)&&editorOriginal.sha){const oo=editorOriginal.repo.split('/')[0]||username;let os=await getFileShaSafe(`${oo}/${or}`,editorOriginal.filename,token);if(os)await fetch(`https://api.github.com/repos/${oo}/${or}/contents/${safeEnc(editorOriginal.filename)}`,{method:'DELETE',headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify({message:`Xóa cũ`,sha:os})});}let nt={...db.tags},ta=tags.split(',').map(x=>x.trim()).filter(Boolean);if(ta.length)nt[fk]=ta;else delete nt[fk];let nti={...db.titles};nti[fk]=title;let nl={...db.links},vl=uploadLinks.filter(l=>l.title.trim()&&l.url.trim());if(vl.length)nl[fk]=vl;else delete nl[fk];let nf=[...db.files].filter(f=>!(f.repoName===rn&&f.fileName===fn)&&!(or&&f.repoName===or&&f.fileName===editorOriginal.filename));const d=new Date();nf.unshift({repoName:rn,name:title,fileName:fn,sha:rd.content?.sha||fs,url:`https://${ro}.github.io/${rn===`${ro}.github.io`?'':rn+'/'}${fn}`,timestamp:d.getTime(),fullDate:d.toLocaleString('vi-VN'),preview:content.substring(0,150).replace(/<[^>]*>?/gm,'')});const rm={};nf.forEach(f=>{if(!rm[f.repoName])rm[f.repoName]=[];rm[f.repoName].push(f);});const ns={...db,files:nf,tags:nt,titles:nti,links:nl,repos:rm};await syncMetaAndDB(ns);saveLocalDb(ns);localStorage.setItem('cms_last_repo',repo);localStorage.setItem('cms_last_tags',tags);setStatus({text:'Thành công!',type:'success'});setTitle('');setSlug('');setContent('');setUploadLinks([]);setIsSlugEdited(false);setEditorOriginal({repo:'',filename:'',sha:''});setTimeout(()=>setStatus({text:'',type:''}),3000);}catch(e){setStatus({text:'Lỗi lưu',type:'error'});}finally{setIsSaving(false);}};
-  
+   
   const handleDeleteArticle=async()=>{if(!editorOriginal.sha||!editorOriginal.filename)return;if(!window.confirm("Chuyển bài viết này vào thùng rác?"))return;setIsSaving(true);setStatus({text:'Đang xóa...',type:'loading'});try{const r=editorOriginal.repo.split('/')[1],fk=`${r}/${editorOriginal.filename}`,nd={...db,deleted:[...(db.deleted||[]),fk]};await syncMetaAndDB(nd);saveLocalDb(nd);setStatus({text:'Đã chuyển vào thùng rác!',type:'success'});setTitle('');setSlug('');setContent('');setTags(localStorage.getItem('cms_last_tags')||'');setUploadLinks([]);setIsSlugEdited(false);setEditorOriginal({repo:'',filename:'',sha:''});setIsEditorOpen(false);setTimeout(()=>setStatus({text:'',type:''}),2000);}catch(e){setStatus({text:'Lỗi',type:'error'});}finally{setIsSaving(false);}};
   const handleRestoreArticle=async(fk)=>{const nd={...db,deleted:(db.deleted||[]).filter(x=>x!==fk)};await syncMetaAndDB(nd);saveLocalDb(nd);};
   const handleHardDelete=async(f)=>{if(!token)return alert("Cần Token Github để xóa!");if(!window.confirm("XÓA VĨNH VIỄN? Không thể khôi phục!"))return;setStatus({text:'Đang xóa...',type:'loading'});try{const o=username,fk=`${f.repoName}/${f.fileName}`;let os=await getFileShaSafe(`${o}/${f.repoName}`,f.fileName,token);if(os)await fetch(`https://api.github.com/repos/${o}/${f.repoName}/contents/${safeEnc(f.fileName)}`,{method:'DELETE',headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify({message:`Delete permanently`,sha:os})});const nf=db.files.filter(x=>!(x.repoName===f.repoName&&x.fileName===f.fileName));const rm={};nf.forEach(x=>{if(!rm[x.repoName])rm[x.repoName]=[];rm[x.repoName].push(x);});const nd={...db,files:nf,repos:rm,deleted:(db.deleted||[]).filter(x=>x!==fk)};const aiDB=await fetchAIBookDB();delete aiDB[fk];await updateAIBookDB(aiDB);await syncMetaAndDB(nd);saveLocalDb(nd);setStatus({text:'Đã xóa vĩnh viễn!',type:'success'});setTimeout(()=>setStatus({text:'',type:''}),2000);}catch(e){setStatus({text:'Lỗi',type:'error'});}};
 
- const syncAIBook=async()=>{
-    if(!token)return alert("Cần Token Github để kéo HTML!");
-    setIsSaving(true);
-    try{
-      const aiDB=await fetchAIBookDB();
-      const fs=db.files.filter(f=>!(db.deleted||[]).includes(`${f.repoName}/${f.fileName}`));
-      let n=0;
-      for(let i=0;i<fs.length;i++){
-        const fk=`${fs[i].repoName}/${fs[i].fileName}`;
-        // Kiểm tra chặt: Cả bài rỗng, bài chứa cảnh báo đều bị bắt quét lại
-        if(!aiDB[fk] || aiDB[fk].trim()==="" || aiDB[fk].includes("⚠️")){
-          setStatus({text:`Đang nạp bài mới ${n+1}... (Xin đợi)`,type:'loading'});
-          try{
-            let fl=await fetchText(`https://api.github.com/repos/${username}/${fs[i].repoName}/contents/${safeEnc(fs[i].fileName)}`,token);
-            if(fl){
-              let text=fl.replace(/<style[^>]*>[\s\S]*?<\/style>/gi,'').replace(/<script[^>]*>[\s\S]*?<\/script>/gi,'').replace(/<[^>]+>/g,'\n').replace(/\n\s*\n/g,'\n\n').trim();
-              aiDB[fk]=text||"(Bài viết không có văn bản)";
-            }else{
-              aiDB[fk]="(Bài viết trống hoặc đã bị xóa)";
-            }
-            n++;
-            if(n%10===0)await updateAIBookDB(aiDB);
-            await new Promise(r=>setTimeout(r,150));
-          }catch(err){
-            aiDB[fk]="(Lỗi không thể tải file)";
-            n++;
-          }
-        }
-      }
-      if(n>0){
-        setStatus({text:`Đang lưu ${n} bài vào Bảng AI...`,type:'loading'});
-        await updateAIBookDB(aiDB);
-      }
-      const d=new Date().toLocaleString('vi-VN');
-      const sm=n>0?`${d} - Nạp ${n} bài`:`${d} - Đã cập nhật (0 bài mới)`;
-      const nd={...db,lastAISync:sm};
-      await syncMetaAndDB(nd);
-      saveLocalDb(nd);
-      setStatus({text:n>0?`Xong! Đã nạp ${n} bài mới.`:'Không có bài mới để nạp.',type:'success'});
-      setTimeout(()=>setStatus({text:'',type:''}),3000);
-    }catch(e){
-      setStatus({text:'Lỗi đồng bộ',type:'error'});
-    }finally{
-      setIsSaving(false);
-    }
-  };
+const handleSaveArticle=async()=>{if(!token)return alert("Cần nhập GitHub Token để xuất bản bài viết!");if(!repo||!title||!content)return alert("Thiếu dữ liệu bài viết!");setIsSaving(true);setStatus({text:'Đang lưu...',type:'loading'});try{let fn=slug.endsWith('.html')?slug:slug+'.html',rn=repo.includes('/')?repo.split('/')[1]:repo,ro=repo.includes('/')?repo.split('/')[0]:username,fk=`${rn}/${fn}`;const ec=await encodeBase64UTF8Async(content);let fs=await getFileShaSafe(`${ro}/${rn}`,fn,token);const rh=await fetch(`https://api.github.com/repos/${ro}/${rn}/contents/${safeEnc(fn)}`,{method:'PUT',headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify({message:`Save: ${title}`,content:ec,sha:fs||undefined})});if(!rh.ok)throw new Error("Ghi thất bại");const doc=new DOMParser().parseFromString(content,'text/html');doc.querySelectorAll('script, style, button, nav, header, footer, iframe, svg').forEach(x=>x.remove());const pT=(doc.body.innerText||doc.body.textContent||"").replace(/\n{3,}/g,'\n\n').trim();const aiDB=await fetchAIBookDB();aiDB[fk]=pT;await updateAIBookDB(aiDB);const rd=await rh.json(),or=editorOriginal.repo?(editorOriginal.repo.includes('/')?editorOriginal.repo.split('/')[1]:editorOriginal.repo):null;if(editorOriginal.filename&&(or!==rn||editorOriginal.filename!==fn)&&editorOriginal.sha){const oo=editorOriginal.repo.split('/')[0]||username;let os=await getFileShaSafe(`${oo}/${or}`,editorOriginal.filename,token);if(os)await fetch(`https://api.github.com/repos/${oo}/${or}/contents/${safeEnc(editorOriginal.filename)}`,{method:'DELETE',headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify({message:`Xóa cũ`,sha:os})});}let nt={...db.tags},ta=tags.split(',').map(x=>x.trim()).filter(Boolean);if(ta.length)nt[fk]=ta;else delete nt[fk];let nti={...db.titles};nti[fk]=title;let nl={...db.links},vl=uploadLinks.filter(l=>l.title.trim()&&l.url.trim());if(vl.length)nl[fk]=vl;else delete nl[fk];let nf=[...db.files].filter(f=>!(f.repoName===rn&&f.fileName===fn)&&!(or&&f.repoName===or&&f.fileName===editorOriginal.filename));const d=new Date();nf.unshift({repoName:rn,name:title,fileName:fn,sha:rd.content?.sha||fs,url:`https://${ro}.github.io/${rn===`${ro}.github.io`?'':rn+'/'}${fn}`,timestamp:d.getTime(),fullDate:d.toLocaleString('vi-VN'),preview:content.substring(0,150).replace(/<[^>]*>?/gm,'')});const rm={};nf.forEach(f=>{if(!rm[f.repoName])rm[f.repoName]=[];rm[f.repoName].push(f);});const ns={...db,files:nf,tags:nt,titles:nti,links:nl,repos:rm};await syncMetaAndDB(ns);saveLocalDb(ns);localStorage.setItem('cms_last_repo',repo);localStorage.setItem('cms_last_tags',tags);setStatus({text:'Thành công!',type:'success'});setTitle('');setSlug('');setContent('');setUploadLinks([]);setIsSlugEdited(false);setEditorOriginal({repo:'',filename:'',sha:''});setTimeout(()=>setStatus({text:'',type:''}),3000);}catch(e){setStatus({text:'Lỗi lưu',type:'error'});}finally{setIsSaving(false);}};
 
-  const exportAIBookZip=async()=>{
-    setStatus({text:'Đang nén Sách ZIP...',type:'loading'});
-    try{
-      const aiDB=await fetchAIBookDB();
-      const fs=db.files.filter(f=>!(db.deleted||[]).includes(`${f.repoName}/${f.fileName}`));
-      
-      // Chặn ngay lập tức nếu dữ liệu chưa được nạp
-      if(Object.keys(aiDB).length===0 && fs.length>0){
-        alert("⚠️ Dữ liệu Bảng Text AI đang trống!\nBạn HÃY BẤM NÚT '🔄 Đồng bộ Text AI' và chờ hệ thống nạp xong trước khi xuất sách nhé.");
-        setStatus({text:'',type:''});
-        return;
-      }
-      
-      const JSZip=await loadJSZip();
-      const zip=new JSZip();
-      const MW=450000;
-      let c="",w=0,p=1;
-      fs.forEach((f,idx)=>{
-        let pl=aiDB[`${f.repoName}/${f.fileName}`];
-        
-        // Cơ chế bọc hậu an toàn tuyệt đối
-        if(!pl || pl.trim()===""){
-          pl = (f.preview && f.preview.trim()!=="") ? f.preview : "(⚠️ Dữ liệu trống. Hãy bấm 'Đồng bộ Text AI' để hệ thống tự động kéo nội dung về!)";
-        }
-        
-        const m=`\n\n# [BÀI ${idx+1}] ${f.name}\n- Kho: ${f.repoName}\n- Ngày: ${f.fullDate}\n\n### Nội dung:\n${pl}\n\n---\n`;
-        const cw=m.split(/\s+/).length;
-        if(w+cw>MW&&w>0){
-          zip.file(`Sach_AI_VietNDJ_Phan_${p}.md`,c);
-          p++;c=m;w=cw;
-        }else{
-          c+=m;w+=cw;
-        }
-      });
-      if(c)zip.file(`Sach_AI_VietNDJ_Phan_${p}.md`,c);
-      const b=await zip.generateAsync({type:"blob"});
-      const u=URL.createObjectURL(b),a=document.createElement('a');
-      a.href=u;a.download=`Sach_AI_VietNDJ_ZIP.zip`;a.click();
-      URL.revokeObjectURL(u);
-      setStatus({text:'Đã xuất File ZIP!',type:'success'});
-      setTimeout(()=>setStatus({text:'',type:''}),3000);
-    }catch(e){
-      setStatus({text:'Lỗi xuất sách',type:'error'});
-    }
-  };
+  const syncAIBook=async()=>{if(!token)return alert("Cần Token Github để kéo HTML!");setIsSaving(true);try{const aiDB=await fetchAIBookDB();const fs=db.files.filter(f=>!(db.deleted||[]).includes(`${f.repoName}/${f.fileName}`));let n=0;for(let i=0;i<fs.length;i++){const fk=`${fs[i].repoName}/${fs[i].fileName}`;if(!aiDB[fk]||aiDB[fk].trim()===""||aiDB[fk].includes("⚠️")){setStatus({text:`Đang nạp bài mới ${n+1}... (Xin đợi)`,type:'loading'});try{let fl=await fetchText(`https://api.github.com/repos/${username}/${fs[i].repoName}/contents/${safeEnc(fs[i].fileName)}`,token);if(fl){const doc=new DOMParser().parseFromString(fl,'text/html');doc.querySelectorAll('script, style, button, nav, header, footer, iframe, svg').forEach(x=>x.remove());aiDB[fk]=(doc.body.innerText||doc.body.textContent||"").replace(/\n{3,}/g,'\n\n').trim()||"(Bài viết không có văn bản)";}else{aiDB[fk]="(Bài viết trống hoặc đã bị xóa)";}n++;if(n%10===0)await updateAIBookDB(aiDB);await new Promise(r=>setTimeout(r,150));}catch(err){aiDB[fk]="(Lỗi không thể tải file)";n++;}}}if(n>0){setStatus({text:`Đang lưu ${n} bài vào Bảng AI...`,type:'loading'});await updateAIBookDB(aiDB);}const d=new Date().toLocaleString('vi-VN');const nd={...db,lastAISync:n>0?`${d} - Nạp ${n} bài`:`${d} - Đã cập nhật (0 bài mới)`};await syncMetaAndDB(nd);saveLocalDb(nd);setStatus({text:n>0?`Xong! Đã nạp ${n} bài mới.`:'Không có bài mới để nạp.',type:'success'});setTimeout(()=>setStatus({text:'',type:''}),3000);}catch(e){setStatus({text:'Lỗi đồng bộ',type:'error'});}finally{setIsSaving(false);}};
+
+  const exportAIBookZip=async()=>{setStatus({text:'Đang nén Sách ZIP...',type:'loading'});try{const aiDB=await fetchAIBookDB();const fs=db.files.filter(f=>!(db.deleted||[]).includes(`${f.repoName}/${f.fileName}`));if(Object.keys(aiDB).length===0&&fs.length>0){alert("⚠️ Dữ liệu Bảng Text AI đang trống!\nBạn HÃY BẤM NÚT '🔄 Đồng bộ Text AI' trước.");setStatus({text:'',type:''});return;}const JSZip=await loadJSZip();const zip=new JSZip();const MW=450000;let c="",w=0,p=1;fs.forEach((f,idx)=>{let pl=aiDB[`${f.repoName}/${f.fileName}`];if(!pl||pl.trim()==="")pl=(f.preview&&f.preview.trim()!=="")?f.preview:"(⚠️ Dữ liệu trống. Hãy Đồng bộ Text AI!)";const m=`\n\n# [BÀI ${idx+1}] ${f.name}\n- Kho: ${f.repoName}\n- Ngày: ${f.fullDate}\n\n### Nội dung:\n${pl}\n\n---\n`;const cw=m.trim().split(/\s+/).filter(x=>x.length>0).length;if(w+cw>MW&&w>0){zip.file(`Sach_AI_VietNDJ_Phan_${p}.txt`,c);p++;c=m;w=cw;}else{c+=m;w+=cw;}});if(c)zip.file(`Sach_AI_VietNDJ_Phan_${p}.txt`,c);const b=await zip.generateAsync({type:"blob"});const u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download=`Sach_AI_VietNDJ_ZIP.zip`;a.click();URL.revokeObjectURL(u);setStatus({text:'Đã xuất File ZIP!',type:'success'});setTimeout(()=>setStatus({text:'',type:''}),3000);}catch(e){setStatus({text:'Lỗi xuất sách',type:'error'});}};
+
   const editFileContent=async(rn,f,s)=>{setIsEditorOpen(true);window.scrollTo({top:0,behavior:'smooth'});setStatus({text:'Đang nạp...',type:'loading'});try{const r=await fetchText(`https://api.github.com/repos/${username}/${rn}/contents/${safeEnc(f)}?t=${Date.now()}`,token);if(r){setContent(r);const p=rn===username||rn===`${username}.github.io`?`${username}/${username}.github.io`:`${username}/${rn}`,k=`${rn}/${f}`;setRepo(p);setTitle(db.titles[k]||f.replace('.html',''));setSlug(f.replace('.html',''));setIsSlugEdited(true);setTags((db.tags[k]||[]).join(', '));setUploadLinks(db.links[k]?JSON.parse(JSON.stringify(db.links[k])):[]);setEditorOriginal({repo:p,filename:f,sha:s});setStatus({text:'Xong!',type:'success'});setTimeout(()=>setStatus({text:'',type:''}),1000);}}catch(e){setStatus({text:'Lỗi nạp',type:'error'});}};
   const togglePin=async(r,f)=>{const k=`${r}/${f}`;let np=[...db.pinned];if(np.includes(k))np=np.filter(x=>x!==k);else np.push(k);const nd={...db,pinned:np};saveLocalDb(nd);syncMetaAndDB(nd);};
   const handleSetColor=async(k,c)=>{const nc={...db.colors};if(c)nc[k]=c;else delete nc[k];const ns={...db,colors:nc};setDb(ns);await syncMetaAndDB(ns);saveLocalDb(ns);setActiveColorPickerCard(null);};
