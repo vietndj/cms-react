@@ -30,9 +30,98 @@ function useCMS() {
   const handleRestoreArticle=async(fk)=>{const nd={...db,deleted:(db.deleted||[]).filter(x=>x!==fk)};await syncMetaAndDB(nd);saveLocalDb(nd);};
   const handleHardDelete=async(f)=>{if(!token)return alert("Cần Token Github để xóa!");if(!window.confirm("XÓA VĨNH VIỄN? Không thể khôi phục!"))return;setStatus({text:'Đang xóa...',type:'loading'});try{const o=username,fk=`${f.repoName}/${f.fileName}`;let os=await getFileShaSafe(`${o}/${f.repoName}`,f.fileName,token);if(os)await fetch(`https://api.github.com/repos/${o}/${f.repoName}/contents/${safeEnc(f.fileName)}`,{method:'DELETE',headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify({message:`Delete permanently`,sha:os})});const nf=db.files.filter(x=>!(x.repoName===f.repoName&&x.fileName===f.fileName));const rm={};nf.forEach(x=>{if(!rm[x.repoName])rm[x.repoName]=[];rm[x.repoName].push(x);});const nd={...db,files:nf,repos:rm,deleted:(db.deleted||[]).filter(x=>x!==fk)};const aiDB=await fetchAIBookDB();delete aiDB[fk];await updateAIBookDB(aiDB);await syncMetaAndDB(nd);saveLocalDb(nd);setStatus({text:'Đã xóa vĩnh viễn!',type:'success'});setTimeout(()=>setStatus({text:'',type:''}),2000);}catch(e){setStatus({text:'Lỗi',type:'error'});}};
 
-  const syncAIBook=async()=>{if(!token)return alert("Cần Token Github để kéo HTML!");setIsSaving(true);try{const aiDB=await fetchAIBookDB();const fs=db.files.filter(f=>!(db.deleted||[]).includes(`${f.repoName}/${f.fileName}`));let n=0;for(let i=0;i<fs.length;i++){const fk=`${fs[i].repoName}/${fs[i].fileName}`;if(aiDB[fk]===undefined){setStatus({text:`Đang nạp bài mới ${n+1}... (Xin đợi)`,type:'loading'});try{let fl=await fetchText(`https://api.github.com/repos/${username}/${fs[i].repoName}/contents/${safeEnc(fs[i].fileName)}`,token);if(fl){aiDB[fk]=fl.replace(/<style[^>]*>[\s\S]*?<\/style>/gi,'').replace(/<script[^>]*>[\s\S]*?<\/script>/gi,'').replace(/<[^>]+>/g,'\n').replace(/\n\s*\n/g,'\n\n').trim();}else{aiDB[fk]="(Bài viết trống hoặc đã bị xóa trên Github)";}n++;if(n%10===0)await updateAIBookDB(aiDB);await new Promise(r=>setTimeout(r,150));}catch(err){aiDB[fk]="(Lỗi không thể tải file)";n++;}}}if(n>0){setStatus({text:`Đang lưu ${n} bài vào Bảng AI...`,type:'loading'});await updateAIBookDB(aiDB);}const d=new Date().toLocaleString('vi-VN');const sm=n>0?`${d} - Nạp ${n} bài`:`${d} - Đã cập nhật (0 bài mới)`;const nd={...db,lastAISync:sm};await syncMetaAndDB(nd);saveLocalDb(nd);setStatus({text:n>0?`Xong! Đã nạp ${n} bài mới.`:'Không có bài mới để nạp.',type:'success'});setTimeout(()=>setStatus({text:'',type:''}),3000);}catch(e){setStatus({text:'Lỗi đồng bộ',type:'error'});}finally{setIsSaving(false);}};
-  const exportAIBookZip=async()=>{setStatus({text:'Đang nén Sách ZIP...',type:'loading'});try{const aiDB=await fetchAIBookDB();const JSZip=await loadJSZip();const zip=new JSZip();const fs=db.files.filter(f=>!(db.deleted||[]).includes(`${f.repoName}/${f.fileName}`));const MW=450000;let c="",w=0,p=1;fs.forEach((f,idx)=>{const pl=aiDB[`${f.repoName}/${f.fileName}`]||f.preview;const m=`\n\n# [BÀI ${idx+1}] ${f.name}\n- Kho: ${f.repoName}\n- Ngày: ${f.fullDate}\n\n### Nội dung:\n${pl}\n\n---\n`;const cw=m.split(/\s+/).length;if(w+cw>MW&&w>0){zip.file(`Sach_AI_VietNDJ_Phan_${p}.md`,c);p++;c=m;w=cw;}else{c+=m;w+=cw;}});if(c)zip.file(`Sach_AI_VietNDJ_Phan_${p}.md`,c);const b=await zip.generateAsync({type:"blob"});const u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download=`Sach_AI_VietNDJ_ZIP.zip`;a.click();URL.revokeObjectURL(u);setStatus({text:'Đã xuất File ZIP!',type:'success'});setTimeout(()=>setStatus({text:'',type:''}),3000);}catch(e){setStatus({text:'Lỗi xuất sách',type:'error'});}};
+ const syncAIBook=async()=>{
+    if(!token)return alert("Cần Token Github để kéo HTML!");
+    setIsSaving(true);
+    try{
+      const aiDB=await fetchAIBookDB();
+      const fs=db.files.filter(f=>!(db.deleted||[]).includes(`${f.repoName}/${f.fileName}`));
+      let n=0;
+      for(let i=0;i<fs.length;i++){
+        const fk=`${fs[i].repoName}/${fs[i].fileName}`;
+        // Kiểm tra chặt: Cả bài rỗng, bài chứa cảnh báo đều bị bắt quét lại
+        if(!aiDB[fk] || aiDB[fk].trim()==="" || aiDB[fk].includes("⚠️")){
+          setStatus({text:`Đang nạp bài mới ${n+1}... (Xin đợi)`,type:'loading'});
+          try{
+            let fl=await fetchText(`https://api.github.com/repos/${username}/${fs[i].repoName}/contents/${safeEnc(fs[i].fileName)}`,token);
+            if(fl){
+              let text=fl.replace(/<style[^>]*>[\s\S]*?<\/style>/gi,'').replace(/<script[^>]*>[\s\S]*?<\/script>/gi,'').replace(/<[^>]+>/g,'\n').replace(/\n\s*\n/g,'\n\n').trim();
+              aiDB[fk]=text||"(Bài viết không có văn bản)";
+            }else{
+              aiDB[fk]="(Bài viết trống hoặc đã bị xóa)";
+            }
+            n++;
+            if(n%10===0)await updateAIBookDB(aiDB);
+            await new Promise(r=>setTimeout(r,150));
+          }catch(err){
+            aiDB[fk]="(Lỗi không thể tải file)";
+            n++;
+          }
+        }
+      }
+      if(n>0){
+        setStatus({text:`Đang lưu ${n} bài vào Bảng AI...`,type:'loading'});
+        await updateAIBookDB(aiDB);
+      }
+      const d=new Date().toLocaleString('vi-VN');
+      const sm=n>0?`${d} - Nạp ${n} bài`:`${d} - Đã cập nhật (0 bài mới)`;
+      const nd={...db,lastAISync:sm};
+      await syncMetaAndDB(nd);
+      saveLocalDb(nd);
+      setStatus({text:n>0?`Xong! Đã nạp ${n} bài mới.`:'Không có bài mới để nạp.',type:'success'});
+      setTimeout(()=>setStatus({text:'',type:''}),3000);
+    }catch(e){
+      setStatus({text:'Lỗi đồng bộ',type:'error'});
+    }finally{
+      setIsSaving(false);
+    }
+  };
 
+  const exportAIBookZip=async()=>{
+    setStatus({text:'Đang nén Sách ZIP...',type:'loading'});
+    try{
+      const aiDB=await fetchAIBookDB();
+      const fs=db.files.filter(f=>!(db.deleted||[]).includes(`${f.repoName}/${f.fileName}`));
+      
+      // Chặn ngay lập tức nếu dữ liệu chưa được nạp
+      if(Object.keys(aiDB).length===0 && fs.length>0){
+        alert("⚠️ Dữ liệu Bảng Text AI đang trống!\nBạn HÃY BẤM NÚT '🔄 Đồng bộ Text AI' và chờ hệ thống nạp xong trước khi xuất sách nhé.");
+        setStatus({text:'',type:''});
+        return;
+      }
+      
+      const JSZip=await loadJSZip();
+      const zip=new JSZip();
+      const MW=450000;
+      let c="",w=0,p=1;
+      fs.forEach((f,idx)=>{
+        let pl=aiDB[`${f.repoName}/${f.fileName}`];
+        
+        // Cơ chế bọc hậu an toàn tuyệt đối
+        if(!pl || pl.trim()===""){
+          pl = (f.preview && f.preview.trim()!=="") ? f.preview : "(⚠️ Dữ liệu trống. Hãy bấm 'Đồng bộ Text AI' để hệ thống tự động kéo nội dung về!)";
+        }
+        
+        const m=`\n\n# [BÀI ${idx+1}] ${f.name}\n- Kho: ${f.repoName}\n- Ngày: ${f.fullDate}\n\n### Nội dung:\n${pl}\n\n---\n`;
+        const cw=m.split(/\s+/).length;
+        if(w+cw>MW&&w>0){
+          zip.file(`Sach_AI_VietNDJ_Phan_${p}.md`,c);
+          p++;c=m;w=cw;
+        }else{
+          c+=m;w+=cw;
+        }
+      });
+      if(c)zip.file(`Sach_AI_VietNDJ_Phan_${p}.md`,c);
+      const b=await zip.generateAsync({type:"blob"});
+      const u=URL.createObjectURL(b),a=document.createElement('a');
+      a.href=u;a.download=`Sach_AI_VietNDJ_ZIP.zip`;a.click();
+      URL.revokeObjectURL(u);
+      setStatus({text:'Đã xuất File ZIP!',type:'success'});
+      setTimeout(()=>setStatus({text:'',type:''}),3000);
+    }catch(e){
+      setStatus({text:'Lỗi xuất sách',type:'error'});
+    }
+  };
   const editFileContent=async(rn,f,s)=>{setIsEditorOpen(true);window.scrollTo({top:0,behavior:'smooth'});setStatus({text:'Đang nạp...',type:'loading'});try{const r=await fetchText(`https://api.github.com/repos/${username}/${rn}/contents/${safeEnc(f)}?t=${Date.now()}`,token);if(r){setContent(r);const p=rn===username||rn===`${username}.github.io`?`${username}/${username}.github.io`:`${username}/${rn}`,k=`${rn}/${f}`;setRepo(p);setTitle(db.titles[k]||f.replace('.html',''));setSlug(f.replace('.html',''));setIsSlugEdited(true);setTags((db.tags[k]||[]).join(', '));setUploadLinks(db.links[k]?JSON.parse(JSON.stringify(db.links[k])):[]);setEditorOriginal({repo:p,filename:f,sha:s});setStatus({text:'Xong!',type:'success'});setTimeout(()=>setStatus({text:'',type:''}),1000);}}catch(e){setStatus({text:'Lỗi nạp',type:'error'});}};
   const togglePin=async(r,f)=>{const k=`${r}/${f}`;let np=[...db.pinned];if(np.includes(k))np=np.filter(x=>x!==k);else np.push(k);const nd={...db,pinned:np};saveLocalDb(nd);syncMetaAndDB(nd);};
   const handleSetColor=async(k,c)=>{const nc={...db.colors};if(c)nc[k]=c;else delete nc[k];const ns={...db,colors:nc};setDb(ns);await syncMetaAndDB(ns);saveLocalDb(ns);setActiveColorPickerCard(null);};
