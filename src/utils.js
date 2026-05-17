@@ -1,3 +1,11 @@
+
+// Thêm 4 hàm này vào utils.js để kết nối Supabase
+export const SUPA_URL = "https://hogksepvfxzhxyqllkxv.supabase.co/rest/v1/";
+export const SUPA_KEY = "sb_publishable_hvyjuTVE11__0IHZGHi_DQ_GylrEYoT";
+
+export const getSupaHeaders=()=>({'apikey':SUPA_KEY,'Authorization':`Bearer ${SUPA_KEY}`,'Content-Type':'application/json'});
+export const fetchSupabaseDB=async()=>{try{const r=await fetch(`${SUPA_URL}/rest/v1/cms_store?id=eq.1&select=data`,{headers:getSupaHeaders()});if(r.ok){const res=await r.json();return res[0]?.data||null;}}catch(e){}return null;};
+export const updateSupabaseDB=async(d)=>{try{await fetch(`${SUPA_URL}/rest/v1/cms_store?id=eq.1`,{method:'PATCH',headers:getSupaHeaders(),body:JSON.stringify({data:d})});}catch(e){}};
 export const username='vietndj'; export const SECRET_PIN="0070";
 export const safeEnc=fn=>{try{fn=decodeURIComponent(fn);}catch(e){}return encodeURIComponent(fn);};
 export const encodeBase64UTF8Async=async(s)=>{const b=new TextEncoder().encode(s);let r='';for(let i=0;i<b.byteLength;i+=16384)r+=String.fromCharCode.apply(null,b.subarray(i,i+16384));return btoa(r);};
