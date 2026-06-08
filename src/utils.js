@@ -1,7 +1,8 @@
 export const SUPA_URL = "https://hogksepvfxzhxyqllkxv.supabase.co/rest/v1/";
 export const SUPA_KEY = "sb_publishable_hvyjuTVE11__0IHZGHi_DQ_GylrEYoT";
 export const getSupaHeaders=()=>({'apikey':SUPA_KEY,'Authorization':`Bearer ${SUPA_KEY}`,'Content-Type':'application/json'});
-export const fetchSupabaseDB=async()=>{try{const r=await fetch(`${SUPA_URL}cms_store?id=eq.1&select=data`,{headers:getSupaHeaders()});if(r.ok){const res=await r.json();return res[0]?.data||null;}}catch(e){}return null;};
+export const fetchSupabaseDB=async()=>{try{const r=await fetch(`${SUPA_URL}cms_store?id=eq.1&select=data&t=${Date.now()}`,{headers:getSupaHeaders(),cache:'no-store'});if(r.ok){const res=await r.json();return res[0]?.data||null;}}catch(e){}return null;};
+
 export const updateSupabaseDB=async(d)=>{try{await fetch(`${SUPA_URL}cms_store?id=eq.1`,{method:'PATCH',headers:getSupaHeaders(),body:JSON.stringify({data:d})});}catch(e){}};
 export const username='vietndj'; export const SECRET_PIN="0070";
 
