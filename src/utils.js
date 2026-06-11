@@ -1,12 +1,15 @@
 export const SUPA_URL = "https://hogksepvfxzhxyqllkxv.supabase.co/rest/v1/";
 export const SUPA_KEY = "sb_publishable_hvyjuTVE11__0IHZGHi_DQ_GylrEYoT";
 export const getSupaHeaders=()=>({'apikey':SUPA_KEY,'Authorization':`Bearer ${SUPA_KEY}`,'Content-Type':'application/json'});
-export const fetchSupabaseDB=async()=>{try{const r=await fetch(`${SUPA_URL}cms_store?id=eq.1&select=data&t=${Date.now()}`,{headers:getSupaHeaders(),cache:'no-store'});if(r.ok){const res=await r.json();return res[0]?.data||null;}}catch(e){}return null;};
 
-export const updateSupabaseDB=async(d)=>{try{await fetch(`${SUPA_URL}cms_store?id=eq.1`,{method:'PATCH',headers:getSupaHeaders(),body:JSON.stringify({data:d})});}catch(e){}};
+export const fetchSupabaseDB=async()=>{try{const r=await fetch(`${SUPA_URL}cms_store?id=eq.1&select=data&t=${Date.now()}`,{headers:{...getSupaHeaders(),'Cache-Control':'no-store','Pragma':'no-cache'},cache:'no-store'});if(r.ok){const res=await r.json();return res[0]?.data||null;}console.error("Lỗi API Supabase");}catch(e){console.error("Lỗi fetch DB:",e);}return null;};
+export const updateSupabaseDB=async(d)=>{try{const r=await fetch(`${SUPA_URL}cms_store?id=eq.1`,{method:'PATCH',headers:getSupaHeaders(),body:JSON.stringify({data:d})});if(!r.ok){throw new Error(await r.text());}return true;}catch(e){console.error("Lỗi update DB:",e);return false;}};
+export const encodeBase64UTF8Async=s=>new Promise(r=>{const rd=new FileReader();rd.onload=()=>r(rd.result.split(',')[1]);rd.readAsDataURL(new Blob([s]));});
+
+
+
 export const username='vietndj'; export const SECRET_PIN="0070";
 
-export const encodeBase64UTF8Async=async(s)=>{const b=new TextEncoder().encode(s);let r='';for(let i=0;i<b.byteLength;i+=16384)r+=String.fromCharCode.apply(null,b.subarray(i,i+16384));return btoa(r);};
 export const getHeaders=t=>t?{'Authorization':`Bearer ${t}`,'Accept':'application/vnd.github.v3+json'}:{'Accept':'application/vnd.github.v3+json'};
 export const getContrastYIQ=h=>{if(!h)return '#1D1D1F';h=h.replace("#","");const y=((parseInt(h.substr(0,2),16)*299)+(parseInt(h.substr(2,2),16)*587)+(parseInt(h.substr(4,2),16)*114))/1000;return y>=128?'#1D1D1F':'#FFFFFF';};
 export const fetchText=async(u,t)=>{try{const r=await fetch(u,{headers:{...getHeaders(t),'Accept':'application/vnd.github.v3.raw'}});return r.ok?await r.text():null;}catch(e){return null;}};
