@@ -11,21 +11,68 @@ function useCMS() {
   const [isTasksOpen, setIsTasksOpen] = useState(false), [isToolsOpen, setIsToolsOpen] = useState(false), [nativeTaskInput, setNativeTaskInput] = useState(''), [activeColorPickerCard, setActiveColorPickerCard] = useState(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false), [isSaving, setIsSaving] = useState(false), [repo, setRepo] = useState(() => localStorage.getItem('cms_last_repo') || `${username}/${username}.github.io`), [tags, setTags] = useState(() => localStorage.getItem('cms_last_tags') || '');
   const [title, setTitle] = useState(''), [slug, setSlug] = useState(''), [isSlugEdited, setIsSlugEdited] = useState(false), [uploadLinks, setUploadLinks] = useState([]), [content, setContent] = useState(''), [editorOriginal, setEditorOriginal] = useState({ repo: '', filename: '', sha: '' });
-  const toolsMenuRef = useRef(null), editorInputRef = useRef(null);
+  const toolsMenuRef = useRef(null), editorInputRef = useRef(null), dbRef = useRef(null);
 
   useEffect(() => { if (isEditorOpen && editorInputRef.current) setTimeout(() => editorInputRef.current.focus(), 100); }, [isEditorOpen]);
   useEffect(() => { const h = e => { const c = navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? e.metaKey : e.ctrlKey; if (c && e.key.toLowerCase() === 'e') { e.preventDefault(); setIsEditorOpen(p => !p); } if (c && e.key.toLowerCase() === 's') { e.preventDefault(); document.getElementById('btn-save-article')?.click(); } if (c && e.key.toLowerCase() === 'k') { const t = e.target; if (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA') return; e.preventDefault(); document.getElementById('search-input-main')?.focus(); } }; window.addEventListener('keydown', h); return () => window.removeEventListener('keydown', h); }, []);
   useEffect(() => { const h = e => { if (toolsMenuRef.current && !toolsMenuRef.current.contains(e.target)) setIsToolsOpen(false); }; document.addEventListener('mousedown', h); return () => document.removeEventListener('mousedown', h); }, []);
   useEffect(() => { if (localStorage.getItem("cms_auth") === "granted") setIsAuthenticated(true); const t = localStorage.getItem('github_pat'); if (t) setToken(t); try { const d = JSON.parse(localStorage.getItem('cms_repo_data')); if (d && d.files) setDb(d); } catch (e) { } }, []);
-  useEffect(() => { if (isAuthenticated && db.files.length === 0) loadDatabase(); }, [isAuthenticated]);
+  // Fix #1: luôn fetch cloud khi đăng nhập, không chặn bởi localStorage
+  useEffect(() => { if (isAuthenticated) loadDatabase(); }, [isAuthenticated]);
+  // Fix #3: giữ dbRef luôn trỏ tới state mới nhất (tránh stale closure)
+  useEffect(() => { dbRef.current = db; }, [db]);
+  // Fix #4: Polling 30s + Page Visibility để nhận thay đổi từ browser khác
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    let tid = null;
+    const poll = async () => {
+      try {
+        const cloudDb = await fetchSupabaseDB();
+        if (!cloudDb || !dbRef.current) return;
+        const cur = dbRef.current;
+        // Chỉ cập nhật khi cloud thực sự mới hơn local
+        if ((cloudDb._updatedAt || 0) <= (cur._updatedAt || 0)) return;
+        const merged = mergeDBs(cur, cloudDb);
+        try { localStorage.setItem('cms_repo_data', JSON.stringify(merged)); } catch(e) {}
+        setDb(merged);
+      } catch(e) {}
+    };
+    // Sync ngay khi user quay lại tab
+    const onVisibility = () => { if (document.visibilityState === 'visible') poll(); };
+    tid = setInterval(poll, 30000);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => { clearInterval(tid); document.removeEventListener('visibilitychange', onVisibility); };
+  }, [isAuthenticated]);
 
-  const mergeDBs = (loc, cld) => { if (!cld) return loc; if (!loc) return cld; const m = new Map(); (cld.files || []).forEach(f => m.set(`${f.repoName}/${f.fileName}`, f)); (loc.files || []).forEach(f => { const k = `${f.repoName}/${f.fileName}`, ex = m.get(k); if (!ex || Math.max(f.lastScanned||0, f.timestamp||0) > Math.max(ex.lastScanned||0, ex.timestamp||0) || (f.preview && f.preview.length > 50 && (!ex.preview || ex.preview.length < 50))) m.set(k, f); }); const nF = Array.from(m.values()).sort((a, b) => b.timestamp - a.timestamp); const rM = {}; nF.forEach(f => { if (!rM[f.repoName]) rM[f.repoName] = []; rM[f.repoName].push(f); }); const mO = (l, r) => { let res = { ...r }; Object.keys(l || {}).forEach(k => { if (l[k] && Array.isArray(l[k])) res[k] = Array.from(new Set([...(res[k] || []), ...l[k]])); else if (l[k]) res[k] = l[k]; }); return res; }; return { ...cld, ...loc, files: nF, repos: rM, deleted: Array.from(new Set([...(loc.deleted || []), ...(cld.deleted || [])])), tags: mO(loc.tags, cld.tags), titles: mO(loc.titles, cld.titles), links: mO(loc.links, cld.links), views: mO(loc.views, cld.views), colors: mO(loc.colors, cld.colors), pinned: Array.from(new Set([...(loc.pinned || []), ...(cld.pinned || [])])) }; };
+  const mergeDBs = (loc, cld) => { if (!cld) return loc; if (!loc) return cld; const m = new Map(); (cld.files || []).forEach(f => m.set(`${f.repoName}/${f.fileName}`, f)); (loc.files || []).forEach(f => { const k = `${f.repoName}/${f.fileName}`, ex = m.get(k); if (!ex || Math.max(f.lastScanned||0, f.timestamp||0) > Math.max(ex.lastScanned||0, ex.timestamp||0) || (f.preview && f.preview.length > 50 && (!ex.preview || ex.preview.length < 50))) m.set(k, f); }); const nF = Array.from(m.values()).sort((a, b) => b.timestamp - a.timestamp); const rM = {}; nF.forEach(f => { if (!rM[f.repoName]) rM[f.repoName] = []; rM[f.repoName].push(f); });     // Fix #2: Metadata — bên có _updatedAt mới hơn thắng (không luôn để local đè cloud)
+    const locTime = loc._updatedAt || 0, cldTime = cld._updatedAt || 0;
+    const newer = locTime >= cldTime ? loc : cld;
+    const older = newer === loc ? cld : loc;
+    // Views: luôn lấy max per-key (không bao giờ mất lượt đọc)
+    const mergedViews = {};
+    [older.views || {}, newer.views || {}].forEach(vs => Object.keys(vs).forEach(k => { mergedViews[k] = Math.max(mergedViews[k] || 0, vs[k] || 0); }));
+    // Tags/titles/links/colors: newer wins per-key
+    const mO = (a, b) => ({ ...b, ...a });
+    return { ...older, ...newer, files: nF, repos: rM,
+      pinned: newer.pinned || older.pinned || [],
+      deleted: Array.from(new Set([...(loc.deleted || []), ...(cld.deleted || [])])), // union: an toàn hơn intersection
+      tasks: newer.tasks || older.tasks || [],
+      tags: mO(newer.tags || {}, older.tags || {}),
+      titles: mO(newer.titles || {}, older.titles || {}),
+      links: mO(newer.links || {}, older.links || {}),
+      colors: mO(newer.colors || {}, older.colors || {}),
+      views: mergedViews,
+    };
+  };
 
   const saveLocalDb = nd => { try { localStorage.setItem('cms_repo_data', JSON.stringify(nd)); setDb(nd); } catch (e) { setDb(nd); } };
 
-  const loadDatabase = async (forcePush = false) => { if (isSyncing) return; setIsSyncing(true); setStatus({ text: 'Đang tải DB Cloud và Hợp nhất...', type: 'loading' }); try { const cDb = await fetchSupabaseDB(); const lStr = localStorage.getItem('cms_repo_data'); const lDb = lStr ? JSON.parse(lStr) : null; if (!cDb && !lDb) throw new Error("Kho rỗng"); const finalDb = mergeDBs(lDb || {files:[]}, cDb || {files:[]}); saveLocalDb(finalDb); if (!title && !content && !editorOriginal.sha) { const cx = getLastContextFromDB(finalDb); setRepo(cx.repo); setTags(cx.tags); } setStatus({ text: `Đã Gộp & Đồng bộ chuẩn xác: ${finalDb.files.length} bài!`, type: 'success' }); setTimeout(() => setStatus({ text: '', type: '' }), 3000); if (forcePush || (cDb && lDb && cDb.files?.length !== finalDb.files?.length)) { await updateSupabaseDB(finalDb); } } catch (e) { setStatus({ text: 'Lỗi nạp DB', type: 'error' }); setTimeout(() => setStatus({ text: '', type: '' }), 3000); } finally { setIsSyncing(false); } };
+  const loadDatabase = async (forcePush = false) => { if (isSyncing) return; setIsSyncing(true); setStatus({ text: 'Đang tải DB Cloud và Hợp nhất...', type: 'loading' }); try { const cDb = await fetchSupabaseDB(); const lStr = localStorage.getItem('cms_repo_data'); const lDb = lStr ? JSON.parse(lStr) : null; if (!cDb && !lDb) throw new Error("Kho rỗng"); const finalDb = mergeDBs(lDb || {files:[]}, cDb || {files:[]}); saveLocalDb(finalDb); if (!title && !content && !editorOriginal.sha) { const cx = getLastContextFromDB(finalDb); setRepo(cx.repo); setTags(cx.tags); } setStatus({ text: `Đã Gộp & Đồng bộ chuẩn xác: ${finalDb.files.length} bài!`, type: 'success' }); setTimeout(() => setStatus({ text: '', type: '' }), 3000); // Fix #5: push cloud khi bất kỳ thay đổi nào (không chỉ khi số file thay đổi)
+      const hasChanges = !cDb || cDb.files?.length !== finalDb.files?.length || (cDb._updatedAt || 0) < (finalDb._updatedAt || 0) || JSON.stringify(cDb.pinned) !== JSON.stringify(finalDb.pinned) || JSON.stringify(cDb.tasks) !== JSON.stringify(finalDb.tasks) || JSON.stringify(cDb.deleted) !== JSON.stringify(finalDb.deleted);
+      if (forcePush || hasChanges) { await updateSupabaseDB(finalDb); } } catch (e) { setStatus({ text: 'Lỗi nạp DB', type: 'error' }); setTimeout(() => setStatus({ text: '', type: '' }), 3000); } finally { setIsSyncing(false); } };
 
-  const syncMetaAndDB = async (newState) => { setStatus({ text: 'Đang hợp nhất Cloud...', type: 'loading' }); try { const cloudDb = await fetchSupabaseDB(); const mergedDb = mergeDBs(newState, cloudDb); const ok = await updateSupabaseDB(mergedDb); if (!ok) throw new Error("Cloud Reject"); setDb(mergedDb); saveLocalDb(mergedDb); setStatus({ text: 'Lưu Cloud thành công!', type: 'success' }); setTimeout(() => setStatus({ text: '', type: '' }), 2000); return mergedDb; } catch (e) { setStatus({ text: 'Lỗi Cloud! Chỉ lưu tạm trên máy.', type: 'error' }); alert("⛔ LỖI ĐỒNG BỘ CLOUD!\n\nMạng lag hoặc Data quá lớn khiến Supabase từ chối.\nDữ liệu hiện CHỈ LƯU TẠM trên máy này.\nHãy ấn nút 'Tải Lại & Hợp Nhất DB' để đẩy lại!"); saveLocalDb(newState); setDb(newState); return newState; } };
+  const syncMetaAndDB = async (newState) => { setStatus({ text: 'Đang hợp nhất Cloud...', type: 'loading' }); try { // Fix #3: thêm _updatedAt để mergeDBs biết đây là write mới nhất
+    const cloudDb = await fetchSupabaseDB(); const withTs = { ...newState, _updatedAt: Date.now() }; const mergedDb = mergeDBs(withTs, cloudDb); const ok = await updateSupabaseDB(mergedDb); if (!ok) throw new Error("Cloud Reject"); saveLocalDb(mergedDb); setStatus({ text: 'Lưu Cloud thành công!', type: 'success' }); setTimeout(() => setStatus({ text: '', type: '' }), 2000); return mergedDb; } catch (e) { setStatus({ text: 'Lỗi Cloud! Chỉ lưu tạm trên máy.', type: 'error' }); alert("⛔ LỖI ĐỒNG BỘ CLOUD!\n\nMạng lag hoặc Data quá lớn khiến Supabase từ chối.\nDữ liệu hiện CHỈ LƯU TẠM trên máy này.\nHãy ấn nút 'Tải Lại & Hợp Nhất DB' để đẩy lại!"); saveLocalDb(newState); return newState; } };
 
 const processScanQueue = async (queueData) => { setIsSaving(true); let { repo: tR, files, currentIndex, isForce } = queueData; const chunk = files.slice(currentIndex, currentIndex + 3); if (chunk.length === 0) { localStorage.removeItem('cms_scan_queue'); setStatus({ text: 'Hoàn tất quét toàn bộ!', type: 'success' }); setTimeout(() => setStatus({ text: '', type: '' }), 3000); setIsSaving(false); return; } setStatus({ text: `Đang quét: ${currentIndex + 1} - ${Math.min(currentIndex + 3, files.length)} / ${files.length} bài...`, type: 'loading' }); let updates = []; for (let i = 0; i < chunk.length; i++) { const it = chunk[i]; let nm = it.path.replace('.html', '').split('/').pop(), prev = "Lỗi trích xuất..."; try { let ct = null; const encodedPath = it.path.split('/').map(encodeURIComponent).join('/'); const urlPage = `https://fedu.vn/${tR === `${username}.github.io` ? '' : tR + '/'}${encodedPath}?t=${Date.now()}`; try { const rPage = await fetch(urlPage, {cache:'no-store'}); if (rPage.ok) ct = await rPage.text(); } catch(e) {} if (!ct) { const curToken = token || localStorage.getItem('github_pat'); ct = await fetchText(`https://api.github.com/repos/${username}/${tR}/contents/${safeEnc(it.path)}?t=${Date.now()}`, curToken); } if (ct) { prev = getPreviewText(ct); const m = ct.match(/<title[^>]*>([\s\S]*?)<\/title>/i); if (m && m[1]) nm = m[1].trim(); } } catch (err) {} updates.push({ path: it.path, sha: it.sha, index: it.index, prev, nm }); } try { const cloudDb = await fetchSupabaseDB(); const localDbStr = localStorage.getItem('cms_repo_data'); let currDb = localDbStr ? JSON.parse(localDbStr) : { files: [] }; let mergedDb = mergeDBs(currDb, cloudDb); let cFiles = [...mergedDb.files]; updates.forEach(u => { const ts = Date.now() - (1000 * 60 * 60 * 24 * u.index); const idx = cFiles.findIndex(x => x.repoName === tR && x.fileName === u.path); if (idx >= 0) cFiles[idx] = { ...cFiles[idx], preview: u.prev, sha: u.sha, name: u.nm.replace(/-/g, ' '), lastScanned: Date.now() }; else cFiles.unshift({ repoName: tR, name: u.nm.replace(/-/g, ' '), fileName: u.path, sha: u.sha, url: `https://fedu.vn/${tR === 'vietndj.github.io' ? '' : tR + '/'}${u.path}`, timestamp: ts, fullDate: new Date(ts).toLocaleString('vi-VN'), preview: u.prev, lastScanned: Date.now() }); }); cFiles.sort((a, b) => b.timestamp - a.timestamp); const rm = {}; cFiles.forEach(f => { if (!rm[f.repoName]) rm[f.repoName] = []; rm[f.repoName].push(f); }); const nd = { ...mergedDb, files: cFiles, repos: rm }; saveLocalDb(nd); await updateSupabaseDB(nd); } catch (e) { console.error("Lỗi sync scan:", e); } queueData.currentIndex += 3; localStorage.setItem('cms_scan_queue', JSON.stringify(queueData)); setTimeout(() => processScanQueue(queueData), 1000); };
 
