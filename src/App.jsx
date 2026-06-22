@@ -67,11 +67,17 @@ function useCMS() {
 
   const saveLocalDb = nd => { try { localStorage.setItem('cms_repo_data', JSON.stringify(nd)); setDb(nd); } catch (e) { setDb(nd); } };
 
-  const loadDatabase = async (forcePush = false) => { if (isSyncing) return; setIsSyncing(true); setStatus({ text: 'Đang tải DB Cloud và Hợp nhất...', type: 'loading' }); try { const cDbRaw = await fetchSupabaseDB(); // Tách _encToken khỏi data trước khi dùng
+  const loadDatabase = async (forcePush = false) => { if (isSyncing) return; setIsSyncing(true); setStatus({ text: 'Đang tải DB Cloud và Hợp nhất...', type: 'loading' }); try { const cDbRaw = await fetchSupabaseDB();
     const cDb = cDbRaw ? (({ _encToken, ...rest }) => rest)(cDbRaw) : null;
-    const lStr = localStorage.getItem('cms_repo_data'); const lDb = lStr ? JSON.parse(lStr) : null; if (!cDb && !lDb) { setStatus({ text: '⚠️ Không kết nối được Cloud DB. Kiểm tra mạng!', type: 'error' }); setTimeout(() => setStatus({ text: '', type: '' }), 5000); setIsSyncing(false); return; } const finalDb = mergeDBs(lDb || {files:[]}, cDb || {files:[]}); saveLocalDb(finalDb); if (!title && !content && !editorOriginal.sha) { const cx = getLastContextFromDB(finalDb); setRepo(cx.repo); setTags(cx.tags); } setStatus({ text: `Đã Gộp & Đồng bộ: ${finalDb.files.length} bài!`, type: 'success' }); setTimeout(() => setStatus({ text: '', type: '' }), 3000);
-      const hasChanges = !cDb || cDb.files?.length !== finalDb.files?.length || (cDb._updatedAt || 0) < (finalDb._updatedAt || 0) || JSON.stringify(cDb.pinned) !== JSON.stringify(finalDb.pinned) || JSON.stringify(cDb.tasks) !== JSON.stringify(finalDb.tasks) || JSON.stringify(cDb.deleted) !== JSON.stringify(finalDb.deleted);
-      if (forcePush || hasChanges) { await updateSupabaseDB(finalDb); } } catch (e) { setStatus({ text: '⚠️ Lỗi nạp DB: ' + (e.message || 'Không xác định'), type: 'error' }); setTimeout(() => setStatus({ text: '', type: '' }), 5000); } finally { setIsSyncing(false); } };
+    const lStr = localStorage.getItem('cms_repo_data'); const lDb = lStr ? JSON.parse(lStr) : null;
+    if (!cDb && !lDb) { setStatus({ text: '⚠️ Không kết nối được Cloud DB. Kiểm tra mạng!', type: 'error' }); setTimeout(() => setStatus({ text: '', type: '' }), 5000); setIsSyncing(false); return; }
+    const finalDb = mergeDBs(lDb || {files:[]}, cDb || {files:[]});
+    saveLocalDb(finalDb);
+    if (!title && !content && !editorOriginal.sha) { const cx = getLastContextFromDB(finalDb); setRepo(cx.repo); setTags(cx.tags); }
+    setStatus({ text: `Đã Gộp & Đồng bộ: ${finalDb.files.length} bài!`, type: 'success' }); setTimeout(() => setStatus({ text: '', type: '' }), 3000);
+    // Nếu Supabase đang trống (chưa có dữ liệu) hoặc có thay đổi — luôn push lên
+    const hasChanges = !cDb || cDb.files?.length !== finalDb.files?.length || (cDb._updatedAt || 0) < (finalDb._updatedAt || 0) || JSON.stringify(cDb.pinned) !== JSON.stringify(finalDb.pinned) || JSON.stringify(cDb.tasks) !== JSON.stringify(finalDb.tasks) || JSON.stringify(cDb.deleted) !== JSON.stringify(finalDb.deleted);
+    if (forcePush || hasChanges) { await updateSupabaseDB(finalDb); } } catch (e) { setStatus({ text: '⚠️ Lỗi nạp DB: ' + (e.message || 'Không xác định'), type: 'error' }); setTimeout(() => setStatus({ text: '', type: '' }), 5000); } finally { setIsSyncing(false); } };
 
   const syncMetaAndDB = async (newState) => { setStatus({ text: 'Đang hợp nhất Cloud...', type: 'loading' }); try { // Fix #3: thêm _updatedAt để mergeDBs biết đây là write mới nhất
     const cloudDb = await fetchSupabaseDB(); const withTs = { ...newState, _updatedAt: Date.now() }; const mergedDb = mergeDBs(withTs, cloudDb); const ok = await updateSupabaseDB(mergedDb); if (!ok) throw new Error("Cloud Reject"); saveLocalDb(mergedDb); setStatus({ text: 'Lưu Cloud thành công!', type: 'success' }); setTimeout(() => setStatus({ text: '', type: '' }), 2000); return mergedDb; } catch (e) { setStatus({ text: 'Lỗi Cloud! Chỉ lưu tạm trên máy.', type: 'error' }); alert("⛔ LỖI ĐỒNG BỘ CLOUD!\n\nMạng lag hoặc Data quá lớn khiến Supabase từ chối.\nDữ liệu hiện CHỈ LƯU TẠM trên máy này.\nHãy ấn nút 'Tải Lại & Hợp Nhất DB' để đẩy lại!"); saveLocalDb(newState); return newState; } };
