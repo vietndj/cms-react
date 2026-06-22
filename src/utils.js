@@ -6,6 +6,16 @@ export const fetchSupabaseDB=async()=>{try{const r=await fetch(`${SUPA_URL}cms_s
 export const updateSupabaseDB=async(d)=>{try{const r=await fetch(`${SUPA_URL}cms_store?id=eq.1`,{method:'PATCH',headers:getSupaHeaders(),body:JSON.stringify({data:d})});if(!r.ok){throw new Error(await r.text());}return true;}catch(e){console.error("Lỗi update DB:",e);return false;}};
 export const encodeBase64UTF8Async=s=>new Promise(r=>{const rd=new FileReader();rd.onload=()=>r(rd.result.split(',')[1]);rd.readAsDataURL(new Blob([s]));});
 
+// ── Cloud Token Crypto (AES-GCM + PBKDF2) ──────────────────────────────────
+const buf2b64=b=>btoa(String.fromCharCode(...new Uint8Array(b)));
+const b642buf=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0)).buffer;
+const deriveKey=async pin=>{const enc=new TextEncoder();const km=await crypto.subtle.importKey('raw',enc.encode(pin),{name:'PBKDF2'},false,['deriveKey']);return crypto.subtle.deriveKey({name:'PBKDF2',salt:enc.encode('cms-fedu-salt-v1'),iterations:100000,hash:'SHA-256'},km,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);};
+export const encryptToken=async(token,pin)=>{try{const key=await deriveKey(pin);const iv=crypto.getRandomValues(new Uint8Array(12));const enc=await crypto.subtle.encrypt({name:'AES-GCM',iv},key,new TextEncoder().encode(token));return{iv:buf2b64(iv.buffer),ct:buf2b64(enc)};}catch(e){console.error('Encrypt error:',e);return null;}};
+export const decryptToken=async(data,pin)=>{try{if(!data?.iv||!data?.ct)return null;const key=await deriveKey(pin);const dec=await crypto.subtle.decrypt({name:'AES-GCM',iv:new Uint8Array(b642buf(data.iv))},key,b642buf(data.ct));return new TextDecoder().decode(dec);}catch(e){console.error('Decrypt error:',e);return null;}};
+
+export const fetchTokenFromCloud=async()=>{try{const r=await fetch(`${SUPA_URL}cms_store?id=eq.2&select=data&t=${Date.now()}`,{headers:{...getSupaHeaders(),'Cache-Control':'no-store'},cache:'no-store'});if(r.ok){const res=await r.json();return res[0]?.data||null;}}catch(e){console.error('Fetch token error:',e);}return null;};
+export const saveTokenToCloud=async(token,pin)=>{try{const enc=await encryptToken(token,pin);if(!enc)return false;const payload={data:enc};const chk=await fetch(`${SUPA_URL}cms_store?id=eq.2`,{headers:getSupaHeaders()});const existing=chk.ok?await chk.json():[];const method=existing.length>0?'PATCH':'POST';const url=existing.length>0?`${SUPA_URL}cms_store?id=eq.2`:`${SUPA_URL}cms_store`;const body=existing.length>0?JSON.stringify(payload):JSON.stringify({id:2,...payload});const r=await fetch(url,{method,headers:getSupaHeaders(),body});return r.ok;}catch(e){console.error('Save token error:',e);return false;}};
+
 
 
 export const username='vietndj'; export const SECRET_PIN="0070";
