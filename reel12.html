@@ -1,0 +1,908 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reel12 — Plan → Video Script · All-in-one</title>
+  <meta name="description" content="Reel12 — 4 câu hỏi, AI tự suy ra framework, xuất 2 Mega Prompt: Chiến lược MVP + Kịch bản Video ngắn.">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:#0d0d0d; --surface:#181818; --s2:#222; --border:#2c2c2c;
+      --text:#e8e8e8; --muted:#777; --dim:#999;
+      /* Brand: purple gradient (Plan×Video) */
+      --a:#a855f7; --a-dim:rgba(168,85,247,.12); --a-glow:rgba(168,85,247,.25);
+      --a2:#3b82f6;
+      --ubg:#1c2235; --uborder:#283047;
+      --g:#22c55e; --g-dim:rgba(34,197,94,.1);
+    }
+    html,body{height:100%}
+    body{font-family:'Inter',-apple-system,sans-serif;background:var(--bg);color:var(--text);
+      display:flex;flex-direction:column;height:100vh;overflow:hidden}
+
+    /* ── HEADER ── */
+    header{display:flex;align-items:center;justify-content:space-between;
+      padding:13px 20px;background:var(--surface);border-bottom:1px solid var(--border);
+      flex-shrink:0;z-index:50}
+    .hl{display:flex;align-items:center;gap:12px}
+    .av-w{position:relative;width:38px;height:38px}
+    .av{width:38px;height:38px;border-radius:11px;
+      background:linear-gradient(135deg,#a855f7,#3b82f6);
+      display:flex;align-items:center;justify-content:center;
+      font-size:13px;font-weight:800;color:#fff;position:relative;z-index:2;
+      box-shadow:0 0 14px rgba(168,85,247,.3)}
+    .av-ring{position:absolute;inset:-4px;border-radius:14px;
+      border:2px solid var(--a);opacity:0;transition:opacity .3s}
+    .av-ring.on{opacity:1;animation:rp 1.6s ease-in-out infinite}
+    @keyframes rp{0%,100%{box-shadow:0 0 0 0 var(--a-glow)}50%{box-shadow:0 0 0 7px transparent}}
+    .hd-title{font-size:14px;font-weight:700;display:flex;align-items:center;gap:7px}
+    .badge{font-size:9px;font-weight:700;padding:2px 7px;border-radius:999px;
+      background:var(--a-dim);color:var(--a);border:1px solid rgba(168,85,247,.25);
+      letter-spacing:.5px;text-transform:uppercase}
+    .badge2{background:rgba(59,130,246,.12);color:#3b82f6;border-color:rgba(59,130,246,.25)}
+    .hd-sub{font-size:11px;color:var(--dim);display:flex;align-items:center;gap:5px;margin-top:2px}
+    .dot-live{width:6px;height:6px;border-radius:50%;background:var(--g);
+      animation:blink 2.2s ease-in-out infinite}
+    @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+    .mode-badge{display:flex;align-items:center;gap:5px;padding:4px 10px;border-radius:8px;
+      border:1px solid var(--border);background:var(--s2);
+      font-size:11px;font-weight:600;color:var(--muted);cursor:pointer;transition:all .2s}
+    .mode-badge.on{border-color:rgba(34,197,94,.3);background:var(--g-dim);color:var(--g)}
+    .mode-dot{width:6px;height:6px;border-radius:50%;background:var(--muted)}
+    .mode-badge.on .mode-dot{background:var(--g)}
+    .hr{display:flex;align-items:center;gap:8px}
+    .icon-btn{width:34px;height:34px;border-radius:9px;border:1px solid var(--border);
+      background:transparent;color:var(--muted);display:flex;align-items:center;justify-content:center;
+      cursor:pointer;font-size:13px;transition:all .2s}
+    .icon-btn:hover{background:var(--s2);color:var(--text)}
+
+    /* Phase indicator */
+    .phase-bar{display:flex;align-items:center;gap:0;padding:7px 20px;
+      background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0}
+    .ph{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:600;
+      color:var(--muted);padding:4px 10px;border-radius:7px;transition:all .3s}
+    .ph.active{background:var(--a-dim);color:var(--a)}
+    .ph.done{color:var(--g)}
+    .ph-sep{width:24px;height:1px;background:var(--border);margin:0 2px}
+
+    /* ── PROGRESS ── */
+    .pt{height:2px;background:var(--border);flex-shrink:0}
+    .pf{height:100%;background:linear-gradient(90deg,#a855f7,#3b82f6);
+      width:0%;transition:width .6s cubic-bezier(.4,0,.2,1)}
+
+    /* ── CHAT ── */
+    #chat{flex:1;overflow-y:auto;padding:28px 16px 0;scroll-behavior:smooth}
+    #chat::-webkit-scrollbar{width:4px}
+    #chat::-webkit-scrollbar-thumb{background:#333;border-radius:999px}
+    .cw{max-width:660px;margin:0 auto;display:flex;flex-direction:column;gap:18px;padding-bottom:20px}
+    .msg{display:flex;gap:10px;animation:rise .28s ease-out}
+    @keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    .msg.user{flex-direction:row-reverse}
+    .mav{width:30px;height:30px;border-radius:9px;display:flex;align-items:center;
+      justify-content:center;font-size:12px;flex-shrink:0;margin-top:2px}
+    .mav.ai{background:linear-gradient(135deg,#a855f7,#3b82f6);font-weight:800;color:#fff}
+    .mav.human{background:var(--s2);border:1px solid var(--border);color:var(--muted)}
+    .bubble{max-width:82%;background:var(--surface);border:1px solid var(--border);
+      border-radius:4px 16px 16px 16px;padding:12px 15px;font-size:13.5px;
+      line-height:1.72;color:var(--text)}
+    .msg.user .bubble{background:var(--ubg);border-color:var(--uborder);
+      border-radius:16px 4px 16px 16px;color:#c9d8f8}
+    .bm{font-size:10px;color:var(--muted);margin-top:7px;display:flex;align-items:center;gap:4px}
+    .qlabel{display:block;font-size:10px;font-weight:700;color:var(--muted);
+      text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px}
+    .h{color:var(--a);font-weight:600}
+    .h2{color:var(--a2);font-weight:600}
+    .hg{color:#4ade80;font-weight:600}
+
+    .cur{display:inline-block;width:2px;height:13px;background:var(--a);
+      margin-left:2px;vertical-align:middle;animation:cb .75s step-end infinite}
+    @keyframes cb{0%,100%{opacity:1}50%{opacity:0}}
+    .stream-cur{display:inline-block;width:2px;height:14px;background:var(--g);
+      vertical-align:middle;margin-left:1px;border-radius:1px;
+      animation:cb .55s step-end infinite}
+
+    .chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;
+      color:#4ade80;background:rgba(74,222,128,.08);border:1px solid rgba(74,222,128,.18);
+      border-radius:6px;padding:2px 8px;margin-bottom:8px}
+
+    .tb{background:var(--surface);border:1px solid var(--border);
+      border-radius:4px 16px 16px 16px;padding:11px 14px;
+      display:flex;align-items:center;gap:9px;font-size:12px;color:var(--muted);font-style:italic}
+    .dots{display:flex;gap:4px}
+    .d{width:5px;height:5px;border-radius:50%;background:var(--a);
+      animation:db 1.4s ease-in-out infinite}
+    .d:nth-child(2){animation-delay:.16s}
+    .d:nth-child(3){animation-delay:.32s}
+    @keyframes db{0%,80%,100%{transform:scale(.65);opacity:.4}40%{transform:scale(1);opacity:1}}
+
+    /* Framework card */
+    .fw-card{background:rgba(168,85,247,.06);border:1px solid rgba(168,85,247,.2);
+      border-radius:12px;padding:14px 16px;margin:10px 0 4px}
+    .fw-title{font-size:11px;font-weight:700;color:var(--a);letter-spacing:.4px;
+      text-transform:uppercase;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+    .fw-name{font-size:15px;font-weight:700;color:var(--text);margin-bottom:4px}
+    .fw-desc{font-size:12px;color:var(--muted);line-height:1.6}
+
+    /* Summary card */
+    .sc{background:rgba(34,197,94,.06);border:1px solid rgba(34,197,94,.2);
+      border-radius:12px;padding:14px 16px;margin:10px 0 4px}
+    .sct{font-size:11px;font-weight:700;color:var(--g);letter-spacing:.4px;
+      text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:6px}
+    .sr{display:flex;gap:8px;align-items:baseline;margin-bottom:5px}
+    .sk{color:var(--muted);min-width:110px;font-size:11px;flex-shrink:0}
+    .sv{color:var(--text);font-weight:500;font-size:12.5px}
+
+    /* Prompt box */
+    .pbox{background:#0a0a0a;border:1px solid var(--border);border-radius:12px;
+      padding:14px;font-family:'Courier New',monospace;font-size:11px;line-height:1.65;
+      color:#8a9ab8;max-height:300px;overflow-y:auto;white-space:pre-wrap;
+      word-break:break-word;margin-top:10px;position:relative}
+    .pbox::-webkit-scrollbar{width:4px}
+    .pbox::-webkit-scrollbar-thumb{background:#333}
+    .cpbtn{position:sticky;top:0;left:100%;display:block;width:fit-content;
+      margin-left:auto;margin-bottom:8px;padding:5px 12px;border-radius:7px;
+      background:var(--s2);border:1px solid var(--border);color:var(--dim);
+      font-size:11px;font-weight:600;cursor:pointer;transition:all .2s;
+      font-family:'Inter',sans-serif}
+    .cpbtn:hover{background:var(--a);color:#fff;border-color:var(--a)}
+
+    /* Open AI buttons */
+    .btn-row{display:flex;gap:8px;margin-top:12px}
+    .open-ai-btn{display:flex;align-items:center;justify-content:center;gap:8px;
+      flex:1;padding:12px 10px;border-radius:12px;border:none;
+      color:#fff;font-size:13px;font-weight:700;cursor:pointer;transition:all .2s;
+      font-family:'Inter',sans-serif;white-space:nowrap}
+    .open-ai-btn.chatgpt{background:linear-gradient(135deg,#3b82f6,#6366f1)}
+    .open-ai-btn.gemini{background:linear-gradient(135deg,#1a73e8,#0d9488)}
+    .open-ai-btn:hover{opacity:.9;transform:translateY(-1px)}
+
+    /* Prompt section label */
+    .prompt-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;
+      margin-bottom:6px;display:flex;align-items:center;gap:6px}
+
+    /* Phase divider */
+    .phase-div{display:flex;align-items:center;gap:12px;margin:8px 0}
+    .phase-div-line{flex:1;height:1px;background:var(--border)}
+    .phase-div-text{font-size:10px;font-weight:700;color:var(--muted);
+      text-transform:uppercase;letter-spacing:.8px;white-space:nowrap}
+
+    /* ── INPUT ── */
+    #inp-area{flex-shrink:0;padding:10px 16px 18px;
+      background:linear-gradient(to top,var(--bg) 75%,transparent)}
+    #qtags{display:flex;gap:7px;overflow-x:auto;padding-bottom:2px;margin-bottom:9px}
+    #qtags::-webkit-scrollbar{display:none}
+    .qt{flex-shrink:0;padding:5px 11px;border-radius:8px;background:var(--surface);
+      border:1px solid var(--border);color:var(--dim);font-size:11.5px;cursor:pointer;
+      transition:all .18s;white-space:nowrap;font-family:'Inter',sans-serif}
+    .qt:hover{border-color:var(--a);color:var(--a);background:var(--a-dim)}
+    .irow{display:flex;align-items:center;gap:9px;background:var(--surface);
+      border:1px solid var(--border);border-radius:14px;padding:9px 9px 9px 15px;
+      transition:border-color .2s,box-shadow .2s}
+    .irow:focus-within{border-color:var(--a);box-shadow:0 0 0 3px var(--a-dim)}
+    #uin{flex:1;background:transparent;border:none;outline:none;color:var(--text);
+      font-size:13.5px;font-family:'Inter',sans-serif}
+    #uin::placeholder{color:var(--muted)}
+    #sbtn{width:36px;height:36px;border-radius:10px;background:var(--a);border:none;
+      color:#fff;font-size:13px;display:flex;align-items:center;justify-content:center;
+      cursor:pointer;transition:all .2s;flex-shrink:0}
+    #sbtn:hover:not(:disabled){background:#9333ea;transform:scale(1.06)}
+    #sbtn:disabled{opacity:.35;cursor:default;transform:none}
+
+    /* ── SETTINGS ── */
+    #sov{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:200;
+      display:flex;align-items:flex-end;justify-content:center;
+      opacity:0;pointer-events:none;transition:opacity .25s}
+    #sov.open{opacity:1;pointer-events:all}
+    .ss{background:var(--surface);border:1px solid var(--border);
+      border-radius:20px 20px 0 0;padding:22px 20px 32px;
+      width:100%;max-width:600px;
+      transform:translateY(100%);transition:transform .3s cubic-bezier(.4,0,.2,1)}
+    #sov.open .ss{transform:translateY(0)}
+    .sh{width:36px;height:3px;border-radius:999px;background:var(--border);margin:0 auto 18px}
+    .st{font-size:14px;font-weight:700;color:var(--text);margin-bottom:16px}
+    .sb{margin-bottom:13px}
+    .sl{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;
+      letter-spacing:.5px;margin-bottom:5px}
+    .sel{width:100%;background:var(--s2);border:1px solid var(--border);
+      border-radius:10px;padding:9px 12px;color:var(--text);font-size:13px;
+      font-family:'Inter',sans-serif;outline:none;appearance:none;-webkit-appearance:none}
+    .sel:focus{border-color:var(--a)}
+    .abtn{width:100%;padding:12px;border-radius:12px;background:var(--a);border:none;
+      color:#fff;font-size:14px;font-weight:700;cursor:pointer;margin-top:4px;
+      font-family:'Inter',sans-serif;transition:background .2s}
+    .abtn:hover{background:#9333ea}
+
+    /* ── TOAST ── */
+    #toast{position:fixed;bottom:90px;left:50%;
+      transform:translateX(-50%) translateY(16px);
+      background:var(--g);color:#fff;padding:9px 18px;border-radius:12px;
+      font-size:13px;font-weight:600;opacity:0;pointer-events:none;
+      transition:all .28s;z-index:999;white-space:nowrap}
+    #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+    @media(min-width:768px){
+      #chat{padding:36px 32px 0}
+      #inp-area{padding:10px 32px 22px}
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── HEADER ── -->
+<header>
+  <div class="hl">
+    <div class="av-w">
+      <div class="av"><i class="fas fa-film" style="font-size:14px"></i></div>
+      <div class="av-ring" id="av-ring"></div>
+    </div>
+    <div>
+      <div class="hd-title">Reel12 <span class="badge">Plan</span> <span class="badge badge2">Video</span></div>
+      <div class="hd-sub"><span class="dot-live"></span>MVP Strategy + Video Script · All-in-one</div>
+    </div>
+  </div>
+  <div class="hr">
+    <div class="mode-badge" id="mbadge" onclick="openS()">
+      <span class="mode-dot" id="mdot"></span>
+      <span id="mtext">Offline</span>
+    </div>
+    <button class="icon-btn" onclick="openS()" title="Cài đặt"><i class="fas fa-sliders-h"></i></button>
+  </div>
+</header>
+
+<!-- Phase bar -->
+<div class="phase-bar">
+  <div class="ph active" id="ph1"><i class="fas fa-layer-group" style="font-size:10px"></i> Bước 1 · Plan MVP</div>
+  <div class="ph-sep"></div>
+  <div class="ph" id="ph2"><i class="fas fa-video" style="font-size:10px"></i> Bước 2 · Video Script</div>
+</div>
+
+<!-- ── PROGRESS ── -->
+<div class="pt"><div class="pf" id="prog"></div></div>
+
+<!-- ── CHAT ── -->
+<div id="chat"><div class="cw" id="cw"></div></div>
+
+<!-- ── INPUT ── -->
+<div id="inp-area">
+  <div id="qtags"></div>
+  <div class="irow">
+    <input id="uin" type="text" autocomplete="off"
+      placeholder="Chọn gợi ý hoặc nhập câu trả lời..."
+      onkeydown="if(event.key==='Enter'&&!event.shiftKey)send()">
+    <button id="sbtn" onclick="send()"><i class="fas fa-arrow-up"></i></button>
+  </div>
+</div>
+
+<!-- ── SETTINGS ── -->
+<div id="sov" onclick="if(event.target===this)closeS()">
+  <div class="ss">
+    <div class="sh"></div>
+    <div class="st">⚙ Cài đặt chiến dịch</div>
+    <div class="sb">
+      <div class="sl">Loại sản phẩm MVP</div>
+      <select class="sel" id="sf">
+        <option value="Mô hình Coaching / Đồng hành thực chiến">Coaching / Đồng hành thực chiến</option>
+        <option value="Sản phẩm số / Template / Công cụ">Sản phẩm số / Template / Công cụ</option>
+        <option value="Dịch vụ tư vấn chuyên gia / Agency">Dịch vụ tư vấn / Agency</option>
+        <option value="Sản phẩm vật lý thiết yếu ngách">Sản phẩm vật lý ngách</option>
+      </select>
+    </div>
+    <div class="sb">
+      <div class="sl">Kênh video chính</div>
+      <select class="sel" id="sch">
+        <option value="TikTok/Reels (Video ngắn)">TikTok / Reels</option>
+        <option value="Facebook/Instagram (Bài viết + Story)">Facebook / Instagram</option>
+        <option value="YouTube (Video dài + SEO)">YouTube</option>
+      </select>
+    </div>
+    <div class="sb">
+      <div class="sl">Giọng điệu Content</div>
+      <select class="sel" id="sto">
+        <option value="Sắc bén, đanh thép, thực chiến — đi thẳng vào vấn đề">Đanh thép, thực chiến</option>
+        <option value="Đồng cảm sâu sắc, kể chuyện chân thực">Đồng cảm, kể chuyện</option>
+        <option value="Kịch tính, tạo cảm giác FOMO và khẩn cấp">Kịch tính, FOMO</option>
+      </select>
+    </div>
+    <button class="abtn" onclick="closeS()">Xác nhận</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════════════════════
+//  QUESTIONS — Phase 1 (Plan, 4 câu)
+// ══════════════════════════════════════════════════════════
+const Q = [
+  {
+    q: 'Bạn đang muốn đóng gói <span class="h">sản phẩm MVP hoặc dịch vụ cụ thể</span> nào?',
+    hint: 'Gọi tên nó ngắn gọn — đây là trung tâm của toàn bộ chiến lược.',
+    h: ['Mô hình Coaching/Đồng hành thực chiến','Sản phẩm số/Template/Công cụ','Dịch vụ tư vấn chuyên gia/Agency','Sản phẩm vật lý thiết yếu ngách']
+  },
+  {
+    q: 'Khách hàng của bạn đang <span class="h">tốn tiền/thời gian nhất</span> ở công đoạn nào mà MVP này giải quyết được?',
+    hint: 'Đây là lõi Insight Marketing — nỗi đau hành vi thực sự.',
+    h: ['Quá bí ý tưởng, rào cản đứng trước camera','Chi phí vận hành và thuê ngoài quá lớn','Mua nhiều khóa học nhưng chỉ dạy lý thuyết','Dùng sản phẩm rẻ tiền nhưng mau hỏng']
+  },
+  {
+    q: 'Kẽ hở / điểm yếu chí mạng của <span class="h">các đối thủ hiện tại</span> là gì?',
+    hint: '"Vết nứt thị trường" — đối thủ lớn đang bỏ qua điều gì?',
+    h: ['Đối thủ bán giá quá cao, khó tiếp cận','Quy trình đối thủ quá cồng kềnh, khó dùng','Bán xong bỏ chợ, không hỗ trợ','Chỉ mạnh branding, thiếu tính thực chiến']
+  },
+  {
+    q: 'Hệ sinh thái marketing sau khi bán MVP sẽ là <span class="h">sản phẩm Upsell</span> gì?',
+    hint: 'MVP chỉ là phễu mồi. Bạn định Upsell gì ở phía sau?',
+    h: ['Gói dịch vụ Done-for-you (Làm hộ trọn gói)','Thẻ thành viên Subscription hàng tháng','Chương trình cố vấn Mentor 1-1 dài hạn','Phân phối sỉ, mở đại lý bán lẻ']
+  }
+];
+
+const ACK = ['Đã ghi nhận','Capture xong','Data đã lưu','Insight xác định'];
+const THK_PLAN = [
+  'Đang phân tích MVP Core...',
+  'Đang khai thác Behavioral Insight...',
+  'Đang scan Market Gap & đối thủ...',
+  'Đang cấu trúc hóa Phễu Marketing...'
+];
+const THK_VIDEO = [
+  'Đang suy ra framework marketing từ dữ liệu...',
+  'Đang xác định rào cản tâm lý khách hàng...',
+  'Đang đóng gói Mega Prompt Video Script...'
+];
+const FR_PLAN = [
+  _=>'MVP Core đã được ghi nhận. Toàn bộ chiến lược định vị và USP sẽ xây dựng xung quanh sản phẩm này.',
+  _=>'Behavioral Insight đã capture. Đây là lõi cảm xúc — sẽ thành Psychological Trigger mạnh nhất trong Video.',
+  _=>'Market Gap đã xác định. Kẽ hở này sẽ là vũ khí định vị tấn công trực diện vào điểm mù đối thủ.',
+  _=>'Phễu Upsell đã ghi nhận. Dòng tiền sẽ được cấu trúc hóa từ Lead Magnet → MVP → Sản phẩm cao cấp.'
+];
+
+// ══════════════════════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════════════════════
+let step = 0, data = {}, busy = false;
+const SK = 'reel12_v10';
+const GEMINI_KEY = 'AIzaSyB_DnMYS9pCfWY4vMVREFqcwtxPUCaMdIc';
+
+// Video data — điền sau khi AI infer
+let videoData = { industry: '', framework: '', frameworkReason: '', fwCode: '', painPoint: '' };
+
+const cw  = document.getElementById('cw');
+const uin = document.getElementById('uin');
+const sbtn= document.getElementById('sbtn');
+const qtags=document.getElementById('qtags');
+const prog= document.getElementById('prog');
+const ring= document.getElementById('av-ring');
+
+// ══════════════════════════════════════════════════════════
+//  AI ENGINE
+// ══════════════════════════════════════════════════════════
+const AI = {
+  mode: 'fallback', key: '',
+  GURL: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:streamGenerateContent?alt=sse&key=',
+  GNURL:'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=',
+
+  async init() {
+    if (GEMINI_KEY) { this.key = GEMINI_KEY; this.mode = 'gemini'; }
+    this.badge();
+  },
+
+  badge() {
+    const mb=document.getElementById('mbadge'),md=document.getElementById('mdot'),mt=document.getElementById('mtext');
+    if (this.mode==='gemini') {
+      mb.classList.add('on'); md.style.background='var(--g)'; mt.textContent='AI · Gemini';
+    } else {
+      mb.classList.remove('on'); md.style.background='var(--muted)'; mt.textContent='Offline';
+    }
+  },
+
+  // Stream phản hồi sau mỗi câu plan
+  async streamPlan(stepIdx, answer, el) {
+    const qtext = Q[stepIdx].q.replace(/<[^>]+>/g,'');
+    const prompt = `Bạn là chuyên gia MVP & Content Marketing. Tiếng Việt. Không emoji. Không "cảm ơn". Không mở đầu bằng "Tôi đã ghi nhận".
+
+Câu hỏi: "${qtext}"
+Câu trả lời: "${answer}"
+
+Viết phản hồi 2-3 câu: trích dẫn 1-2 từ cốt lõi từ câu trả lời, phân tích tại sao data này quan trọng cho chiến lược, nêu cụ thể nó ảnh hưởng thế nào đến video và phễu marketing.
+Văn phong: đanh thép, tự tin, như strategist đang đọc brief.`;
+    try {
+      if (this.mode==='gemini') return await this._gemini(prompt, el, 150);
+    } catch(e) {}
+    await chunk(el, FR_PLAN[stepIdx]?.(answer)||'', 3, 16);
+  },
+
+  // Gemini infer video framework từ 4 câu plan
+  async inferVideo(d) {
+    const p = `Dữ liệu MVP:
+- Sản phẩm: "${d.q1}"
+- Nỗi đau KH: "${d.q2}"
+- Kẽ hở đối thủ: "${d.q3}"
+- Upsell: "${d.q4}"
+
+Suy ra cho video TikTok/Reels:
+1. "industry": Phân loại ngành (chọn 1: "Bán lẻ / Sản phẩm vật lý" hoặc "Dịch vụ / Khóa học / Chuyên gia" hoặc "Xây kênh Viral / Giải trí")
+2. "painPoint": Rào cản tâm lý / định kiến lớn nhất khiến KH chưa mua (1 câu ngắn, văn nói)
+
+Trả về JSON: {"industry":"...","painPoint":"..."}`;
+    try {
+      const r = await fetch(this.GNURL+this.key, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({contents:[{parts:[{text:p}]}],
+          generationConfig:{maxOutputTokens:100,temperature:.4}})
+      });
+      const j = await r.json();
+      const raw = j.candidates?.[0]?.content?.parts?.[0]?.text||'';
+      const m = raw.match(/\{[\s\S]*?\}/);
+      return m ? JSON.parse(m[0]) : null;
+    } catch(e) { return null; }
+  },
+
+  // Dynamic hints
+  async hints(product, nextIdx) {
+    if (this.mode==='fallback') return null;
+    const nq = Q[nextIdx]?.q.replace(/<[^>]+>/g,'')||'';
+    const p = `Sản phẩm: "${product}". Câu hỏi tiếp: "${nq}".
+3 gợi ý ngắn (≤10 từ/cái) thực tế. Trả về CHỈ JSON array. Tiếng Việt.`;
+    try {
+      const r = await fetch(this.GNURL+this.key, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({contents:[{parts:[{text:p}]}],
+          generationConfig:{maxOutputTokens:80,temperature:.7}})
+      });
+      const j = await r.json();
+      const raw = j.candidates?.[0]?.content?.parts?.[0]?.text||'';
+      const m = raw.match(/\[.*?\]/s);
+      return m ? JSON.parse(m[0]) : null;
+    } catch(e) { return null; }
+  },
+
+  async _gemini(prompt, el, max=150) {
+    const r = await fetch(this.GURL+this.key, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({contents:[{parts:[{text:prompt}]}],
+        generationConfig:{maxOutputTokens:max,temperature:.85}})
+    });
+    if (!r.ok) throw new Error(r.status);
+    const cur = document.createElement('span'); cur.className='stream-cur'; el.appendChild(cur);
+    const reader=r.body.getReader(), dec=new TextDecoder(); let buf='';
+    while (true) {
+      const {done,value}=await reader.read(); if(done) break;
+      buf+=dec.decode(value,{stream:true});
+      const lines=buf.split('\n'); buf=lines.pop()||'';
+      for (const ln of lines) {
+        if (!ln.startsWith('data: ')||ln.includes('[DONE]')) continue;
+        try { const j=JSON.parse(ln.slice(6)); const t=j.candidates?.[0]?.content?.parts?.[0]?.text||'';
+          if(t){el.insertBefore(document.createTextNode(t),cur);scrollB();} } catch(e){}
+      }
+    }
+    cur.remove();
+  }
+};
+
+// ══════════════════════════════════════════════════════════
+//  CHUNK TYPEWRITER
+// ══════════════════════════════════════════════════════════
+function chunk(el, html, n=3, ms=16) {
+  return new Promise(res=>{
+    el.innerHTML='';
+    const tokens=[]; const re=/(<[^>]+>|&[^;]+;|[\s\S])/g; let m;
+    while((m=re.exec(html))!==null) tokens.push(m[0]);
+    let i=0;
+    const CUR='<span class="cur"></span>';
+    function tick() {
+      if(i>=tokens.length){el.innerHTML=html;res();return}
+      let added=0;
+      while(i<tokens.length&&added<n){i++;if(!tokens[i-1].startsWith('<'))added++;}
+      el.innerHTML=tokens.slice(0,i).join('')+CUR; scrollB();
+      const last=tokens[i-1]||'';
+      const delay=last==='.'||last==='!'||last==='?'?120:last===','?60:ms;
+      setTimeout(tick,delay);
+    }
+    tick();
+  });
+}
+
+// ══════════════════════════════════════════════════════════
+//  MESSAGE RENDERERS
+// ══════════════════════════════════════════════════════════
+async function aiSay(html) {
+  busy=true; active(true); setIn(false);
+  const row=mkRow('ai'); const txt=row.querySelector('.txt');
+  cw.appendChild(row); scrollB();
+  await chunk(txt, html, 3, 16);
+  busy=false; active(false);
+}
+
+function userSay(text) {
+  const row=mkRow('user'); row.querySelector('.txt').textContent=text;
+  cw.appendChild(row); scrollB();
+}
+
+function showThink(msg) {
+  const id='t'+Date.now(); const el=document.createElement('div');
+  el.id=id; el.className='msg';
+  el.innerHTML=`<div class="mav ai"><i class="fas fa-bolt" style="font-size:11px"></i></div>
+    <div class="tb"><div class="dots"><div class="d"></div><div class="d"></div><div class="d"></div></div><span>${msg}</span></div>`;
+  cw.appendChild(el); scrollB(); return id;
+}
+
+function mkRow(who) {
+  const r=document.createElement('div');
+  r.className='msg'+(who==='user'?' user':'');
+  const u=who==='user';
+  r.innerHTML=`<div class="mav ${u?'human':'ai'}">${u?'<i class="fas fa-user" style="font-size:11px"></i>':'<i class="fas fa-film" style="font-size:10px"></i>'}</div>
+    <div class="bubble"><div class="txt"></div>
+    <div class="bm"><i class="fas fa-check-double" style="color:${u?'#555':'var(--a)'}"></i> ${now()}</div></div>`;
+  return r;
+}
+
+// ══════════════════════════════════════════════════════════
+//  FRAMEWORK DETECTION (giống video.html gốc)
+// ══════════════════════════════════════════════════════════
+function detectFramework(industry) {
+  const txt=(industry||'').toLowerCase();
+  if (txt.includes('vật lý')||txt.includes('bán lẻ')||txt.includes('sản phẩm')) {
+    return { name:'PAS — Vấn đề · Kích động · Giải pháp', code:'PAS',
+      desc:'Sản phẩm vật lý giải quyết nhu cầu cụ thể. PAS chỉ thẳng vào vấn đề → xoáy sâu nỗi đau → đưa ra giải pháp. Tỷ lệ chuyển đổi cao nhất cho FMCG và hàng hóa.' };
+  } else if (txt.includes('dịch vụ')||txt.includes('khóa học')||txt.includes('chuyên gia')||txt.includes('coaching')) {
+    return { name:'AIDA — Chú ý · Thích thú · Khao khát · Hành động', code:'AIDA',
+      desc:'Bán dịch vụ và tri thức là bán niềm tin. AIDA xây dựng sự tin tưởng từng tầng, khơi gợi khao khát từ từ trước khi chốt sale — phù hợp với high-ticket offer.' };
+  } else {
+    return { name:'HRR — Hook · Retain · Reward', code:'HRR',
+      desc:'Với kênh giải trí/viral, tỷ lệ giữ chân là vua. HRR tạo tò mò ngay giây đầu → giữ chân bằng nhịp điệu → thưởng bằng kết quả bất ngờ ở cuối video.' };
+  }
+}
+
+// ══════════════════════════════════════════════════════════
+//  FLOW — Phase 1 (4 câu plan)
+// ══════════════════════════════════════════════════════════
+async function askQ(n) {
+  const label = `Module ${n+1} / 4`;
+  await aiSay(`<span class="qlabel">${label}</span>${Q[n].q}
+    ${Q[n].hint?`<br><span style="font-size:11.5px;color:var(--muted);display:block;margin-top:5px;font-style:italic">${Q[n].hint}</span>`:''}`)  ;
+  tags(Q[n].h); setIn(true); uin.focus();
+}
+
+async function send() {
+  const val=uin.value.trim();
+  if (!val||busy||step>=4) return;
+
+  data[`q${step+1}`]=val;
+  userSay(val); uin.value=''; clearTags(); setIn(false); save();
+
+  const s=step; step++; setP(step, 5); // 4 plan + 1 video phase
+
+  const thinkDelay=700+Math.min(val.length*12,1400)+Math.random()*300;
+  const tid=showThink(THK_PLAN[s]); active(true);
+
+  // Fetch hints cho câu tiếp
+  let dynHints=null;
+  if (step<4 && data.q1 && AI.mode!=='fallback') {
+    const hintWindow=Math.max(thinkDelay,800)+600;
+    const [,hints]=await Promise.all([
+      sleep(thinkDelay),
+      Promise.race([AI.hints(data.q1,step).catch(()=>null), sleep(hintWindow).then(()=>null)])
+    ]);
+    dynHints=hints;
+  } else {
+    await sleep(thinkDelay);
+  }
+
+  rm(tid); active(false);
+
+  // AI reaction
+  const row=mkRow('ai'); const txt=row.querySelector('.txt');
+  cw.appendChild(row); active(true);
+  if (AI.mode!=='fallback') {
+    try { await AI.streamPlan(s, val, txt); }
+    catch(e) { txt.textContent=FR_PLAN[s]?.(val)||''; }
+  } else {
+    txt.textContent=FR_PLAN[s]?.(val)||'';
+  }
+  active(false);
+
+  if (step < 4) {
+    await sleep(320);
+    await askQ(step);
+    tags(dynHints||Q[step].h); setIn(true); uin.focus();
+  } else {
+    // Kết thúc phase 1 → chuyển phase 2
+    await sleep(500);
+    await transitionToVideoPhase();
+  }
+}
+
+// ══════════════════════════════════════════════════════════
+//  TRANSITION — Plan → Video
+// ══════════════════════════════════════════════════════════
+async function transitionToVideoPhase() {
+  // Cập nhật phase bar
+  document.getElementById('ph1').classList.remove('active');
+  document.getElementById('ph1').classList.add('done');
+  document.getElementById('ph1').innerHTML='<i class="fas fa-check" style="font-size:10px"></i> Bước 1 · Plan MVP';
+  document.getElementById('ph2').classList.add('active');
+
+  await aiSay(
+    `<span class="hg"><i class="fas fa-check-circle"></i> Hoàn tất Plan MVP!</span><br><br>`+
+    `<span style="color:var(--muted);font-size:12.5px">Tôi đã thu thập đủ 4 modules chiến lược. Đang chuyển sang <span style="color:var(--a2);font-weight:600">Bước 2 · Video Script</span> — tự động suy ra framework phù hợp từ dữ liệu của bạn…</span>`
+  );
+
+  const tid1=showThink(THK_VIDEO[0]); active(true);
+
+  // AI infer ngành hàng + rào cản tâm lý
+  let inferred=null;
+  if (AI.mode!=='fallback') {
+    inferred=await AI.inferVideo(data);
+  }
+
+  // Fallback nếu không có AI
+  if (!inferred) {
+    const p=(data.q1||'').toLowerCase();
+    let industry='Dịch vụ / Khóa học / Chuyên gia';
+    if (p.includes('vật lý')||p.includes('sản phẩm')||p.includes('hàng')) industry='Bán lẻ / Sản phẩm vật lý';
+    else if (p.includes('viral')||p.includes('giải trí')||p.includes('kênh')) industry='Xây kênh Viral / Giải trí';
+    inferred={ industry, painPoint: data.q2 };
+  }
+
+  rm(tid1); active(false);
+  await sleep(300);
+
+  const fw=detectFramework(inferred.industry);
+  videoData.industry    = inferred.industry;
+  videoData.framework   = fw.name;
+  videoData.frameworkReason = fw.desc;
+  videoData.fwCode      = fw.code;
+  videoData.painPoint   = inferred.painPoint;
+
+  // Hiển thị framework đã xác định
+  await aiSay(
+    `Framework marketing được xác định từ dữ liệu Plan:<br><br>`+
+    `<div class="fw-card">`+
+    `<div class="fw-title"><i class="fas fa-chart-network"></i> Framework Video</div>`+
+    `<div class="fw-name">${fw.name}</div>`+
+    `<div class="fw-desc">${fw.desc}</div>`+
+    `</div><br>`+
+    `<div style="display:flex;gap:8px;align-items:baseline">`+
+    `<span style="color:var(--muted);font-size:11px;min-width:90px">Rào cản KH</span>`+
+    `<span style="color:var(--text);font-size:12.5px;font-weight:500">${esc(inferred.painPoint)}</span>`+
+    `</div>`
+  );
+
+  await sleep(500);
+  const tid2=showThink(THK_VIDEO[2]); active(true);
+  await sleep(1800);
+  rm(tid2); active(false);
+
+  await genOutput();
+}
+
+// ══════════════════════════════════════════════════════════
+//  OUTPUT — 2 Mega Prompt blocks
+// ══════════════════════════════════════════════════════════
+async function genOutput() {
+  setP(5, 5);
+
+  const fmt  = document.getElementById('sf').value;
+  const sch  = document.getElementById('sch').value;
+  const tone = document.getElementById('sto').value;
+
+  // Summary
+  await aiSay(
+    `<span class="hg"><i class="fas fa-check-circle"></i> Đóng gói hoàn tất!</span><br><br>`+
+    `<span style="color:var(--muted);font-size:12.5px">Đã xử lý toàn bộ dữ liệu và tạo ra <strong style="color:var(--text)">2 Mega Prompt</strong>: chiến lược MVP và kịch bản video.</span>`+
+    `<div class="sc"><div class="sct"><i class="fas fa-layer-group"></i> Tóm tắt</div>`+
+    `<div class="sr"><span class="sk">MVP Lõi</span><span class="sv">${esc(data.q1||'—')}</span></div>`+
+    `<div class="sr"><span class="sk">Nỗi đau KH</span><span class="sv">${esc((data.q2||'').slice(0,55))}</span></div>`+
+    `<div class="sr"><span class="sk">Kẽ hở đối thủ</span><span class="sv">${esc((data.q3||'').slice(0,55))}</span></div>`+
+    `<div class="sr"><span class="sk">Framework Video</span><span class="sv">${esc(videoData.fwCode)} — ${esc(videoData.framework.split('—')[0].trim())}</span></div>`+
+    `<div class="sr"><span class="sk">Rào cản tâm lý</span><span class="sv">${esc((videoData.painPoint||'').slice(0,55))}</span></div>`+
+    `</div>`
+  );
+
+  // ── PROMPT 1: Plan/Strategy (Kael) ──
+  const promptPlan = buildPlanPrompt(fmt, sch, tone);
+  const pid1 = 'pr1_'+Date.now();
+  const row1 = document.createElement('div');
+  row1.className='msg';
+  row1.innerHTML=`
+    <div class="mav ai" style="background:linear-gradient(135deg,#a855f7,#6366f1)"><i class="fas fa-layer-group" style="font-size:10px"></i></div>
+    <div class="bubble" style="max-width:100%;border-color:rgba(168,85,247,.25)">
+      <div class="prompt-label" style="color:var(--a)"><i class="fas fa-chess-king" style="font-size:10px"></i> Prompt 1 · Chiến lược MVP (Kael)</div>
+      <div style="font-size:11.5px;color:var(--muted);margin-bottom:4px">Paste vào ChatGPT/Claude/Gemini để nhận phân tích chiến lược + mindmap + 5 ý tưởng video</div>
+      <div class="pbox" id="${pid1}"><button class="cpbtn" onclick="copyP('${pid1}')"><i class="fas fa-copy"></i> Copy</button>${esc(promptPlan)}</div>
+      <div class="btn-row">
+        <button class="open-ai-btn chatgpt" onclick="copyAndOpen('${pid1}')"><i class="fas fa-robot" style="font-size:12px"></i> ChatGPT</button>
+        <button class="open-ai-btn gemini" onclick="copyAndOpenGemini('${pid1}')"><i class="fas fa-gem" style="font-size:12px"></i> Gemini</button>
+      </div>
+    </div>`;
+  cw.appendChild(row1);
+
+  await sleep(400);
+
+  // ── PROMPT 2: Video Script (Nova) ──
+  const promptVideo = buildVideoPrompt();
+  const pid2 = 'pr2_'+Date.now();
+  const row2 = document.createElement('div');
+  row2.className='msg';
+  row2.innerHTML=`
+    <div class="mav ai" style="background:linear-gradient(135deg,#3b82f6,#0d9488)"><i class="fas fa-video" style="font-size:10px"></i></div>
+    <div class="bubble" style="max-width:100%;border-color:rgba(59,130,246,.25)">
+      <div class="prompt-label" style="color:var(--a2)"><i class="fas fa-film" style="font-size:10px"></i> Prompt 2 · Kịch bản Video Script (3 module)</div>
+      <div style="font-size:11.5px;color:var(--muted);margin-bottom:4px">Paste vào ChatGPT/Claude/Gemini để tạo kịch bản Hook–Body–CTA dưới 75 giây</div>
+      <div class="pbox" id="${pid2}"><button class="cpbtn" onclick="copyP('${pid2}')"><i class="fas fa-copy"></i> Copy</button>${esc(promptVideo)}</div>
+      <div class="btn-row">
+        <button class="open-ai-btn chatgpt" onclick="copyAndOpen('${pid2}')"><i class="fas fa-robot" style="font-size:12px"></i> ChatGPT</button>
+        <button class="open-ai-btn gemini" onclick="copyAndOpenGemini('${pid2}')"><i class="fas fa-gem" style="font-size:12px"></i> Gemini</button>
+      </div>
+    </div>`;
+  cw.appendChild(row2);
+
+  clearTags();
+  uin.disabled=true; uin.placeholder='✓ 2 Mega Prompt đã sẵn sàng'; sbtn.disabled=true;
+  clearSess();
+
+  const rb=document.createElement('button');
+  rb.className='qt';
+  rb.innerHTML='<i class="fas fa-redo" style="margin-right:6px;font-size:10px"></i>Bắt đầu lại';
+  rb.onclick=()=>location.reload();
+  qtags.appendChild(rb);
+  scrollB();
+}
+
+// ══════════════════════════════════════════════════════════
+//  PROMPT BUILDER 1 — Kael MVP Strategy (giữ nguyên 100% logic plan.html)
+// ══════════════════════════════════════════════════════════
+function buildPlanPrompt(fmt, sch, tone) {
+  const d = data;
+  return `Bạn là Kael, một AI chuyên gia kiến trúc dữ liệu và cố vấn đóng gói sản phẩm Marketing xuất sắc. Nhiệm vụ của bạn là tiếp nhận tập dữ liệu phỏng vấn thô về MVP của tôi để phân tích chuyên sâu, đóng gói lại và tạo ra bức tranh chiến lược kinh doanh, định vị truyền thông hoàn chỉnh.
+
+[DỮ LIỆU ĐẦU VÀO TỪ KIRA SYSTEM]:
+- Sản phẩm MVP Lõi: ${d.q1} (${fmt})
+- Nỗi đau hành vi khách hàng: ${d.q2}
+- Điểm mù của đối thủ: ${d.q3}
+- Phễu sản phẩm Upsell Marketing: ${d.q4}
+- Kênh phân phối chính: ${sch}
+- Giọng điệu Content bắt buộc: ${tone}
+
+[QUY TRÌNH EXPORT DỮ LIỆU - YÊU CẦU TUÂN THỦ 100% CẤU TRÚC SAU]:
+
+1. BƯỚC 1 - VẼ ASCII MINDMAP:
+Xuất ngay một sơ đồ tư duy bằng ký tự ASCII trực quan để mô tả hệ sinh thái sản phẩm và định vị (Sử dụng các ký tự nét liền ───, │, └───).
+
+2. BƯỚC 2 - ĐÓNG GÓI CÁC BẢNG MATRIX MARKETING (TIÊU ĐỀ IN HOA TOÀN BỘ):
+
+# BẢNG 1: ĐỊNH VỊ MVP VÀ THỊ TRƯỜNG NGÁCH
+- Phân tích bản chất giải pháp MVP và điểm độc bản (USP) để truyền thông.
+- Chỉ ra phân khúc khách hàng mục tiêu sẵn sàng xuống tiền ngay.
+
+# BẢNG 2: BẢN ĐỒ ĐỐI THỦ & CHIẾN LƯỢC TẤN CÔNG KHÔNG GIAN TRỐNG
+- Phân tích kẽ hở/lỗ hổng vận hành của đối thủ.
+- Đưa ra chiến lược định vị truyền thông đánh trực diện vào điểm yếu này để kéo traffic.
+
+# BẢNG 3: BỘ TỪ KHÓA TÂM LÝ (PSYCHOLOGICAL TRIGGERS)
+- Bóc tách nỗi sợ hãi thầm kín và rào cản mua hàng dựa trên Insight.
+- Cung cấp bộ 10 từ khóa "thôi miên" nên dùng trên Video/Landing Page để tăng tỷ lệ chuyển đổi.
+
+# BẢNG 4: HỆ SINH THÁI PHỄU MARKETING & DÒNG TIỀN
+- Cấu trúc hóa mô hình: Quà tặng (Lead Magnet) -> Sản phẩm MVP -> Sản phẩm Upsell cao cấp.
+- Giải thích tính liền mạch của dòng tiền trong phễu này.
+
+# BỘ TÀI NGUYÊN CONTENT: 5 KỊCH BẢN VIDEO NGẮN MỞ PHỄU
+- Đóng gói 5 ý tưởng định hướng nội dung video (${sch}) đánh mạnh vào nỗi đau hành vi thực tế, tích hợp CTA khéo léo để kéo khách về phễu MVP.
+- Giọng điệu bắt buộc cho toàn bộ kịch bản: ${tone}
+
+3. BƯỚC 3 - KHỞI TẠO VÒNG LẶP (LOOP):
+Sau khi xuất xong, đặt câu hỏi chính xác như sau: "Dữ liệu Marketing đã được Kael đóng gói. Bạn muốn tôi làm rõ thêm, viết chi tiết kịch bản video nào, hay điều chỉnh sơ đồ ASCII phía trên để chuẩn xác nhất?".`;
+}
+
+// ══════════════════════════════════════════════════════════
+//  PROMPT BUILDER 2 — Nova Video Script (giữ nguyên 100% logic video.html)
+// ══════════════════════════════════════════════════════════
+function buildVideoPrompt() {
+  const d = videoData;
+  return `Hãy đóng vai trò là một Giám đốc Chiến lược Nội dung (Senior Content Strategist) và Copywriter thực chiến. Nhiệm vụ của bạn là đồng hành tư vấn 1-1 để giúp tôi tạo ra kịch bản video dọc (Tiktok/Reels) tối ưu chuyển đổi, thời lượng STRICTLY dưới 75 giây (tối đa 210 từ).
+
+BỐI CẢNH DỰ ÁN CỦA TÔI:
+- Ngành hàng / Sản phẩm: ${d.industry} — ${data.q1}
+- Rào cản / Nỗi đau lớn nhất của khách hàng: "${d.painPoint}"
+- Điểm yếu đối thủ (lợi thế định vị): ${data.q3}
+- Công thức Marketing xương sống: ${d.framework}
+
+CHIẾN LƯỢC SẢN XUẤT CÔNG NGHIỆP (3 MODULE):
+Video sẽ được cấu trúc thành 3 phần tách biệt để tôi tối ưu thời gian quay dựng:
+- Phần 1 (Hook - 15-20s): Thay đổi linh hoạt theo từng video để test A/B thị trường.
+- Phần 2 (Body - 40s): LÕI CỐ ĐỊNH. Áp dụng chuẩn công thức [${d.fwCode}]. Phần này mang thông điệp chính, tôi SẼ CHỈ QUAY 1 LẦN để ghép vào giữa mọi video.
+- Phần 3 (CTA - 10s): Thay đổi linh hoạt sao cho nối mượt với Hook.
+
+QUY TẮC LÀM VIỆC CỦA BẠN (BẮT BUỘC):
+1. KHÔNG BAO GIỜ tự ý nhả toàn bộ kịch bản ra trong 1 lần trả lời. Phải làm việc theo TỪNG BƯỚC HỎI ĐÁP bên dưới. Đợi tôi trả lời xong bước này mới được qua bước sau.
+2. Ngôn ngữ giao tiếp điềm đạm, thực tế, đúng chất chuyên gia. Tuyệt đối không dùng những từ ngữ sáo rỗng, viễn tưởng.
+3. Kịch bản xuất ra phải là "văn nói" tự nhiên, có nhịp điệu, động từ mạnh.
+
+QUY TRÌNH THỰC HIỆN TỪNG BƯỚC:
+
+BƯỚC 1 (Tạo Body cố định): Đặt cho tôi 1 hoặc 2 câu hỏi làm rõ về Ưu điểm nổi bật (USP) của sản phẩm tôi đang bán. Sau khi tôi cung cấp, hãy viết phần Lõi Body (khoảng 90-100 từ) áp dụng đúng cấu trúc ${d.framework}. (Chờ tôi duyệt hoặc sửa).
+
+BƯỚC 2 (Đề xuất Hook): Dựa vào Insight và Body đã chốt, hãy đưa ra 4 phương án Hook khác nhau (~40-50 từ/Hook). Phân loại rõ 4 hướng tiếp cận: (1) Đâm thẳng vào nỗi đau, (2) Lật ngược định kiến, (3) Bằng chứng thực tế, (4) Storytelling. (Yêu cầu tôi chọn 1 số).
+
+BƯỚC 3 (Đề xuất CTA): Dựa vào Hook tôi đã chọn, đề xuất 3 câu CTA (~25 từ) nối mượt mà từ Body sang chốt sale. (Yêu cầu tôi chọn).
+
+BƯỚC 4 (Lắp ráp & Tối ưu): Ghép [Hook] + [Body] + [CTA]. Chuốt lại các từ nối. BẮT BUỘC: Đếm chính xác tổng số từ, đảm bảo tuyệt đối dưới 210 từ.
+
+Nếu bạn đã hiểu quy trình chuyên nghiệp này, hãy xác nhận ngắn gọn và bắt đầu ngay BƯỚC 1 bằng cách hỏi tôi về USP của sản phẩm!`;
+}
+
+// ══════════════════════════════════════════════════════════
+//  SESSION PERSISTENCE
+// ══════════════════════════════════════════════════════════
+function save(){localStorage.setItem(SK,JSON.stringify({step,data,ts:Date.now()}))}
+function clearSess(){localStorage.removeItem(SK)}
+function tryResume(){
+  try{
+    const s=JSON.parse(localStorage.getItem(SK)||'null');
+    if(!s||Date.now()-s.ts>7200000||!s.step) return false;
+    step=s.step; data=s.data; return true;
+  }catch(e){return false}
+}
+
+function openS(){document.getElementById('sov').classList.add('open')}
+function closeS(){document.getElementById('sov').classList.remove('open')}
+
+// ══════════════════════════════════════════════════════════
+//  BOOT
+// ══════════════════════════════════════════════════════════
+window.addEventListener('load', async()=>{
+  await AI.init();
+
+  if (tryResume()) {
+    await aiSay(
+      `Tôi thấy bạn đang làm dở chiến dịch cho <span class="h">"${data.q1||'sản phẩm của bạn'}"</span> — đã hoàn thành <span class="h">${step}/4</span> modules Plan.<br><br>`+
+      `<span style="color:var(--muted)">Tiếp tục từ Module ${step+1} nhé —</span>`
+    );
+    await askQ(step);
+    return;
+  }
+
+  await sleep(220);
+  const aiTag = AI.mode!=='fallback'
+    ? ` <span style="color:#4ade80;font-size:12px">· AI Gemini Flash đang chạy</span>` : '';
+  await aiSay(
+    `Xin chào! Tôi là <span class="h">Reel12</span>${aiTag} — trợ lý <strong>all-in-one</strong> dành cho học viên làm video.<br><br>`+
+    `Quy trình gồm <span class="h">2 bước tích hợp</span>:<br>`+
+    `<span style="color:var(--muted);font-size:12.5px">① <strong style="color:var(--text)">Plan MVP</strong> — 4 câu định hình chiến lược sản phẩm<br>`+
+    `② <strong style="color:var(--a2)">Video Script</strong> — AI tự suy ra framework, tạo kịch bản 3 module</span><br><br>`+
+    `<span class="hg">Chỉ 4 câu hỏi → 2 Mega Prompt.</span> Bắt đầu nào —`
+  );
+  await askQ(0);
+});
+
+// ══════════════════════════════════════════════════════════
+//  UTILS
+// ══════════════════════════════════════════════════════════
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function now(){const d=new Date();return d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0')}
+function rm(id){document.getElementById(id)?.remove()}
+function scrollB(){const c=document.getElementById('chat');c.scrollTop=c.scrollHeight}
+function active(on){ring.classList.toggle('on',on)}
+function sleep(ms){return new Promise(r=>setTimeout(r,ms))}
+function setIn(on){uin.disabled=!on;sbtn.disabled=!on;uin.placeholder=on?'Chọn gợi ý hoặc nhập câu trả lời...':'Reel12 đang xử lý...'}
+function setP(cur,tot){prog.style.width=((cur/tot)*100)+'%'}
+function tags(h){qtags.innerHTML='';(h||[]).forEach(t=>{const b=document.createElement('button');b.className='qt';b.textContent=t;b.onclick=()=>{uin.value=t;send()};qtags.appendChild(b)})}
+function clearTags(){qtags.innerHTML=''}
+function toast(msg){const t=document.getElementById('toast');t.innerHTML=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2400)}
+function copyP(id){
+  const el=document.getElementById(id);
+  const btn=el.querySelector('.cpbtn');btn.style.display='none';
+  const text=el.innerText.trim();btn.style.display='';
+  (navigator.clipboard?.writeText(text)??Promise.reject()).catch(()=>{
+    const ta=Object.assign(document.createElement('textarea'),{value:text});
+    document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();
+  });
+  toast('<i class="fas fa-check-circle"></i> Đã sao chép Mega Prompt!');
+}
+function copyAndOpen(id){ copyP(id); window.open('https://chatgpt.com','_blank'); }
+function copyAndOpenGemini(id){ copyP(id); window.open('https://gemini.google.com','_blank'); }
+</script>
+</body>
+</html>
