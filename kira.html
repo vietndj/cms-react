@@ -388,12 +388,15 @@ Văn phong: đanh thép, tự tin, như expert MVP đang đọc brief — không
     await chunk(el,FR[stepIdx]?.(answer)||'',3,16);
   },
 
-  // Generate dynamic chips cho câu hỏi tiếp theo
-  async hints(q1,nextIdx){
+  // Generate dynamic chips dựa trên TOÀN BỘ data đã thu thập
+  async hints(collectedData, nextIdx){
     if(this.mode==='fallback') return null;
     const nq=Q[nextIdx]?.q.replace(/<[^>]+>/g,'')||'';
-    const p=`MVP/Sản phẩm: "${q1}". Câu hỏi tiếp theo: "${nq}".
-3 gợi ý ví dụ ngắn (≤8 từ/cái) phù hợp sản phẩm này. Trả về CHỈ JSON array. Tiếng Việt đời thường.`;
+    const moduleNames=['MVP Lõi','Nỗi đau khách hàng','Kẽ hở đối thủ','Phễu Upsell'];
+    const contextLines=Object.entries(collectedData)
+      .map(([k,v],i)=>`- ${moduleNames[i]||k}: ${v}`)
+      .join('\n');
+    const p=`Dữ liệu MVP đã thu thập:\n${contextLines}\n\nCâu hỏi tiếp theo: "${nq}".\n3 gợi ý ví dụ ngắn (≤8 từ/cái) liên quan trực tiếp đến sản phẩm và dữ liệu trên. Trả về CHỈ JSON array. Tiếng Việt đời thường.`;
     try{
       if(this.mode==='nano'){
         const s=await window.ai.languageModel.create();
@@ -405,7 +408,7 @@ Văn phong: đanh thép, tự tin, như expert MVP đang đọc brief — không
         const r=await fetch(this.GNURL+this.key,{
           method:'POST',headers:{'Content-Type':'application/json'},
           body:JSON.stringify({contents:[{parts:[{text:p}]}],
-            generationConfig:{maxOutputTokens:80,temperature:.7}})
+            generationConfig:{maxOutputTokens:100,temperature:.75}})
         });
         const j=await r.json();
         const raw=j.candidates?.[0]?.content?.parts?.[0]?.text||'';
@@ -560,7 +563,7 @@ async function send(){
     sleep(thinkDelay),
     (step<4&&data.q1&&AI.mode!=='fallback')
       ? Promise.race([
-          AI.hints(data.q1,step).catch(()=>null),
+          AI.hints(data,step).catch(()=>null),
           sleep(hintWindow).then(()=>null)
         ])
       : Promise.resolve(null)
