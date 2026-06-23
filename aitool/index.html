@@ -315,6 +315,10 @@
       color: #fff;
     }
 
+    .btn-action:hover::before {
+      opacity: 0;
+    }
+
     .btn-action span, .btn-action i {
       position: relative;
       z-index: 2;
@@ -927,12 +931,13 @@
       mouse.y = -1000;
     });
 
-    // Technology vocabulary words (vietnamese & english)
+    // Technology & Video Editing vocabulary words
     const wordsList = [
-      'Plan AI', 'Video AI', 'Landing AI', 'Fedu', 'Astra', 'Kira', 'Nova', 'Leo',
-      'Prompt', 'Strategy', 'Future', 'Marketing', 'Reels', 'TikTok', 'Sales Page',
-      'Artificial Intelligence', 'Cyberpunk', 'Next.js', 'Vite', 'React', 'Gemini Pro',
-      'AIDA', 'Hook', 'CTA', 'MVP', 'Conversion', 'Big Data', 'Neural Network', 'Automation'
+      'J-Cut', 'L-Cut', 'Match Cut', 'Jump Cut', 'Zoom In', 'Zoom Out',
+      'Whip Pan', 'B-Roll', 'Keyframe', 'Subtitles', 'Voiceover', 'Audio Sync',
+      'Transition', 'Color Grading', 'Sound FX', 'CapCut', 'Premiere', 'Reels',
+      'TikTok', 'Shorts', 'Viral Hook', 'Cinematic', 'Frame Rate', 'Aspect Ratio',
+      'Render', 'Timeline', 'A-Roll', 'Lighting', 'Visual Effects', 'Speed Ramp'
     ];
 
     class Particle {
@@ -949,7 +954,7 @@
         this.vy = (Math.random() - 0.5) * 0.6;
         
         // Physics constants
-        this.radius = this.isText ? ctx.measureText(text).width / 2 + 10 : Math.random() * 3 + 1;
+        this.radius = this.isText ? ctx.measureText(text).width / 2 + 8 : Math.random() * 3 + 1;
         this.density = (Math.random() * 20) + 10;
         
         // Visual
@@ -961,7 +966,7 @@
       draw() {
         ctx.save();
         if (this.isText) {
-          ctx.font = 'bold 13px Plus Jakarta Sans';
+          ctx.font = 'bold 10px Plus Jakarta Sans';
           ctx.fillStyle = this.color;
           ctx.globalAlpha = this.alpha;
           ctx.shadowBlur = 8;
