@@ -19,8 +19,9 @@ jobs:
         run: |
           mkdir -p dist/aitool
           cp kira.html nova.html leo.html plan.html video.html landing.html reel12.html dist/aitool/ 2>/dev/null || true
+          cp -r aitool/* dist/aitool/ 2>/dev/null || true
           echo "Files copied to dist/aitool:"
-          ls dist/aitool/
+          ls -R dist/aitool/
       - uses: actions/upload-pages-artifact@v3
         with: { path: ./dist }
   deploy:
