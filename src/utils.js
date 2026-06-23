@@ -2,7 +2,7 @@ export const SUPA_URL = "https://hogksepvfxzhxyqllkxv.supabase.co/rest/v1/";
 export const SUPA_KEY = "sb_publishable_hvyjuTVE11__0IHZGHi_DQ_GylrEYoT";
 export const getSupaHeaders=()=>({'apikey':SUPA_KEY,'Authorization':`Bearer ${SUPA_KEY}`,'Content-Type':'application/json'});
 
-export const fetchSupabaseDB=async()=>{try{const r=await fetch(`${SUPA_URL}cms_store?id=eq.1&select=data&t=${Date.now()}`,{headers:{...getSupaHeaders(),'Cache-Control':'no-store','Pragma':'no-cache'},cache:'no-store'});if(r.ok){const res=await r.json();if(!res||res.length===0){console.warn("Supabase: bảng cms_store trống hoặc không có row id=1");return null;}return res[0]?.data||null;}const errBody=await r.text().catch(()=>'');console.error(`Supabase lỗi HTTP ${r.status}:`,errBody);}catch(e){console.error("Lỗi fetch DB:",e.message);}return null;};
+export const fetchSupabaseDB=async()=>{try{const r=await fetch(`${SUPA_URL}cms_store?id=eq.1&select=data`,{headers:{...getSupaHeaders(),'Cache-Control':'no-store','Pragma':'no-cache'},cache:'no-store'});if(r.ok){const res=await r.json();if(!res||res.length===0){console.warn("Supabase: bảng cms_store trống hoặc không có row id=1");return null;}return res[0]?.data||null;}const errBody=await r.text().catch(()=>'');console.error(`Supabase lỗi HTTP ${r.status}:`,errBody);}catch(e){console.error("Lỗi fetch DB:",e.message);}return null;};
 export const updateSupabaseDB=async(d)=>{try{// Đính kèm _encToken đã cache từ localStorage để không bị mất khi sync
   const cachedEnc=localStorage.getItem('_enc_token_cache');const encToken=cachedEnc?JSON.parse(cachedEnc):null;const payload=encToken?{...d,_encToken:encToken}:d;const r=await fetch(`${SUPA_URL}cms_store?id=eq.1`,{method:'PATCH',headers:getSupaHeaders(),body:JSON.stringify({data:payload})});if(!r.ok){throw new Error(await r.text());}return true;}catch(e){console.error("Lỗi update DB:",e);return false;}};
 export const encodeBase64UTF8Async=s=>new Promise(r=>{const rd=new FileReader();rd.onload=()=>r(rd.result.split(',')[1]);rd.readAsDataURL(new Blob([s]));});
@@ -15,10 +15,10 @@ export const encryptToken=async(token,pin)=>{try{const key=await deriveKey(pin);
 export const decryptToken=async(data,pin)=>{try{if(!data?.iv||!data?.ct)return null;const key=await deriveKey(pin);const dec=await crypto.subtle.decrypt({name:'AES-GCM',iv:new Uint8Array(b642buf(data.iv))},key,b642buf(data.ct));return new TextDecoder().decode(dec);}catch(e){console.error('Decrypt error:',e);return null;}};
 
 // Lưu/đọc _encToken bên trong data JSON của row id=1
-export const fetchTokenFromCloud=async()=>{try{const r=await fetch(`${SUPA_URL}cms_store?id=eq.1&select=data&t=${Date.now()}`,{headers:{...getSupaHeaders(),'Cache-Control':'no-store'},cache:'no-store'});if(r.ok){const res=await r.json();const d=res[0]?.data;return d?._encToken||null;}}catch(e){console.error('Fetch token error:',e);}return null;};
+export const fetchTokenFromCloud=async()=>{try{const r=await fetch(`${SUPA_URL}cms_store?id=eq.1&select=data`,{headers:{...getSupaHeaders(),'Cache-Control':'no-store'},cache:'no-store'});if(r.ok){const res=await r.json();const d=res[0]?.data;return d?._encToken||null;}}catch(e){console.error('Fetch token error:',e);}return null;};
 export const saveTokenToCloud=async(token,pin)=>{try{const enc=await encryptToken(token,pin);if(!enc)return false;
   // Đọc data hiện tại để merge, tránh mất dữ liệu
-  const r0=await fetch(`${SUPA_URL}cms_store?id=eq.1&select=data&t=${Date.now()}`,{headers:getSupaHeaders()});
+  const r0=await fetch(`${SUPA_URL}cms_store?id=eq.1&select=data`,{headers:getSupaHeaders()});
   const existing=(r0.ok?(await r0.json()):[])[0]?.data||{};
   const merged={...existing,_encToken:enc};
   const r=await fetch(`${SUPA_URL}cms_store?id=eq.1`,{method:'PATCH',headers:getSupaHeaders(),body:JSON.stringify({data:merged})});
