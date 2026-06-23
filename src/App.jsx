@@ -71,7 +71,8 @@ function useCMS() {
     const cDb = cDbRaw ? (({ _encToken, ...rest }) => rest)(cDbRaw) : null;
     const lStr = localStorage.getItem('cms_repo_data'); const lDb = lStr ? JSON.parse(lStr) : null;
     if (!cDb && !lDb) { setStatus({ text: '⚠️ Không kết nối được Cloud DB. Kiểm tra mạng!', type: 'error' }); setTimeout(() => setStatus({ text: '', type: '' }), 5000); setIsSyncing(false); return; }
-    const finalDb = mergeDBs({ ...(lDb || {files:[]}), _updatedAt: Date.now() }, cDb || {files:[]});
+    // Nếu chỉ có một bên (ví dụ client mới chỉ có cloud), ta dùng chính nó thay vì merge
+    const finalDb = (lDb && cDb) ? mergeDBs({ ...lDb, _updatedAt: Date.now() }, cDb) : (lDb || cDb || {files:[]});
     saveLocalDb(finalDb);
     if (!title && !content && !editorOriginal.sha) { const cx = getLastContextFromDB(finalDb); setRepo(cx.repo); setTags(cx.tags); }
     setStatus({ text: `Đã Gộp & Đồng bộ: ${finalDb.files.length} bài!`, type: 'success' }); setTimeout(() => setStatus({ text: '', type: '' }), 3000);
