@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && mkdir -p dist/aitool && cp kira.html nova.html leo.html plan.html video.html landing.html reel12.html dist/aitool/ 2>/dev/null || true && cp -r aitool/* dist/aitool/ 2>/dev/null || true",
     "preview": "vite preview"
   },
   "dependencies": {
