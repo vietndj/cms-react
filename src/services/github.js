@@ -1,10 +1,4 @@
-// src/utils/github.js
-export const safeEnc = (fn) => {
-  try {
-    fn = decodeURIComponent(fn);
-  } catch (e) {}
-  return encodeURIComponent(fn);
-};
+import { safeEnc } from "../utils/helpers";
 
 export const encodeBase64UTF8Async = async (str) => {
   const bytes = new TextEncoder().encode(str);

@@ -1,181 +1,862 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { username, SECRET_PIN, safeEnc, encodeBase64UTF8Async, getContrastYIQ, fetchText, getFileShaSafe, getLastContextFromDB, removeAccents, getStringColor, getTimelineLabel, generateSlug, fetchSupabaseDB, updateSupabaseDB, getPreviewText, fetchTokenFromCloud, saveTokenToCloud, decryptToken } from './utils.js';
+import React, { useState } from "react";
+import { getContrastYIQ, getStringColor, getTimelineLabel } from "./utils/helpers";
+import { UI } from "./constants/theme";
+import { useCMS } from "./hooks/useCMS";
+import LoginScreen from "./components/auth/LoginScreen";
+import Header from "./components/layout/Header";
+import FilterNav from "./components/layout/FilterNav";
+import TasksSidebar from "./components/layout/TasksSidebar";
+import EditorCard from "./components/editor/EditorCard";
 
-const UI = { card: "cms-card flex flex-col relative transition border cms-border hover:border-[var(--accent)] cursor-pointer group shadow-sm bg-[var(--bg-card)] rounded-2xl overflow-hidden", input: "px-4 py-3 bg-[var(--bg-hover)] rounded-xl text-sm font-bold outline-none text-[var(--text-main)] border cms-border focus:border-[var(--accent)] transition w-full", btnTool: "px-3 py-2 rounded-xl text-xs font-bold transition text-[var(--text-main)] bg-[var(--bg-hover)] border border-transparent hover:border-[var(--border)] flex items-center gap-1", btnSave: "bg-[var(--accent)] text-white px-8 py-3 rounded-xl font-bold shadow-lg hover:scale-105 transition disabled:opacity-50", tagBase: "text-[9px] px-2 py-0.5 rounded uppercase font-bold tracking-tight border border-[var(--border)]", iconBtn: "p-1.5 opacity-60 hover:opacity-100 bg-[var(--bg-hover)] hover:bg-[var(--border)] rounded transition" };
-
-
-
-function useCMS() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false), [pin, setPin] = useState(''), [token, setToken] = useState(''), [db, setDb] = useState({ files: [], repos: {}, tags: {}, pinned: [], links: {}, colors: {}, titles: {}, tasks: [], views: {}, deleted: [], jsonSyncInfo: "" }), [status, setStatus] = useState({ text: '', type: '' }), [isSyncing, setIsSyncing] = useState(false);
-  const [searchQuery, setSearchQuery] = useState(''), [isDeepSearch, setIsDeepSearch] = useState(false), [activeRepo, setActiveRepo] = useState('all'), [activeTag, setActiveTag] = useState('all'), [currentView, setCurrentView] = useState('grid');
-  const [isTasksOpen, setIsTasksOpen] = useState(false), [isToolsOpen, setIsToolsOpen] = useState(false), [nativeTaskInput, setNativeTaskInput] = useState(''), [activeColorPickerCard, setActiveColorPickerCard] = useState(null);
-  const [isEditorOpen, setIsEditorOpen] = useState(false), [isSaving, setIsSaving] = useState(false), [repo, setRepo] = useState(() => localStorage.getItem('cms_last_repo') || `${username}/${username}.github.io`), [tags, setTags] = useState(() => localStorage.getItem('cms_last_tags') || '');
-  const [title, setTitle] = useState(''), [slug, setSlug] = useState(''), [isSlugEdited, setIsSlugEdited] = useState(false), [uploadLinks, setUploadLinks] = useState([]), [content, setContent] = useState(''), [editorOriginal, setEditorOriginal] = useState({ repo: '', filename: '', sha: '' });
-  const toolsMenuRef = useRef(null), editorInputRef = useRef(null), dbRef = useRef(null);
-
-  useEffect(() => { if (isEditorOpen && editorInputRef.current) setTimeout(() => editorInputRef.current.focus(), 100); }, [isEditorOpen]);
-  useEffect(() => { const h = e => { const c = navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? e.metaKey : e.ctrlKey; if (c && e.key.toLowerCase() === 'e') { e.preventDefault(); setIsEditorOpen(p => !p); } if (c && e.key.toLowerCase() === 's') { e.preventDefault(); document.getElementById('btn-save-article')?.click(); } if (c && e.key.toLowerCase() === 'k') { const t = e.target; if (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA') return; e.preventDefault(); document.getElementById('search-input-main')?.focus(); } }; window.addEventListener('keydown', h); return () => window.removeEventListener('keydown', h); }, []);
-  useEffect(() => { const h = e => { if (toolsMenuRef.current && !toolsMenuRef.current.contains(e.target)) setIsToolsOpen(false); }; document.addEventListener('mousedown', h); return () => document.removeEventListener('mousedown', h); }, []);
-  useEffect(() => { if (localStorage.getItem("cms_auth") === "granted") setIsAuthenticated(true); const t = localStorage.getItem('github_pat'); if (t) setToken(t); try { const d = JSON.parse(localStorage.getItem('cms_repo_data')); if (d && d.files) setDb(d); } catch (e) { } }, []);
-  // Fix #1: luôn fetch cloud khi đăng nhập, không chặn bởi localStorage
-  useEffect(() => { if (isAuthenticated) loadDatabase(); }, [isAuthenticated]);
-  // Fix #3: giữ dbRef luôn trỏ tới state mới nhất (tránh stale closure)
-  useEffect(() => { dbRef.current = db; }, [db]);
-  // Fix #4: Polling 30s + Page Visibility để nhận thay đổi từ browser khác
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    let tid = null;
-    const poll = async () => {
-      try {
-        const cloudDb = await fetchSupabaseDB();
-        if (!cloudDb || !dbRef.current) return;
-        const cur = dbRef.current;
-        // Chỉ cập nhật khi cloud thực sự mới hơn local
-        if ((cloudDb._updatedAt || 0) <= (cur._updatedAt || 0)) return;
-        const merged = mergeDBs(cur, cloudDb);
-        try { localStorage.setItem('cms_repo_data', JSON.stringify(merged)); } catch(e) {}
-        setDb(merged);
-      } catch(e) {}
-    };
-    // Sync ngay khi user quay lại tab
-    const onVisibility = () => { if (document.visibilityState === 'visible') poll(); };
-    tid = setInterval(poll, 30000);
-    document.addEventListener('visibilitychange', onVisibility);
-    return () => { clearInterval(tid); document.removeEventListener('visibilitychange', onVisibility); };
-  }, [isAuthenticated]);
-
-  const mergeDBs = (loc, cld) => { if (!cld) return loc; if (!loc) return cld; const m = new Map(); (cld.files || []).forEach(f => m.set(`${f.repoName}/${f.fileName}`, f)); (loc.files || []).forEach(f => { const k = `${f.repoName}/${f.fileName}`, ex = m.get(k); if (!ex || Math.max(f.lastScanned||0, f.timestamp||0) > Math.max(ex.lastScanned||0, ex.timestamp||0) || (f.preview && f.preview.length > 50 && (!ex.preview || ex.preview.length < 50))) m.set(k, f); }); const nF = Array.from(m.values()).sort((a, b) => b.timestamp - a.timestamp); const rM = {}; nF.forEach(f => { if (!rM[f.repoName]) rM[f.repoName] = []; rM[f.repoName].push(f); });     // Fix #2: Metadata — bên có _updatedAt mới hơn thắng (không luôn để local đè cloud)
-    const locTime = loc._updatedAt || 0, cldTime = cld._updatedAt || 0;
-    const newer = locTime >= cldTime ? loc : cld;
-    const older = newer === loc ? cld : loc;
-    // Views: luôn lấy max per-key (không bao giờ mất lượt đọc)
-    const mergedViews = {};
-    [older.views || {}, newer.views || {}].forEach(vs => Object.keys(vs).forEach(k => { mergedViews[k] = Math.max(mergedViews[k] || 0, vs[k] || 0); }));
-    // Tags/titles/links/colors: newer wins per-key
-    const mO = (a, b) => ({ ...b, ...a });
-    return { ...older, ...newer, files: nF, repos: rM,
-      pinned: newer.pinned || older.pinned || [],
-      deleted: Array.from(new Set([...(loc.deleted || []), ...(cld.deleted || [])])), // union: an toàn hơn intersection
-      tasks: newer.tasks || older.tasks || [],
-      tags: mO(newer.tags || {}, older.tags || {}),
-      titles: mO(newer.titles || {}, older.titles || {}),
-      links: mO(newer.links || {}, older.links || {}),
-      colors: mO(newer.colors || {}, older.colors || {}),
-      views: mergedViews,
-    };
-  };
-
-  const saveLocalDb = nd => { try { localStorage.setItem('cms_repo_data', JSON.stringify(nd)); setDb(nd); } catch (e) { setDb(nd); } };
-
-  const loadDatabase = async (forcePush = false) => { if (isSyncing) return; setIsSyncing(true); setStatus({ text: 'Đang tải DB Cloud và Hợp nhất...', type: 'loading' }); try { const cDbRaw = await fetchSupabaseDB();
-    const cDb = cDbRaw ? (({ _encToken, ...rest }) => rest)(cDbRaw) : null;
-    const lStr = localStorage.getItem('cms_repo_data'); const lDb = lStr ? JSON.parse(lStr) : null;
-    if (!cDb && !lDb) { setStatus({ text: '⚠️ Không kết nối được Cloud DB. Kiểm tra mạng!', type: 'error' }); setTimeout(() => setStatus({ text: '', type: '' }), 5000); setIsSyncing(false); return; }
-    // Nếu chỉ có một bên (ví dụ client mới chỉ có cloud), ta dùng chính nó thay vì merge
-    const finalDb = (lDb && cDb) ? mergeDBs({ ...lDb, _updatedAt: Date.now() }, cDb) : (lDb || cDb || {files:[]});
-    saveLocalDb(finalDb);
-    if (!title && !content && !editorOriginal.sha) { const cx = getLastContextFromDB(finalDb); setRepo(cx.repo); setTags(cx.tags); }
-    setStatus({ text: `Đã Gộp & Đồng bộ: ${finalDb.files.length} bài!`, type: 'success' }); setTimeout(() => setStatus({ text: '', type: '' }), 3000);
-    // Nếu Supabase đang trống (chưa có dữ liệu) hoặc có thay đổi — luôn push lên
-    const hasChanges = !cDb || cDb.files?.length !== finalDb.files?.length || (cDb._updatedAt || 0) < (finalDb._updatedAt || 0) || JSON.stringify(cDb.pinned) !== JSON.stringify(finalDb.pinned) || JSON.stringify(cDb.tasks) !== JSON.stringify(finalDb.tasks) || JSON.stringify(cDb.deleted) !== JSON.stringify(finalDb.deleted);
-    if (forcePush || hasChanges) { await updateSupabaseDB(finalDb); } } catch (e) { setStatus({ text: '⚠️ Lỗi nạp DB: ' + (e.message || 'Không xác định'), type: 'error' }); setTimeout(() => setStatus({ text: '', type: '' }), 5000); } finally { setIsSyncing(false); } };
-
-  const syncMetaAndDB = async (newState) => { setStatus({ text: 'Đang hợp nhất Cloud...', type: 'loading' }); try { // Fix #3: thêm _updatedAt để mergeDBs biết đây là write mới nhất
-    const cloudDb = await fetchSupabaseDB(); const withTs = { ...newState, _updatedAt: Date.now() }; const mergedDb = mergeDBs(withTs, cloudDb); const ok = await updateSupabaseDB(mergedDb); if (!ok) throw new Error("Cloud Reject"); saveLocalDb(mergedDb); setStatus({ text: 'Lưu Cloud thành công!', type: 'success' }); setTimeout(() => setStatus({ text: '', type: '' }), 2000); return mergedDb; } catch (e) { setStatus({ text: 'Lỗi Cloud! Chỉ lưu tạm trên máy.', type: 'error' }); alert("⛔ LỖI ĐỒNG BỘ CLOUD!\n\nMạng lag hoặc Data quá lớn khiến Supabase từ chối.\nDữ liệu hiện CHỈ LƯU TẠM trên máy này.\nHãy ấn nút 'Tải Lại & Hợp Nhất DB' để đẩy lại!"); saveLocalDb(newState); return newState; } };
-
-const processScanQueue = async (queueData) => { setIsSaving(true); let { repo: tR, files, currentIndex, isForce } = queueData; const chunk = files.slice(currentIndex, currentIndex + 3); if (chunk.length === 0) { localStorage.removeItem('cms_scan_queue'); setStatus({ text: 'Hoàn tất quét toàn bộ!', type: 'success' }); setTimeout(() => setStatus({ text: '', type: '' }), 3000); setIsSaving(false); return; } setStatus({ text: `Đang quét: ${currentIndex + 1} - ${Math.min(currentIndex + 3, files.length)} / ${files.length} bài...`, type: 'loading' }); let updates = []; for (let i = 0; i < chunk.length; i++) { const it = chunk[i]; let nm = it.path.replace('.html', '').split('/').pop(), prev = "Lỗi trích xuất..."; try { let ct = null; const encodedPath = it.path.split('/').map(encodeURIComponent).join('/'); const urlPage = `https://fedu.vn/${tR === `${username}.github.io` ? '' : tR + '/'}${encodedPath}?t=${Date.now()}`; try { const rPage = await fetch(urlPage, {cache:'no-store'}); if (rPage.ok) ct = await rPage.text(); } catch(e) {} if (!ct) { const curToken = token || localStorage.getItem('github_pat'); ct = await fetchText(`https://api.github.com/repos/${username}/${tR}/contents/${safeEnc(it.path)}?t=${Date.now()}`, curToken); } if (ct) { prev = getPreviewText(ct); const m = ct.match(/<title[^>]*>([\s\S]*?)<\/title>/i); if (m && m[1]) nm = m[1].trim(); } } catch (err) {} updates.push({ path: it.path, sha: it.sha, index: it.index, prev, nm }); } try { const cloudDb = await fetchSupabaseDB(); const localDbStr = localStorage.getItem('cms_repo_data'); let currDb = localDbStr ? JSON.parse(localDbStr) : { files: [] }; let mergedDb = mergeDBs(currDb, cloudDb); let cFiles = [...mergedDb.files]; updates.forEach(u => { const ts = Date.now() - (1000 * 60 * 60 * 24 * u.index); const idx = cFiles.findIndex(x => x.repoName === tR && x.fileName === u.path); if (idx >= 0) cFiles[idx] = { ...cFiles[idx], preview: u.prev, sha: u.sha, name: u.nm.replace(/-/g, ' '), lastScanned: Date.now() }; else cFiles.unshift({ repoName: tR, name: u.nm.replace(/-/g, ' '), fileName: u.path, sha: u.sha, url: `https://fedu.vn/${tR === 'vietndj.github.io' ? '' : tR + '/'}${u.path}`, timestamp: ts, fullDate: new Date(ts).toLocaleString('vi-VN'), preview: u.prev, lastScanned: Date.now() }); }); cFiles.sort((a, b) => b.timestamp - a.timestamp); const rm = {}; cFiles.forEach(f => { if (!rm[f.repoName]) rm[f.repoName] = []; rm[f.repoName].push(f); }); const nd = { ...mergedDb, files: cFiles, repos: rm }; saveLocalDb(nd); await updateSupabaseDB(nd); } catch (e) { console.error("Lỗi sync scan:", e); } queueData.currentIndex += 3; localStorage.setItem('cms_scan_queue', JSON.stringify(queueData)); setTimeout(() => processScanQueue(queueData), 1000); };
-
-  const syncSupabaseToGithubJSON = async () => { if (!token) return alert("Cần Token GitHub!"); setIsSaving(true); setStatus({ text: 'Đang kiểm tra JSON...', type: 'loading' }); try { const rP = `${username}.github.io`, fN = 'cms_db.json'; let oldC = 0; try { const chk = await fetch(`https://fedu.vn/${fN}?_t=${Date.now()}`, { cache: 'no-store' }); if (chk.ok) { const od = await chk.json(); oldC = od.allFiles ? od.allFiles.length : 0; } } catch (e) { } if (!window.confirm(`Sổ cái (JSON) trên GitHub đang có: ${oldC} bài.\nDB hiện tại của bạn: ${db.files.length} bài.\nBạn có muốn ghi đè để xuất bản mới không?`)) { setStatus({ text: '', type: '' }); setIsSaving(false); return; } setStatus({ text: 'Đang tiến hành xuất bản ngầm...', type: 'loading' }); const nd = { ...db, jsonSyncInfo: `${new Date().toLocaleString('vi-VN')} - ${db.files.length} bài` }; const merged = await syncMetaAndDB(nd); (async () => { try { const fC = JSON.stringify({ allFiles: merged.files, ...merged }), eC = await encodeBase64UTF8Async(fC); let cS = await getFileShaSafe(`${username}/${rP}`, fN, token); const r = await fetch(`https://api.github.com/repos/${username}/${rP}/contents/${fN}`, { method: 'PUT', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ message: `Sync Supabase DB to JSON`, content: eC, sha: cS || undefined }) }); if (!r.ok) throw new Error("Ghi thất bại"); setStatus({ text: 'Đã xuất JSON ngầm thành công!', type: 'success' }); setTimeout(() => setStatus({ text: '', type: '' }), 3000); } catch (e) { setStatus({ text: 'Lỗi xuất JSON ngầm', type: 'error' }); setTimeout(() => setStatus({ text: '', type: '' }), 3000); } })(); } catch (e) { setStatus({ text: 'Lỗi khởi tạo', type: 'error' }); setIsSaving(false); } };
-  const handleReadArticle = async (f) => { const k = `${f.repoName}/${f.fileName}`, nv = { ...(db.views || {}), [k]: ((db.views || {})[k] || 0) + 1 }, nf = db.files.map(x => (x.repoName === f.repoName && x.fileName === f.fileName) ? { ...x, lastAccessed: Date.now() } : x), nd = { ...db, views: nv, files: nf }; setDb(nd); saveLocalDb(nd); window.open(f.url, '_blank'); syncMetaAndDB(nd); };
-  const handleSaveArticle = async () => { if (!token) return alert("Cần nhập GitHub Token để xuất bản bài viết!"); if (!repo || !title || !content) return alert("Thiếu dữ liệu bài viết!"); setIsSaving(true); setStatus({ text: 'Đang xử lý & Gộp dữ liệu...', type: 'loading' }); try { let fn = slug.endsWith('.html') ? slug : slug + '.html', rn = repo.includes('/') ? repo.split('/')[1] : repo, ro = repo.includes('/') ? repo.split('/')[0] : username, fk = `${rn}/${fn}`, or = editorOriginal.repo ? (editorOriginal.repo.includes('/') ? editorOriginal.repo.split('/')[1] : editorOriginal.repo) : null; let nt = { ...db.tags }, ta = tags.split(',').map(x => x.trim()).filter(Boolean); if (ta.length) nt[fk] = ta; else delete nt[fk]; let nti = { ...db.titles }; nti[fk] = title; let nl = { ...db.links }, vl = uploadLinks.filter(l => l.title.trim() && l.url.trim()); if (vl.length) nl[fk] = vl; else delete nl[fk]; let nf = [...db.files].filter(f => !(f.repoName === rn && f.fileName === fn) && !(or && f.repoName === or && f.fileName === editorOriginal.filename)); const d = new Date(), tempSha = editorOriginal.sha || `temp_${Date.now()}`; nf.unshift({ repoName: rn, name: title, fileName: fn, sha: tempSha, url: `https://fedu.vn/${rn === `${ro}.github.io` ? '' : rn + '/'}${fn}`, timestamp: Date.now(), lastAccessed: Date.now(), fullDate: d.toLocaleString('vi-VN'), preview: getPreviewText(content) }); const rm = {}; nf.forEach(f => { if (!rm[f.repoName]) rm[f.repoName] = []; rm[f.repoName].push(f); }); const ns = { ...db, files: nf, tags: nt, titles: nti, links: nl, repos: rm }; await syncMetaAndDB(ns); localStorage.setItem('cms_last_repo', repo); localStorage.setItem('cms_last_tags', tags); const bgContent = content, bgTitle = title, bgEditor = editorOriginal; setTitle(''); setSlug(''); setContent(''); setUploadLinks([]); setIsSlugEdited(false); setEditorOriginal({ repo: '', filename: '', sha: '' }); (async () => { try { const ec = await encodeBase64UTF8Async(bgContent); let fs = await getFileShaSafe(`${ro}/${rn}`, fn, token); const rh = await fetch(`https://api.github.com/repos/${ro}/${rn}/contents/${safeEnc(fn)}`, { method: 'PUT', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ message: `Save: ${bgTitle}`, content: ec, sha: fs || undefined }) }); let realSha = tempSha; if (rh.ok) { const rd = await rh.json(); realSha = rd.content?.sha || fs; setStatus({ text: 'Đã xuất bản mã nguồn GitHub!', type: 'success' }); setTimeout(() => setStatus({ text: '', type: '' }), 3000); } if (bgEditor.filename && (or !== rn || bgEditor.filename !== fn) && bgEditor.sha) { const oo = bgEditor.repo.split('/')[0] || username; let os = await getFileShaSafe(`${oo}/${or}`, bgEditor.filename, token); if (os) await fetch(`https://api.github.com/repos/${oo}/${or}/contents/${safeEnc(bgEditor.filename)}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ message: `Xóa cũ`, sha: os }) }); } if (realSha !== tempSha) { setDb(cd => { const uF = cd.files.map(f => (f.repoName === rn && f.fileName === fn) ? { ...f, sha: realSha } : f), uD = { ...cd, files: uF }; syncMetaAndDB(uD); return uD; }); } } catch (e) { setStatus({ text: 'Lỗi đồng bộ GitHub', type: 'error' }); setTimeout(() => setStatus({ text: '', type: '' }), 3000); } })(); } catch (e) { setStatus({ text: 'Lỗi lưu', type: 'error' }); } finally { setIsSaving(false); } };
-  const handleDeleteArticle = async () => { if (!editorOriginal.sha || !editorOriginal.filename) return; if (!window.confirm("Chuyển bài viết này vào thùng rác?")) return; setIsSaving(true); setStatus({ text: 'Đang xóa & Gộp...', type: 'loading' }); try { const r = editorOriginal.repo.split('/')[1], fk = `${r}/${editorOriginal.filename}`, nd = { ...db, deleted: [...(db.deleted || []), fk] }; await syncMetaAndDB(nd); setStatus({ text: 'Đã chuyển vào thùng rác!', type: 'success' }); setTitle(''); setSlug(''); setContent(''); setTags(localStorage.getItem('cms_last_tags') || ''); setUploadLinks([]); setIsSlugEdited(false); setEditorOriginal({ repo: '', filename: '', sha: '' }); setIsEditorOpen(false); setTimeout(() => setStatus({ text: '', type: '' }), 2000); } catch (e) { setStatus({ text: 'Lỗi', type: 'error' }); } finally { setIsSaving(false); } };
-  const handleRestoreArticle = async (fk) => { const nd = { ...db, deleted: (db.deleted || []).filter(x => x !== fk) }; await syncMetaAndDB(nd); };
-  const handleHardDelete = async (f) => { if (!token) return alert("Cần Token Github để xóa!"); if (!window.confirm("XÓA VĨNH VIỄN? Không thể khôi phục!")) return; setStatus({ text: 'Đang dọn DB...', type: 'loading' }); try { const o = username, fk = `${f.repoName}/${f.fileName}`, nf = db.files.filter(x => !(x.repoName === f.repoName && x.fileName === f.fileName)), rm = {}; nf.forEach(x => { if (!rm[x.repoName]) rm[x.repoName] = []; rm[x.repoName].push(x); }); const nd = { ...db, files: nf, repos: rm, deleted: (db.deleted || []).filter(x => x !== fk) }; await syncMetaAndDB(nd); setStatus({ text: 'Đã xóa vĩnh viễn!', type: 'success' }); setTimeout(() => setStatus({ text: '', type: '' }), 2000); (async () => { try { let os = await getFileShaSafe(`${o}/${f.repoName}`, f.fileName, token); if (os) await fetch(`https://api.github.com/repos/${o}/${f.repoName}/contents/${safeEnc(f.fileName)}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ message: `Delete permanently`, sha: os }) }); } catch (e) { } })(); } catch (e) { setStatus({ text: 'Lỗi', type: 'error' }); } };
-  const editFileContent = async (rn, f, s) => { setIsEditorOpen(true); window.scrollTo({ top: 0, behavior: 'smooth' }); setStatus({ text: 'Đang nạp...', type: 'loading' }); try { const r = await fetchText(`https://api.github.com/repos/${username}/${rn}/contents/${safeEnc(f)}?t=${Date.now()}`, token); if (r) { setContent(r); const p = rn === username || rn === `${username}.github.io` ? `${username}/${username}.github.io` : `${username}/${rn}`, k = `${rn}/${f}`; setRepo(p); setTitle(db.titles[k] || f.replace('.html', '')); setSlug(f.replace('.html', '')); setIsSlugEdited(true); setTags((db.tags[k] || []).join(', ')); setUploadLinks(db.links[k] ? JSON.parse(JSON.stringify(db.links[k])) : []); setEditorOriginal({ repo: p, filename: f, sha: s }); const nf = db.files.map(x => (x.repoName === rn && x.fileName === f) ? { ...x, lastAccessed: Date.now() } : x), nd = { ...db, files: nf }; setDb(nd); saveLocalDb(nd); setStatus({ text: 'Xong!', type: 'success' }); setTimeout(() => setStatus({ text: '', type: '' }), 1000); syncMetaAndDB(nd); } } catch (e) { setStatus({ text: 'Lỗi nạp', type: 'error' }); } };
-  const togglePin = async (r, f) => { const k = `${r}/${f}`; let np = [...db.pinned]; if (np.includes(k)) np = np.filter(x => x !== k); else np.push(k); const nd = { ...db, pinned: np }; setDb(nd); saveLocalDb(nd); syncMetaAndDB(nd); };
-  const handleSetColor = async (k, c) => { const nc = { ...db.colors }; if (c) nc[k] = c; else delete nc[k]; const ns = { ...db, colors: nc }; setActiveColorPickerCard(null); syncMetaAndDB(ns); };
-  const changeTheme = t => { document.documentElement.setAttribute('data-theme', t); localStorage.setItem('cms_theme', t); setIsToolsOpen(false); };
-  const handleLogin = async () => { if (pin.trim() !== SECRET_PIN) { alert("Mã PIN sai."); return; } localStorage.setItem("cms_auth", "granted"); setIsAuthenticated(true); // Lấy token từ cloud (nằm trong data._encToken của row id=1)
-    try { const encData = await fetchTokenFromCloud(); if (encData) { const pat = await decryptToken(encData, pin.trim()); if (pat) { setToken(pat); localStorage.setItem('github_pat', pat); try{localStorage.setItem('_enc_token_cache',JSON.stringify(encData));}catch(e){} } } } catch(e) { console.error('Lỗi tải token cloud:', e); } };
-
-  const getFileTags = (r, f) => db.tags[`${r}/${f}`] || [], getFileLinks = (r, f) => db.links[`${r}/${f}`] || [];
-  const repoKeysList = useMemo(() => { const k = Object.keys(db.repos || {}); if (!k.includes(`${username}.github.io`)) k.unshift(`${username}.github.io`); return k; }, [db.repos]), allUniqueTags = useMemo(() => { const s = new Set(); Object.values(db.tags).forEach(a => a.forEach(t => s.add(t))); return Array.from(s).sort(); }, [db.tags]);
-  const processedFiles = useMemo(() => { let q = removeAccents(searchQuery); return db.files.filter(f => { const k = `${f.repoName}/${f.fileName}`; if ((db.deleted || []).includes(k)) return false; let mt = activeTag === 'all' || getFileTags(f.repoName, f.fileName).includes(activeTag), mr = activeRepo === 'all' || f.repoName === activeRepo, mq = !q || removeAccents(f.name).includes(q) || (isDeepSearch && removeAccents(f.preview).includes(q)); return mt && mr && mq; }).sort((a, b) => b.timestamp - a.timestamp); }, [db.files, activeRepo, activeTag, searchQuery, isDeepSearch, db.tags, db.deleted]);
-  const groupedFilesByRepo = useMemo(() => { const g = {}; processedFiles.filter(f => !db.pinned.includes(`${f.repoName}/${f.fileName}`)).forEach(f => { if (!g[f.repoName]) g[f.repoName] = []; g[f.repoName].push(f); }); const sg = {}; Object.keys(g).sort((a, b) => Math.max(...g[b].map(x => x.timestamp)) - Math.max(...g[a].map(x => x.timestamp))).forEach(r => { if (currentView === 'grid' && g[r].length > 10) { const s = {}; g[r].forEach(f => { const l = getTimelineLabel(f.timestamp); if (!s[l]) s[l] = []; s[l].push(f); }); sg[r] = { isSub: true, data: s }; } else sg[r] = { isSub: false, data: g[r] }; }); return sg; }, [processedFiles, currentView, db.pinned]);
-  
-const hardScrapeRepo = async () => { if (!token) return alert("Cần Token GitHub!"); let qStr = localStorage.getItem('cms_scan_queue'); if (qStr) { try { const q = JSON.parse(qStr); if (q && q.files && q.currentIndex < q.files.length) { if (window.confirm(`Phát hiện tiến trình quét kho "${q.repo}" đang dở dang (${q.currentIndex}/${q.files.length} bài).\nBạn có muốn QUÉT TIẾP KHÔNG?`)) { return processScanQueue(q); } else localStorage.removeItem('cms_scan_queue'); } else localStorage.removeItem('cms_scan_queue'); } catch (e) { localStorage.removeItem('cms_scan_queue'); } } const tR = window.prompt("Nhập tên Repo muốn quét (VD: vietndj.github.io):", "vietndj.github.io"); if (!tR) return; const isForce = window.confirm("CHẾ ĐỘ ĐỐI SOÁT THÔNG MINH:\n\n- Chọn [CANCEL] (Khuyên dùng): Đối soát cấu trúc GitHub, tự bỏ qua bài đã chuẩn và giữ nguyên bài của thiết bị khác.\n- Chọn [OK]: Ép tải lại toàn bộ từ đầu."); setIsSaving(true); setStatus({ text: `Đang đối soát danh sách file với GitHub Tree...`, type: 'loading' }); try { const r1 = await fetch(`https://api.github.com/repos/${username}/${tR}/branches/main`, { headers: { 'Authorization': `Bearer ${token}` } }); if (!r1.ok) throw new Error("Không thấy nhánh main"); const d1 = await r1.json(), r2 = await fetch(`https://api.github.com/repos/${username}/${tR}/git/trees/${d1.commit.commit.tree.sha}?recursive=1`, { headers: { 'Authorization': `Bearer ${token}` } }), d2 = await r2.json(); const htmlFiles = d2.tree.filter(i => i.type === "blob" && i.path.endsWith('.html') && !['index.html', 'tin.html', 'export.html'].includes(i.path)); if (htmlFiles.length === 0) { setStatus({ text: 'Không có HTML!', type: 'error' }); setTimeout(()=>setStatus({text:'',type:''}),3000); setIsSaving(false); return; } const cloudDb = await fetchSupabaseDB(); const lStr = localStorage.getItem('cms_repo_data'); const lDb = lStr ? JSON.parse(lStr) : { files: [] }; const latestDb = mergeDBs(lDb, cloudDb); const gitPaths = new Set(htmlFiles.map(f => f.path)); let cleanFiles = latestDb.files.filter(f => f.repoName !== tR || gitPaths.has(f.fileName)); let pending = []; for (let i = 0; i < htmlFiles.length; i++) { const f = htmlFiles[i]; if (isForce) { pending.push({ path: f.path, sha: f.sha, index: i }); continue; } const ex = cleanFiles.find(x => x.repoName === tR && x.fileName === f.path), hasValidPreview = ex && ex.preview && ex.preview.length > 50 && !ex.preview.includes('Lỗi') && !ex.preview.includes('Đang xử lý'); if (!hasValidPreview) pending.push({ path: f.path, sha: f.sha, index: i }); } const rm = {}; cleanFiles.forEach(f => { if (!rm[f.repoName]) rm[f.repoName] = []; rm[f.repoName].push(f); }); const initialDb = { ...latestDb, files: cleanFiles, repos: rm }; saveLocalDb(initialDb); if (pending.length === 0) { setStatus({ text: `Đối soát xong! Toàn bộ bài viết đã khớp cấu trúc GitHub.`, type: 'success' }); await updateSupabaseDB(initialDb); setTimeout(()=>setStatus({text:'',type:''}),3000); setIsSaving(false); return; } const qd = { repo: tR, files: pending, currentIndex: 0, isForce }; localStorage.setItem('cms_scan_queue', JSON.stringify(qd)); processScanQueue(qd); } catch (e) { setStatus({ text: 'Lỗi: ' + e.message, type: 'error' }); setTimeout(()=>setStatus({text:'',type:''}),3000); setIsSaving(false); } };
-
-  return { state: { isAuthenticated, pin, token, db, status, isSyncing, searchQuery, isDeepSearch, activeRepo, activeTag, currentView, isTasksOpen, isToolsOpen, nativeTaskInput, activeColorPickerCard, isEditorOpen, isSaving, repo, tags, title, slug, isSlugEdited, uploadLinks, content, editorOriginal, toolsMenuRef, editorInputRef }, data: { repoKeysList, allUniqueTags, processedFiles, groupedFilesByRepo, getFileTags, getFileLinks }, actions: { setIsAuthenticated, setPin, setToken, setDb, setStatus, setIsSyncing, setSearchQuery, setIsDeepSearch, setActiveRepo, setActiveTag, setCurrentView, setIsTasksOpen, setIsToolsOpen, setNativeTaskInput, setActiveColorPickerCard, setIsEditorOpen, setIsSaving, setRepo, setTags, setTitle, setSlug, setIsSlugEdited, setUploadLinks, setContent, setEditorOriginal, loadDatabase, syncMetaAndDB, handleSaveArticle, handleDeleteArticle, handleRestoreArticle, handleHardDelete, handleReadArticle, hardScrapeRepo, editFileContent, togglePin, handleSetColor, saveLocalDb, changeTheme, handleLogin, syncSupabaseToGithubJSON, processScanQueue } };
-}
 
 
 export default function App() {
-  const cms = useCMS(); const { state, actions } = cms;
-  if (!state.isAuthenticated) return <div className="flex fixed inset-0 flex-col items-center justify-center z-[99999] bg-[var(--bg-body)]"><div className="cms-card p-10 max-w-sm w-full mx-4 text-center rounded-3xl shadow-2xl border cms-border"><h2 className="text-2xl font-bold mb-6 text-[var(--text-main)]">Workspace</h2><input type="password" placeholder="••••" value={state.pin} onChange={e => actions.setPin(e.target.value)} onKeyDown={e => e.key === 'Enter' && actions.handleLogin()} className="w-full text-center text-3xl font-bold px-4 py-4 bg-[var(--bg-hover)] rounded-2xl mb-6 border cms-border outline-none tracking-widest" /><button onClick={actions.handleLogin} className="w-full py-4 bg-[var(--accent)] text-white rounded-xl font-bold hover:opacity-90">Mở Khóa</button></div></div>;
+  const cms = useCMS();
+  const { state, actions } = cms;
+  if (!state.isAuthenticated)
+    return <LoginScreen pin={state.pin} setPin={actions.setPin} handleLogin={actions.handleLogin} />;
   return (
-    <div className="flex-col w-full min-h-screen fade-in flex bg-[var(--bg-body)] pb-20" onClick={() => actions.setActiveColorPickerCard(null)}>
-      <Header cms={cms} /><FilterNav cms={cms} />
-      <div className="flex flex-col lg:flex-row gap-6 px-4 md:px-6 lg:px-8 max-w-[1600px] mx-auto items-start w-full relative mt-6"><main className="flex-1 w-full min-w-0 flex flex-col gap-8"><EditorCard cms={cms} />{state.currentView === 'trash' ? <TrashBin cms={cms} /> : <><RecentFiles cms={cms} /><StatisticsBoard cms={cms} /><MasterViews cms={cms} /></>}</main>{state.isTasksOpen && <TasksSidebar cms={cms} />}</div>
-      {state.status.text && <div className="fixed top-[80px] left-1/2 transform -translate-x-1/2 z-[9999999] pointer-events-none fade-in"><div className={`bg-[var(--bg-card)] px-6 py-3.5 rounded-full shadow-2xl flex items-center gap-3 border-2 font-bold text-sm text-[var(--text-main)] ${state.status.type === 'error' ? 'border-red-500' : state.status.type === 'loading' ? 'border-[var(--accent)]' : 'border-green-500'}`}>{state.status.type === 'loading' && <div className="animate-spin h-5 w-5 border-2 border-[var(--accent)] border-t-transparent rounded-full"></div>}<span className="whitespace-nowrap">{state.status.text}</span></div></div>}
+    <div
+      className="flex-col w-full min-h-screen fade-in flex bg-[var(--bg-body)] pb-20"
+      onClick={() => actions.setActiveColorPickerCard(null)}
+    >
+      <Header cms={cms} />
+      <FilterNav cms={cms} />
+      <div className="flex flex-col lg:flex-row gap-6 px-4 md:px-6 lg:px-8 max-w-[1600px] mx-auto items-start w-full relative mt-6">
+        <main className="flex-1 w-full min-w-0 flex flex-col gap-8">
+          <EditorCard cms={cms} />
+          {state.currentView === "trash" ? (
+            <TrashBin cms={cms} />
+          ) : (
+            <>
+              <RecentFiles cms={cms} />
+              <StatisticsBoard cms={cms} />
+              <MasterViews cms={cms} />
+            </>
+          )}
+        </main>
+        {state.isTasksOpen && <TasksSidebar cms={cms} />}
+      </div>
+      {state.status.text && (
+        <div className="fixed top-[80px] left-1/2 transform -translate-x-1/2 z-[9999999] pointer-events-none fade-in">
+          <div
+            className={`bg-[var(--bg-card)] px-6 py-3.5 rounded-full shadow-2xl flex items-center gap-3 border-2 font-bold text-sm text-[var(--text-main)] ${state.status.type === "error" ? "border-red-500" : state.status.type === "loading" ? "border-[var(--accent)]" : "border-green-500"}`}
+          >
+            {state.status.type === "loading" && (
+              <div className="animate-spin h-5 w-5 border-2 border-[var(--accent)] border-t-transparent rounded-full"></div>
+            )}
+            <span className="whitespace-nowrap">{state.status.text}</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-const Header = ({ cms: { state, actions } }) => <header className="bg-[var(--bg-card)] border-b border-[var(--border)] pt-4 pb-3 px-4 md:px-8 flex flex-col md:flex-row items-center gap-4 relative z-[200]"><h1 className="text-2xl font-bold tracking-tight text-[var(--accent)]">vietndj</h1><div className="flex-1 flex w-full items-center gap-2"><div className="flex-1 flex items-center bg-[var(--bg-hover)] rounded-xl px-4 py-2 border cms-border"><svg className="w-4 h-4 text-[var(--text-muted)]"><use href="#icon-search"></use></svg><input id="search-input-main" type="text" value={state.searchQuery} onChange={e => actions.setSearchQuery(e.target.value)} placeholder="Tìm kiếm... (Ctrl K)" className="bg-transparent border-none outline-none text-sm w-full ml-3 font-bold text-[var(--text-main)] placeholder-[var(--text-muted)]" /></div><button onClick={() => actions.setIsDeepSearch(!state.isDeepSearch)} className={`shrink-0 ${UI.btnTool} ${state.isDeepSearch ? 'bg-[var(--accent)] text-white border-transparent' : 'cms-border'}`}><svg className="w-4 h-4"><use href="#icon-search"></use></svg> Sâu</button></div><div className="flex items-center gap-2 relative" ref={state.toolsMenuRef}><button onClick={() => actions.setIsTasksOpen(!state.isTasksOpen)} className={UI.btnTool}>Việc</button><button onClick={() => actions.setIsToolsOpen(!state.isToolsOpen)} className={UI.btnTool}>Công cụ ▾</button>{state.isToolsOpen && <div className="absolute right-0 top-full mt-2 w-56 p-2 z-[100] cms-card rounded-xl shadow-2xl border cms-border fade-in"><div className="flex gap-1 px-1 mb-3"><button onClick={() => actions.changeTheme('light')} className="flex-1 py-1.5 rounded text-[11px] font-bold border cms-border hover:bg-[var(--bg-hover)]">Sáng</button><button onClick={() => actions.changeTheme('dark')} className="flex-1 py-1.5 rounded text-[11px] font-bold border cms-border hover:bg-[var(--bg-hover)]">Tối</button></div><button onClick={() => { actions.setCurrentView('trash'); actions.setIsToolsOpen(false); }} className="w-full text-left px-3 py-2 text-xs font-bold text-yellow-500 hover:bg-[var(--bg-hover)] rounded">🗑️ Mở Thùng Rác</button><hr className="my-1 border-t cms-border" /><button onClick={() => { actions.loadDatabase(true); actions.setIsToolsOpen(false); }} className="w-full text-left px-3 py-2 text-xs font-bold text-[#10B981] hover:bg-[var(--bg-hover)] rounded">🔄 Tải Lại & Hợp Nhất DB</button><button onClick={() => { actions.syncSupabaseToGithubJSON(); actions.setIsToolsOpen(false); }} className="w-full text-left px-3 py-2 text-xs font-bold text-[#8E44AD] hover:bg-[var(--bg-hover)] rounded flex flex-col items-start mt-1"><span className="flex items-center gap-1">📤 Xuất Bản DB (Sách AI)</span><span className="text-[9px] font-normal text-[var(--text-muted)] font-mono mt-1 opacity-70">Lần cuối: {state.db.jsonSyncInfo || 'Chưa từng ghi'}</span></button><button onClick={() => { actions.hardScrapeRepo(); actions.setIsToolsOpen(false); }} className="w-full text-left px-3 py-2 text-xs font-bold text-[#F59E0B] hover:bg-[var(--bg-hover)] rounded mt-1">🕵️ Quét & Cập nhật Luận điểm</button><hr className="my-1 border-t cms-border" /><button onClick={() => window.open('https://fedu.vn/export.html', '_blank')} className="w-full text-left px-3 py-2 text-xs font-bold text-[#007AFF] hover:bg-[var(--bg-hover)] rounded">🤖 Mở Sách AI</button><button onClick={() => window.open('https://fedu.vn/tin.html', '_blank')} className="w-full text-left px-3 py-2 text-xs font-bold hover:bg-[var(--bg-hover)] rounded text-[var(--text-main)] mt-1">📖 Mở Reader</button><hr className="my-1 border-t cms-border" /><button onClick={() => { localStorage.removeItem("cms_auth"); actions.setIsAuthenticated(false); }} className="w-full text-left px-3 py-2 text-xs font-bold text-red-500 hover:bg-[var(--bg-hover)] rounded">🔒 Khóa App</button></div>}</div></header>;
-const FilterNav = ({ cms: { state, data, actions } }) => <nav className="bg-[var(--bg-body)] border-b border-[var(--border)] py-2 px-4 md:px-8 sticky top-0 z-[150] flex flex-col gap-2 shadow-sm"><div className="flex items-center gap-2 overflow-x-auto scrollbar-hide"><span className="text-[9px] font-bold text-[var(--text-muted)] uppercase shrink-0 mr-2">VIEW</span><div className="flex bg-[var(--bg-hover)] p-1 rounded-lg border cms-border gap-1">{[{ id: 'grid', i: '#icon-grid', t: 'Grid' }, { id: 'kanban', i: '#icon-kanban', t: 'Kanban' }].map(v => <button key={v.id} onClick={() => actions.setCurrentView(v.id)} className={`px-3 py-1 rounded-md transition text-[11px] font-bold flex items-center gap-1.5 ${(state.currentView === v.id || (state.currentView === 'trash' && v.id === 'grid')) ? 'bg-[var(--bg-card)] text-[var(--text-main)] shadow-sm border border-[var(--border)]' : 'text-[var(--text-muted)] hover:text-[var(--text-main)] border border-transparent'}`}><svg className="w-3.5 h-3.5"><use href={v.i}></use></svg><span className="hidden md:block">{v.t}</span></button>)}</div></div><div className="flex items-center gap-2 overflow-x-auto scrollbar-hide"><span className="text-[9px] font-bold text-[var(--text-muted)] uppercase shrink-0">KHO</span>{data.repoKeysList.map(r => <button key={r} onClick={() => actions.setActiveRepo(state.activeRepo === r ? 'all' : r)} className={`shrink-0 px-2.5 py-1 text-[10px] font-bold rounded-lg transition ${state.activeRepo === r ? 'bg-[var(--accent)] text-white shadow-sm' : 'bg-[var(--bg-hover)] text-[var(--text-main)] border cms-border'}`}>{r}</button>)}</div><div className="flex items-center gap-2 overflow-x-auto scrollbar-hide"><span className="text-[9px] font-bold text-[var(--text-muted)] uppercase shrink-0">TAG</span>{data.allUniqueTags.map(t => <button key={t} onClick={() => actions.setActiveTag(state.activeTag === t ? 'all' : t)} className={`shrink-0 px-2.5 py-1 text-[10px] font-bold rounded-lg transition ${state.activeTag === t ? 'bg-[var(--accent)] text-white shadow-sm' : 'bg-[var(--bg-hover)] text-[var(--text-main)] border cms-border'}`}>{t}</button>)}</div></nav>;
 
-const EditorCard = ({ cms: { state, actions, data } }) => {
-  const [sTk, setSTk] = useState(!state.token);
-  const [tkStatus, setTkStatus] = useState('idle'); // 'idle'|'saving'|'saved'|'error'
-  const SECRET_PIN_LOCAL = "0070";
+const StatisticsBoard = ({ cms: { state, data, actions } }) => {
+  const [t, setT] = useState(1);
+  const [op, setOp] = useState(false);
+  const fs = data.processedFiles;
+  const l = useMemo(() => {
+    if (t === 1)
+      return [...fs]
+        .sort(
+          (a, b) =>
+            ((state.db.views || {})[`${b.repoName}/${b.fileName}`] || 0) -
+            ((state.db.views || {})[`${a.repoName}/${a.fileName}`] || 0),
+        )
+        .slice(0, 10);
+    if (t === 2)
+      return fs
+        .filter((f) => {
+          const v = (state.db.views || {})[`${f.repoName}/${f.fileName}`] || 0;
+          return v <= 1;
+        })
+        .slice(0, 10);
+    return [...fs].sort(() => 0.5 - Math.random()).slice(0, 10);
+  }, [fs, t, state.db.views]);
+  if (fs.length === 0) return null;
+  return (
+    <div className="mb-6 bg-[var(--bg-card)] border cms-border rounded-2xl shadow-sm p-4">
+      <h3
+        onClick={() => setOp(!op)}
+        className="font-bold text-[14px] flex items-center gap-2 cursor-pointer hover:opacity-80 text-[var(--text-main)] mb-2"
+      >
+        📊 Thống kê{" "}
+        <span className="ml-auto text-[10px] text-[var(--text-muted)]">
+          {op ? "THU GỌN ▲" : "MỞ RA ▼"}
+        </span>
+      </h3>
+      {op && (
+        <div className="animate-fade-in">
+          <div className="flex flex-wrap items-center gap-2 mb-4 border-b cms-border pb-2 pt-2">
+            {[1, 2, 3].map((x) => (
+              <button
+                key={x}
+                onClick={() => setT(x)}
+                className={`px-4 py-1.5 rounded-lg text-xs font-bold transition ${t === x ? "bg-[var(--accent)] text-white" : "bg-[var(--bg-hover)] text-[var(--text-main)] hover:bg-[var(--border)]"}`}
+              >
+                {x === 1
+                  ? "🔥 Đọc Nhiều"
+                  : x === 2
+                    ? "🧊 Cần Chăm Sóc"
+                    : "🎲 Đọc Ngẫu Nhiên"}
+              </button>
+            ))}
+          </div>
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3">
+            {l.map((f) => {
+              const k = `${f.repoName}/${f.fileName}`;
+              return (
+                <div
+                  key={f.sha}
+                  onClick={() => actions.handleReadArticle(f)}
+                  className={`${UI.card} p-3 flex flex-col gap-2 hover:bg-[var(--bg-hover)]`}
+                >
+                  <h4 className="font-bold text-xs leading-snug line-clamp-2">
+                    {f.name}
+                  </h4>
+                  <div className="text-[10px] text-[var(--text-muted)] italic line-clamp-2">
+                    {f.preview}
+                  </div>
+                  <div className="flex justify-between items-center opacity-60 mt-auto pt-1 border-t cms-border">
+                    <span className="text-[9px] font-bold uppercase">
+                      {f.repoName}
+                    </span>
+                    <span className="flex items-center gap-1 text-[10px] font-bold text-[#FF9500]">
+                      <svg className="w-3 h-3">
+                        <use href="#icon-eye"></use>
+                      </svg>{" "}
+                      {(state.db.views || {})[k] || 0}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
-  const hC = e => { const v = e.target.value; actions.setContent(v); if (!state.title.trim() && v.includes('<title>')) { const m = v.match(/<title[^>]*>([\s\S]*?)<\/title>/i); if (m && m[1]) { const x = m[1].trim(); actions.setTitle(x); if (!state.isSlugEdited) actions.setSlug(generateSlug(x, state.tags)); } } };
+const TrashBin = ({ cms: { state, actions } }) => {
+  const tFs = state.db.files.filter((f) =>
+    (state.db.deleted || []).includes(`${f.repoName}/${f.fileName}`),
+  );
+  return (
+    <div className="flex flex-col gap-6 w-full">
+      <div className="flex justify-between items-center border-b border-[var(--border)] pb-2">
+        <h3 className="font-bold text-[18px] flex items-center gap-2 text-red-500">
+          <svg className="w-5 h-5">
+            <use href="#icon-trash"></use>
+          </svg>{" "}
+          Thùng Rác ({tFs.length})
+        </h3>
+        <button
+          onClick={() => actions.setCurrentView("grid")}
+          className="text-sm font-bold text-[var(--text-muted)] hover:text-[var(--text-main)]"
+        >
+          Quay lại
+        </button>
+      </div>
+      {tFs.length === 0 ? (
+        <div className="text-center py-20 font-bold opacity-50">
+          Thùng rác trống
+        </div>
+      ) : (
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-4 w-full">
+          {tFs.map((f) => {
+            const k = `${f.repoName}/${f.fileName}`;
+            return (
+              <div
+                key={f.sha}
+                className={`${UI.card} p-4 bg-[var(--bg-hover)] opacity-80 hover:opacity-100`}
+              >
+                <div className="flex items-start gap-3 mb-2">
+                  <div className="w-8 h-8 shrink-0 rounded-lg flex items-center justify-center text-white font-bold text-sm bg-red-500">
+                    <svg className="w-4 h-4">
+                      <use href="#icon-trash"></use>
+                    </svg>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h4 className="font-bold leading-snug text-[14px] line-clamp-2">
+                      {f.name}
+                    </h4>
+                    <div className="text-[11px] text-[var(--text-muted)] mt-1 line-clamp-2 italic">
+                      {f.preview}
+                    </div>
+                  </div>
+                </div>
+                <span className="text-[10px] font-mono opacity-50 mb-3 block">
+                  {f.fullDate}
+                </span>
+                <div className="flex justify-between items-center pt-3 border-t cms-border">
+                  <button
+                    onClick={() => actions.handleRestoreArticle(k)}
+                    className="px-3 py-1.5 rounded-lg bg-green-500/10 text-green-500 font-bold text-xs hover:bg-green-500 hover:text-white transition"
+                  >
+                    Khôi phục
+                  </button>
+                  <button
+                    onClick={() => actions.handleHardDelete(f)}
+                    className="px-3 py-1.5 rounded-lg bg-red-500/10 text-red-500 font-bold text-xs hover:bg-red-500 hover:text-white transition"
+                  >
+                    Xóa vĩnh viễn
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
 
-  const handleTokenBlur = async (val) => {
-    if (!val || val.length < 10) return;
-    setTkStatus('saving');
-    const ok = await saveTokenToCloud(val, SECRET_PIN_LOCAL);
-    setTkStatus(ok ? 'saved' : 'error');
-    setTimeout(() => setTkStatus('idle'), 3000);
-  };
-
-  const tokenBadge = state.token
-    ? tkStatus === 'saving' ? { label: '⏳ Đang lưu...', cls: 'text-yellow-500 border-yellow-500/30 bg-yellow-500/10' }
-    : tkStatus === 'saved'  ? { label: '✅ Đã lưu Cloud', cls: 'text-green-500 border-green-500/30 bg-green-500/10' }
-    : tkStatus === 'error'  ? { label: '❌ Lỗi lưu Cloud', cls: 'text-red-500 border-red-500/30 bg-red-500/10' }
-    : { label: '🔑 Token sẵn sàng', cls: 'text-[var(--accent)] border-[var(--accent)]/30 bg-[var(--accent)]/10' }
-    : { label: '⚠️ Chưa có Token', cls: 'text-yellow-600 border-yellow-600/30 bg-yellow-600/10' };
-
-  const cTg = state.tags.split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
-  const aTg = data.allUniqueTags.filter(t => !cTg.includes(t.toLowerCase()));
-
-  return <section className="cms-card overflow-hidden border border-[var(--border)] shadow-sm rounded-xl"><button onClick={() => actions.setIsEditorOpen(!state.isEditorOpen)} className="w-full px-6 py-4 flex justify-between items-center bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] font-bold text-[var(--accent)] outline-none transition"><span className="flex items-center gap-2 text-base"><svg className="w-5 h-5"><use href="#icon-edit"></use></svg> Soạn thảo HTML</span><span className="flex items-center gap-3">{<span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${tokenBadge.cls}`}>{tokenBadge.label}</span>}{state.isEditorOpen ? '▲' : '▼'}</span></button>{state.isEditorOpen && <div className="p-6 flex flex-col gap-5 border-t border-[var(--border)] bg-[var(--bg-card)]"><div className="flex flex-col gap-3"><div className="flex justify-between items-start gap-2"><div className="flex flex-wrap gap-2">{data.repoKeysList.map(r => <button key={r} onClick={() => actions.setRepo(`${username}/${r}`)} className={`px-3 py-1.5 text-[10px] font-bold rounded-lg border ${state.repo === `${username}/${r}` ? 'bg-[var(--accent)] text-white border-transparent' : 'bg-[var(--bg-hover)] text-[var(--text-muted)] border-[var(--border)]'}`}>{r}</button>)}</div><button onClick={() => setSTk(!sTk)} className={`shrink-0 px-3 py-1.5 text-[10px] font-bold rounded-lg border transition ${sTk ? 'bg-[var(--accent)] text-white border-transparent' : 'bg-[var(--bg-hover)] text-[var(--text-main)] border-[var(--border)]'}`}>🔑 Token</button></div>{sTk && <div className="flex flex-col gap-2"><input type="password" value={state.token} onChange={e => { actions.setToken(e.target.value); localStorage.setItem('github_pat', e.target.value); }} onBlur={e => handleTokenBlur(e.target.value)} className={UI.input} placeholder="Dán GitHub Personal Access Token (ghp_...) — tự lưu Cloud khi rời ô..." /><p className="text-[10px] text-[var(--text-muted)] px-1">💡 Token sẽ tự động lưu lên Cloud (mã hóa). Máy mới nhập mã 0070 sẽ tự nhận token.</p></div>}</div><textarea ref={state.editorInputRef} rows="12" value={state.content} onChange={hC} className="w-full p-5 bg-[#1D1D1F] text-[#34C759] rounded-xl font-mono text-sm outline-none shadow-inner" placeholder="Dán HTML..."></textarea><div className="grid grid-cols-1 md:grid-cols-2 gap-5"><input type="text" value={state.title} onChange={e => { actions.setTitle(e.target.value); if (!state.isSlugEdited) actions.setSlug(generateSlug(e.target.value, state.tags)); }} className={UI.input} placeholder="Tiêu đề..." /><input type="text" value={state.slug} onChange={e => { actions.setSlug(e.target.value); actions.setIsSlugEdited(true); }} className={`${UI.input} font-mono text-[var(--accent)]`} placeholder="slug..." /></div><div className="flex flex-col gap-3"><input id="tags-input" type="text" value={state.tags} onChange={e => actions.setTags(e.target.value)} className={UI.input} placeholder="Nhập tags (phân cách bằng dấu phẩy)..." />{aTg.length > 0 && <div className="flex flex-wrap gap-2">{aTg.map(t => <button key={t} onClick={() => { const a = state.tags.split(',').map(x => x.trim()).filter(Boolean); a.push(t); actions.setTags(a.join(', ') + ', '); document.getElementById('tags-input').focus(); }} className="px-3 py-1.5 text-[11px] font-bold bg-[var(--bg-hover)] text-[var(--text-main)] rounded-lg border border-[var(--border)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition">+ {t}</button>)}</div>}</div><div className="flex justify-between items-center pt-4 border-t cms-border"><button id="btn-save-article" onClick={actions.handleSaveArticle} disabled={state.isSaving} className={UI.btnSave}>LƯU BÀI</button>{state.editorOriginal.sha && <div className="flex items-center gap-2"><button onClick={actions.handleDeleteArticle} disabled={state.isSaving} className="text-red-500 font-bold px-4 py-2 hover:bg-red-500/10 rounded-xl transition text-xs uppercase tracking-wider">🗑️ Xóa Bài</button><button onClick={() => { actions.setTitle(''); actions.setSlug(''); actions.setContent(''); actions.setTags(localStorage.getItem('cms_last_tags') || ''); actions.setEditorOriginal({ repo: '', filename: '', sha: '' }); actions.setIsSlugEdited(false); }} className="text-[var(--text-muted)] font-bold px-4 py-2 hover:bg-[var(--bg-hover)] rounded-xl transition text-xs uppercase tracking-wider">✕ Hủy Sửa</button></div>}</div></div>}</section>;
+const RecentFiles = ({ cms: { state, actions } }) => {
+  const r =
+    state.activeTag === "all" &&
+    state.activeRepo === "all" &&
+    !state.searchQuery
+      ? [...state.db.files]
+          .filter(
+            (f) =>
+              !(state.db.deleted || []).includes(`${f.repoName}/${f.fileName}`),
+          )
+          .sort(
+            (a, b) =>
+              Math.max(b.timestamp, b.lastAccessed || 0) -
+              Math.max(a.timestamp, a.lastAccessed || 0),
+          )
+          .slice(0, 8)
+      : [];
+  if (r.length === 0) return null;
+  return (
+    <div className="mb-2">
+      <div className="flex items-center mb-2 gap-2 ml-1">
+        <div className="w-2 h-2 bg-[var(--text-main)] rounded-full"></div>
+        <h3 className="font-bold text-[14px] text-[var(--accent)]">
+          Vừa thao tác gần đây
+        </h3>
+      </div>
+      <div className="flex overflow-x-auto gap-2 pb-2 scrollbar-hide snap-x">
+        {r.map((f) => {
+          const k = `${f.repoName}/${f.fileName}`;
+          return (
+            <div
+              key={f.sha}
+              onClick={() => actions.handleReadArticle(f)}
+              className={`${UI.card} p-2.5 min-w-[240px] max-w-[240px] snap-start flex flex-col justify-between hover:z-50 z-10 hover:z-[60]`}
+            >
+              <div className="flex justify-between items-start gap-2 mb-1">
+                <div className="relative group/title flex-1 min-w-0">
+                  <h4 className="font-bold text-[13px] leading-tight line-clamp-2 text-[var(--text-main)]">
+                    {f.name}
+                  </h4>
+                  <div className="text-[10px] text-[var(--text-muted)] line-clamp-2 italic mt-1 opacity-90">
+                    {f.preview}
+                  </div>
+                  <div className="absolute top-[-8px] left-[-8px] w-[calc(100%+40px)] p-2.5 bg-[var(--bg-card)] border cms-border rounded-xl shadow-2xl opacity-0 pointer-events-none group-hover/title:opacity-100 transition-all z-[110] font-bold text-[13px] leading-tight text-[var(--text-main)]">
+                    {f.name}
+                  </div>
+                </div>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    actions.editFileContent(f.repoName, f.fileName, f.sha);
+                  }}
+                  className="text-[#3B82F6] bg-[#3B82F6]/10 font-bold text-[9px] px-2 py-1 rounded shrink-0 transition hover:bg-[#3B82F6] hover:text-white relative z-50"
+                >
+                  Sửa
+                </button>
+              </div>
+              <div className="flex items-center gap-1.5 opacity-60 mt-auto pt-1.5 border-t cms-border">
+                <svg className="w-2.5 h-2.5">
+                  <use href="#icon-folder"></use>
+                </svg>
+                <span className="text-[9px] font-bold uppercase">
+                  {f.repoName}
+                </span>
+                <span className="flex items-center gap-0.5 text-[9px] font-bold text-[var(--accent)] ml-auto">
+                  <svg className="w-2.5 h-2.5">
+                    <use href="#icon-eye"></use>
+                  </svg>{" "}
+                  {(state.db.views || {})[k] || 0}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 };
 
 
-const StatisticsBoard = ({ cms: { state, data, actions } }) => { const [t, setT] = useState(1); const [op, setOp] = useState(false); const fs = data.processedFiles; const l = useMemo(() => { if (t === 1) return [...fs].sort((a, b) => ((state.db.views || {})[`${b.repoName}/${b.fileName}`] || 0) - ((state.db.views || {})[`${a.repoName}/${a.fileName}`] || 0)).slice(0, 10); if (t === 2) return fs.filter(f => { const v = (state.db.views || {})[`${f.repoName}/${f.fileName}`] || 0; return v <= 1; }).slice(0, 10); return [...fs].sort(() => 0.5 - Math.random()).slice(0, 10); }, [fs, t, state.db.views]); if (fs.length === 0) return null; return <div className="mb-6 bg-[var(--bg-card)] border cms-border rounded-2xl shadow-sm p-4"><h3 onClick={() => setOp(!op)} className="font-bold text-[14px] flex items-center gap-2 cursor-pointer hover:opacity-80 text-[var(--text-main)] mb-2">📊 Thống kê <span className="ml-auto text-[10px] text-[var(--text-muted)]">{op ? 'THU GỌN ▲' : 'MỞ RA ▼'}</span></h3>{op && <div className="animate-fade-in"><div className="flex flex-wrap items-center gap-2 mb-4 border-b cms-border pb-2 pt-2">{[1, 2, 3].map(x => <button key={x} onClick={() => setT(x)} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition ${t === x ? 'bg-[var(--accent)] text-white' : 'bg-[var(--bg-hover)] text-[var(--text-main)] hover:bg-[var(--border)]'}`}>{x === 1 ? '🔥 Đọc Nhiều' : x === 2 ? '🧊 Cần Chăm Sóc' : '🎲 Đọc Ngẫu Nhiên'}</button>)}</div><div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3">{l.map(f => { const k = `${f.repoName}/${f.fileName}`; return <div key={f.sha} onClick={() => actions.handleReadArticle(f)} className={`${UI.card} p-3 flex flex-col gap-2 hover:bg-[var(--bg-hover)]`}><h4 className="font-bold text-xs leading-snug line-clamp-2">{f.name}</h4><div className="text-[10px] text-[var(--text-muted)] italic line-clamp-2">{f.preview}</div><div className="flex justify-between items-center opacity-60 mt-auto pt-1 border-t cms-border"><span className="text-[9px] font-bold uppercase">{f.repoName}</span><span className="flex items-center gap-1 text-[10px] font-bold text-[#FF9500]"><svg className="w-3 h-3"><use href="#icon-eye"></use></svg> {(state.db.views || {})[k] || 0}</span></div></div> })}</div></div>}</div>; };
-
-const TrashBin = ({ cms: { state, actions } }) => { const tFs = state.db.files.filter(f => (state.db.deleted || []).includes(`${f.repoName}/${f.fileName}`)); return <div className="flex flex-col gap-6 w-full"><div className="flex justify-between items-center border-b border-[var(--border)] pb-2"><h3 className="font-bold text-[18px] flex items-center gap-2 text-red-500"><svg className="w-5 h-5"><use href="#icon-trash"></use></svg> Thùng Rác ({tFs.length})</h3><button onClick={() => actions.setCurrentView('grid')} className="text-sm font-bold text-[var(--text-muted)] hover:text-[var(--text-main)]">Quay lại</button></div>{tFs.length === 0 ? <div className="text-center py-20 font-bold opacity-50">Thùng rác trống</div> : <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-4 w-full">{tFs.map(f => { const k = `${f.repoName}/${f.fileName}`; return <div key={f.sha} className={`${UI.card} p-4 bg-[var(--bg-hover)] opacity-80 hover:opacity-100`}><div className="flex items-start gap-3 mb-2"><div className="w-8 h-8 shrink-0 rounded-lg flex items-center justify-center text-white font-bold text-sm bg-red-500"><svg className="w-4 h-4"><use href="#icon-trash"></use></svg></div><div className="flex-1 min-w-0"><h4 className="font-bold leading-snug text-[14px] line-clamp-2">{f.name}</h4><div className="text-[11px] text-[var(--text-muted)] mt-1 line-clamp-2 italic">{f.preview}</div></div></div><span className="text-[10px] font-mono opacity-50 mb-3 block">{f.fullDate}</span><div className="flex justify-between items-center pt-3 border-t cms-border"><button onClick={() => actions.handleRestoreArticle(k)} className="px-3 py-1.5 rounded-lg bg-green-500/10 text-green-500 font-bold text-xs hover:bg-green-500 hover:text-white transition">Khôi phục</button><button onClick={() => actions.handleHardDelete(f)} className="px-3 py-1.5 rounded-lg bg-red-500/10 text-red-500 font-bold text-xs hover:bg-red-500 hover:text-white transition">Xóa vĩnh viễn</button></div></div> })}</div>}</div>; };
-
-const RecentFiles = ({ cms: { state, actions } }) => { const r = (state.activeTag === 'all' && state.activeRepo === 'all' && !state.searchQuery) ? [...state.db.files].filter(f => !(state.db.deleted || []).includes(`${f.repoName}/${f.fileName}`)).sort((a, b) => Math.max(b.timestamp, b.lastAccessed || 0) - Math.max(a.timestamp, a.lastAccessed || 0)).slice(0, 8) : []; if (r.length === 0) return null; return <div className="mb-2"><div className="flex items-center mb-2 gap-2 ml-1"><div className="w-2 h-2 bg-[var(--text-main)] rounded-full"></div><h3 className="font-bold text-[14px] text-[var(--accent)]">Vừa thao tác gần đây</h3></div><div className="flex overflow-x-auto gap-2 pb-2 scrollbar-hide snap-x">{r.map(f => { const k = `${f.repoName}/${f.fileName}`; return <div key={f.sha} onClick={() => actions.handleReadArticle(f)} className={`${UI.card} p-2.5 min-w-[240px] max-w-[240px] snap-start flex flex-col justify-between hover:z-50 z-10 hover:z-[60]`}><div className="flex justify-between items-start gap-2 mb-1"><div className="relative group/title flex-1 min-w-0"><h4 className="font-bold text-[13px] leading-tight line-clamp-2 text-[var(--text-main)]">{f.name}</h4><div className="text-[10px] text-[var(--text-muted)] line-clamp-2 italic mt-1 opacity-90">{f.preview}</div><div className="absolute top-[-8px] left-[-8px] w-[calc(100%+40px)] p-2.5 bg-[var(--bg-card)] border cms-border rounded-xl shadow-2xl opacity-0 pointer-events-none group-hover/title:opacity-100 transition-all z-[110] font-bold text-[13px] leading-tight text-[var(--text-main)]">{f.name}</div></div><button onClick={e => { e.stopPropagation(); actions.editFileContent(f.repoName, f.fileName, f.sha) }} className="text-[#3B82F6] bg-[#3B82F6]/10 font-bold text-[9px] px-2 py-1 rounded shrink-0 transition hover:bg-[#3B82F6] hover:text-white relative z-50">Sửa</button></div><div className="flex items-center gap-1.5 opacity-60 mt-auto pt-1.5 border-t cms-border"><svg className="w-2.5 h-2.5"><use href="#icon-folder"></use></svg><span className="text-[9px] font-bold uppercase">{f.repoName}</span><span className="flex items-center gap-0.5 text-[9px] font-bold text-[var(--accent)] ml-auto"><svg className="w-2.5 h-2.5"><use href="#icon-eye"></use></svg> {(state.db.views || {})[k] || 0}</span></div></div> })}</div></div>; };
-
-const TasksSidebar = ({ cms: { state, actions } }) => <aside className="w-full lg:w-[320px] shrink-0 sticky top-[130px] h-[calc(100vh-150px)] fade-in"><div className="bg-[var(--bg-card)] p-5 flex flex-col h-full border border-[var(--border)] rounded-2xl shadow-sm"><div className="flex justify-between items-center mb-5"><h2 className="text-xs font-black text-[var(--accent)] uppercase tracking-widest flex items-center gap-2"><svg className="w-4 h-4"><use href="#icon-edit"></use></svg> Ghi chú</h2><button onClick={() => actions.setIsTasksOpen(false)} className="text-[var(--text-muted)] font-bold hover:text-red-500 px-2">✕</button></div><div className="flex gap-2 mb-5"><input type="text" value={state.nativeTaskInput} onChange={e => actions.setNativeTaskInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && state.nativeTaskInput) { const n = [{ id: Date.now(), title: state.nativeTaskInput, completed: false }, ...state.db.tasks]; actions.saveLocalDb({ ...state.db, tasks: n }); actions.syncMetaAndDB({ ...state.db, tasks: n }); actions.setNativeTaskInput(''); } }} className={UI.input} placeholder="Gõ rồi Enter..." /></div><div className="flex-1 overflow-y-auto space-y-2.5 pr-2">{state.db.tasks.map(t => <div key={t.id} className="p-3 flex gap-3 rounded-xl text-xs font-medium leading-relaxed bg-[var(--bg-hover)] border cms-border text-[var(--text-main)] group hover:border-[var(--accent)] transition"><input type="checkbox" checked={t.completed} onChange={() => { const n = state.db.tasks.map(x => x.id === t.id ? { ...x, completed: !x.completed } : x); actions.saveLocalDb({ ...state.db, tasks: n }); actions.syncMetaAndDB({ ...state.db, tasks: n }); }} className="mt-1 accent-[var(--accent)] w-4 h-4 cursor-pointer" /><span className={`flex-1 ${t.completed ? 'opacity-50 line-through' : ''}`}>{t.title}</span><button onClick={() => { const n = state.db.tasks.filter(x => x.id !== t.id); actions.saveLocalDb({ ...state.db, tasks: n }); actions.syncMetaAndDB({ ...state.db, tasks: n }); }} className="text-red-500 font-bold opacity-0 group-hover:opacity-100 px-2 transition">✕</button></div>)}</div></div></aside>;
-
 const MasterViews = ({ cms }) => {
-  const { state, data, actions } = cms, pFs = data.processedFiles.filter(f => state.db.pinned.includes(`${f.repoName}/${f.fileName}`));
+  const { state, data, actions } = cms,
+    pFs = data.processedFiles.filter((f) =>
+      state.db.pinned.includes(`${f.repoName}/${f.fileName}`),
+    );
   const [col, setCol] = useState({ pinned: true, rnd: false });
-  const tCol = k => setCol(p => ({ ...p, [k]: !p[k] }));
+  const tCol = (k) => setCol((p) => ({ ...p, [k]: !p[k] }));
 
-  const Acts = ({ f, k, iP, tM }) => <div className="flex items-center gap-1 opacity-60 hover:opacity-100 transition relative z-50"><button onClick={e => { e.stopPropagation(); actions.togglePin(f.repoName, f.fileName); }} className={UI.iconBtn} style={{ color: iP ? '#FF9500' : tM }}><svg className="w-3.5 h-3.5"><use href={iP ? "#icon-pin-filled" : "#icon-pin"}></use></svg></button><button onClick={e => { e.stopPropagation(); actions.setActiveColorPickerCard(state.activeColorPickerCard === k ? null : k); }} className={UI.iconBtn} style={{ color: state.activeColorPickerCard === k ? 'var(--accent)' : tM }}><svg className="w-3.5 h-3.5"><use href="#icon-palette"></use></svg></button><button onClick={e => { e.stopPropagation(); actions.editFileContent(f.repoName, f.fileName, f.sha); }} className={UI.iconBtn} style={{ color: tM }}><svg className="w-3.5 h-3.5"><use href="#icon-edit"></use></svg></button></div>;
-  const TLs = ({ tg, lk, bg, tc }) => (tg.length > 0 || lk.length > 0) ? <div className="absolute top-[calc(100%-8px)] left-0 right-0 flex flex-wrap gap-1.5 p-3 rounded-xl shadow-2xl border cms-border backdrop-blur-xl bg-[var(--bg-body)]/95 opacity-0 translate-y-[-10px] pointer-events-none group-hover:translate-y-0 group-hover:pointer-events-auto group-hover:opacity-100 transition-all duration-300 z-[99]" onClick={e => e.stopPropagation()}>{tg.map(t => <span key={t} className={UI.tagBase} style={{ backgroundColor: bg, color: tc }}>{t}</span>)}{lk.map((l, i) => <a key={i} href={l.url} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} className={`${UI.tagBase} flex items-center gap-1 hover:opacity-80`} style={{ backgroundColor: bg, color: 'var(--accent)' }}><svg className="w-2.5 h-2.5"><use href="#icon-link"></use></svg> {l.title}</a>)}</div> : null;
+  const Acts = ({ f, k, iP, tM }) => (
+    <div className="flex items-center gap-1 opacity-60 hover:opacity-100 transition relative z-50">
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          actions.togglePin(f.repoName, f.fileName);
+        }}
+        className={UI.iconBtn}
+        style={{ color: iP ? "#FF9500" : tM }}
+      >
+        <svg className="w-3.5 h-3.5">
+          <use href={iP ? "#icon-pin-filled" : "#icon-pin"}></use>
+        </svg>
+      </button>
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          actions.setActiveColorPickerCard(
+            state.activeColorPickerCard === k ? null : k,
+          );
+        }}
+        className={UI.iconBtn}
+        style={{
+          color: state.activeColorPickerCard === k ? "var(--accent)" : tM,
+        }}
+      >
+        <svg className="w-3.5 h-3.5">
+          <use href="#icon-palette"></use>
+        </svg>
+      </button>
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          actions.editFileContent(f.repoName, f.fileName, f.sha);
+        }}
+        className={UI.iconBtn}
+        style={{ color: tM }}
+      >
+        <svg className="w-3.5 h-3.5">
+          <use href="#icon-edit"></use>
+        </svg>
+      </button>
+    </div>
+  );
+  const TLs = ({ tg, lk, bg, tc }) =>
+    tg.length > 0 || lk.length > 0 ? (
+      <div
+        className="absolute top-[calc(100%-8px)] left-0 right-0 flex flex-wrap gap-1.5 p-3 rounded-xl shadow-2xl border cms-border backdrop-blur-xl bg-[var(--bg-body)]/95 opacity-0 translate-y-[-10px] pointer-events-none group-hover:translate-y-0 group-hover:pointer-events-auto group-hover:opacity-100 transition-all duration-300 z-[99]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {tg.map((t) => (
+          <span
+            key={t}
+            className={UI.tagBase}
+            style={{ backgroundColor: bg, color: tc }}
+          >
+            {t}
+          </span>
+        ))}
+        {lk.map((l, i) => (
+          <a
+            key={i}
+            href={l.url}
+            target="_blank"
+            rel="noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className={`${UI.tagBase} flex items-center gap-1 hover:opacity-80`}
+            style={{ backgroundColor: bg, color: "var(--accent)" }}
+          >
+            <svg className="w-2.5 h-2.5">
+              <use href="#icon-link"></use>
+            </svg>{" "}
+            {l.title}
+          </a>
+        ))}
+      </div>
+    ) : null;
 
-  const Grid = ({ fs }) => <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-3 w-full">{fs.map(f => { const k = `${f.repoName}/${f.fileName}`, iP = state.db.pinned.includes(k), c = state.db.colors[k] || 'var(--bg-card)', iD = c !== 'var(--bg-card)' && getContrastYIQ(c) === '#FFFFFF', tc = iD ? '#FFF' : 'var(--text-main)', tl = data.getFileTags(f.repoName, f.fileName), tgc = tl.length > 0 ? getStringColor(tl[0]) : 'var(--border)'; return <div key={f.sha} className={`${UI.card} !overflow-visible hover:z-50 p-4`} onClick={() => actions.handleReadArticle(f)} style={{ backgroundColor: c, color: tc, borderTop: c === 'var(--bg-card)' ? `3px solid ${tgc}` : '' }}><div className="flex items-start gap-3 mb-1">{c === 'var(--bg-card)' && <div className="w-8 h-8 shrink-0 rounded-lg flex items-center justify-center text-white font-bold text-sm" style={{ backgroundColor: tgc }}>{f.name.charAt(0).toUpperCase()}</div>}<div className="relative flex-1 w-full min-w-0"><h4 className="font-bold leading-snug text-[15px] line-clamp-2 peer cursor-default" title={f.name}>{f.name}</h4><div className="absolute top-[-8px] left-[-8px] w-[calc(100%+16px)] p-2.5 border cms-border rounded-xl shadow-2xl opacity-0 pointer-events-none peer-hover:opacity-100 hover:opacity-100 transition-all z-[9999] font-bold leading-snug text-[14px]" style={{ backgroundColor: c === 'var(--bg-card)' ? 'var(--bg-body)' : c, color: tc }}>{f.name}</div></div></div><div className="text-[12px] mt-2 mb-2 leading-relaxed italic opacity-80 whitespace-pre-line" style={{ color: tc }}>{f.preview}</div><TLs tg={tl} lk={data.getFileLinks(f.repoName, f.fileName)} bg={iD ? 'rgba(255,255,255,0.1)' : 'var(--bg-hover)'} tc={tc} /><div className="mt-auto pt-3 border-t cms-border flex justify-between items-center opacity-90 transition"><span className="flex items-center gap-2"><span className="text-[10px] font-mono">{f.fullDate?.split(' ')[0]}</span><span className="flex items-center gap-0.5 text-[10px] font-bold text-[var(--accent)]"><svg className="w-3 h-3"><use href="#icon-eye"></use></svg> {(state.db.views || {})[k] || 0}</span></span><Acts f={f} k={k} iP={iP} tM={iD ? 'rgba(255,255,255,0.9)' : 'var(--text-muted)'} /></div>{state.activeColorPickerCard === k && <div className="absolute bottom-10 left-1/2 -translate-x-1/2 bg-[var(--bg-body)] border cms-border p-1.5 rounded-xl shadow-xl flex gap-1 z-[100] fade-in" onClick={e => e.stopPropagation()}>{[(null), '#F2F2F7', '#FFD8BF', '#FFE58F', '#D9F7BE', '#BAE7FF', '#D6E4FF', '#EFDBFF', '#FFD6E7', '#1D1D1F'].map((x, i) => <button key={i} onClick={() => actions.handleSetColor(k, x)} className="w-6 h-6 rounded-full border hover:scale-125 transition" style={{ backgroundColor: x || 'var(--bg-card)', borderColor: x ? 'transparent' : 'var(--border)' }}></button>)}</div>}</div>; })}</div>;
+  const Grid = ({ fs }) => (
+    <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-3 w-full">
+      {fs.map((f) => {
+        const k = `${f.repoName}/${f.fileName}`,
+          iP = state.db.pinned.includes(k),
+          c = state.db.colors[k] || "var(--bg-card)",
+          iD = c !== "var(--bg-card)" && getContrastYIQ(c) === "#FFFFFF",
+          tc = iD ? "#FFF" : "var(--text-main)",
+          tl = data.getFileTags(f.repoName, f.fileName),
+          tgc = tl.length > 0 ? getStringColor(tl[0]) : "var(--border)";
+        return (
+          <div
+            key={f.sha}
+            className={`${UI.card} !overflow-visible hover:z-50 p-4`}
+            onClick={() => actions.handleReadArticle(f)}
+            style={{
+              backgroundColor: c,
+              color: tc,
+              borderTop: c === "var(--bg-card)" ? `3px solid ${tgc}` : "",
+            }}
+          >
+            <div className="flex items-start gap-3 mb-1">
+              {c === "var(--bg-card)" && (
+                <div
+                  className="w-8 h-8 shrink-0 rounded-lg flex items-center justify-center text-white font-bold text-sm"
+                  style={{ backgroundColor: tgc }}
+                >
+                  {f.name.charAt(0).toUpperCase()}
+                </div>
+              )}
+              <div className="relative flex-1 w-full min-w-0">
+                <h4
+                  className="font-bold leading-snug text-[15px] line-clamp-2 peer cursor-default"
+                  title={f.name}
+                >
+                  {f.name}
+                </h4>
+                <div
+                  className="absolute top-[-8px] left-[-8px] w-[calc(100%+16px)] p-2.5 border cms-border rounded-xl shadow-2xl opacity-0 pointer-events-none peer-hover:opacity-100 hover:opacity-100 transition-all z-[9999] font-bold leading-snug text-[14px]"
+                  style={{
+                    backgroundColor:
+                      c === "var(--bg-card)" ? "var(--bg-body)" : c,
+                    color: tc,
+                  }}
+                >
+                  {f.name}
+                </div>
+              </div>
+            </div>
+            <div
+              className="text-[12px] mt-2 mb-2 leading-relaxed italic opacity-80 whitespace-pre-line"
+              style={{ color: tc }}
+            >
+              {f.preview}
+            </div>
+            <TLs
+              tg={tl}
+              lk={data.getFileLinks(f.repoName, f.fileName)}
+              bg={iD ? "rgba(255,255,255,0.1)" : "var(--bg-hover)"}
+              tc={tc}
+            />
+            <div className="mt-auto pt-3 border-t cms-border flex justify-between items-center opacity-90 transition">
+              <span className="flex items-center gap-2">
+                <span className="text-[10px] font-mono">
+                  {f.fullDate?.split(" ")[0]}
+                </span>
+                <span className="flex items-center gap-0.5 text-[10px] font-bold text-[var(--accent)]">
+                  <svg className="w-3 h-3">
+                    <use href="#icon-eye"></use>
+                  </svg>{" "}
+                  {(state.db.views || {})[k] || 0}
+                </span>
+              </span>
+              <Acts
+                f={f}
+                k={k}
+                iP={iP}
+                tM={iD ? "rgba(255,255,255,0.9)" : "var(--text-muted)"}
+              />
+            </div>
+            {state.activeColorPickerCard === k && (
+              <div
+                className="absolute bottom-10 left-1/2 -translate-x-1/2 bg-[var(--bg-body)] border cms-border p-1.5 rounded-xl shadow-xl flex gap-1 z-[100] fade-in"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {[
+                  null,
+                  "#F2F2F7",
+                  "#FFD8BF",
+                  "#FFE58F",
+                  "#D9F7BE",
+                  "#BAE7FF",
+                  "#D6E4FF",
+                  "#EFDBFF",
+                  "#FFD6E7",
+                  "#1D1D1F",
+                ].map((x, i) => (
+                  <button
+                    key={i}
+                    onClick={() => actions.handleSetColor(k, x)}
+                    className="w-6 h-6 rounded-full border hover:scale-125 transition"
+                    style={{
+                      backgroundColor: x || "var(--bg-card)",
+                      borderColor: x ? "transparent" : "var(--border)",
+                    }}
+                  ></button>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
 
-  const Kan = () => { const randomFs = useMemo(() => [...data.processedFiles].sort(() => 0.5 - Math.random()).slice(0, 15), [data.processedFiles]); return <div className="flex overflow-x-auto gap-4 pb-4 w-full items-start kanban-scroll min-h-[70vh]">{pFs.length > 0 && <div className="w-[300px] shrink-0 bg-[#F9FAFB] dark:bg-[#121212] border cms-border rounded-xl flex flex-col max-h-[80vh]"><div onClick={() => tCol('pinned')} className="p-3 flex justify-between items-center cursor-pointer hover:bg-[var(--bg-hover)] transition rounded-t-xl border-b cms-border mb-2 bg-[var(--bg-card)]"><div className="flex items-center gap-2 min-w-0 flex-1 pr-2"><svg className="w-4 h-4 shrink-0 text-[#FF9500]"><use href="#icon-pin-filled"></use></svg><h3 className="truncate uppercase tracking-widest text-xs font-bold text-[#FF9500]" title="Đã ghim">Đã ghim</h3></div><div className="flex items-center gap-2 shrink-0"><span className="bg-[var(--bg-body)] text-[var(--text-main)] text-[10px] px-2 py-1 rounded-full border cms-border shadow-sm font-mono">{pFs.length}</span><span className="text-[10px] text-[var(--text-muted)]">{col.pinned ? '▼' : '▲'}</span></div></div>{!col.pinned && <div className="overflow-y-auto px-2 pb-2 space-y-2 kanban-scroll flex-1">{pFs.map(f => { const k = `${f.repoName}/${f.fileName}`, c = state.db.colors[k] || 'var(--bg-card)', iD = c !== 'var(--bg-card)' && getContrastYIQ(c) === '#FFFFFF', tc = iD ? '#FFF' : 'var(--text-main)'; return <div key={f.sha} className={`${UI.card} !overflow-visible hover:z-50 p-3`} onClick={() => actions.handleReadArticle(f)} style={{ backgroundColor: c, color: tc }}><div className="relative mb-1 min-w-0"><h4 className="font-bold text-[13px] leading-snug line-clamp-2 peer cursor-default" title={f.name}>{f.name}</h4><div className="absolute top-[-8px] left-[-8px] w-[calc(100%+16px)] p-2.5 border cms-border rounded-xl shadow-2xl opacity-0 pointer-events-none peer-hover:opacity-100 hover:opacity-100 transition-all z-[9999] font-bold text-[13px] leading-snug" style={{ backgroundColor: c === 'var(--bg-card)' ? 'var(--bg-body)' : c, color: tc }}>{f.name}</div></div><div className="text-[10px] mt-1 mb-2 leading-relaxed italic opacity-80 whitespace-pre-line" style={{ color: tc }}>{f.preview}</div><TLs tg={data.getFileTags(f.repoName, f.fileName)} lk={data.getFileLinks(f.repoName, f.fileName)} bg={iD ? 'rgba(255,255,255,0.1)' : 'var(--bg-hover)'} tc={tc} /><div className="flex justify-between items-center mt-2.5 pt-2 border-t cms-border opacity-90 transition"><span className="flex items-center gap-2"><span className="text-[9px] font-mono">{f.fullDate?.split(' ')[0]}</span><span className="flex items-center gap-0.5 text-[9px] font-bold text-[var(--accent)]"><svg className="w-2.5 h-2.5"><use href="#icon-eye"></use></svg> {(state.db.views || {})[k] || 0}</span></span><Acts f={f} k={k} iP={true} tM={iD ? 'rgba(255,255,255,0.8)' : 'var(--text-muted)'} /></div></div>; })}</div>}</div>}{Object.keys(data.groupedFilesByRepo).map(r => { const g = data.groupedFilesByRepo[r], fs = g.isSub ? Object.values(g.data).flat() : g.data; return <div key={r} className="w-[300px] shrink-0 bg-[#F9FAFB] dark:bg-[#121212] border cms-border rounded-xl flex flex-col max-h-[80vh]"><div onClick={() => tCol(r)} className="p-3 flex justify-between items-center cursor-pointer hover:bg-[var(--bg-hover)] transition rounded-t-xl border-b cms-border mb-2 bg-[var(--bg-card)]"><div className="flex items-center gap-2 min-w-0 flex-1 pr-2"><svg className="w-4 h-4 opacity-50 shrink-0"><use href="#icon-folder"></use></svg><h3 className="truncate uppercase tracking-widest text-xs font-bold text-[var(--text-main)]" title={r}>{r}</h3></div><div className="flex items-center gap-2 shrink-0"><span className="bg-[var(--bg-body)] text-[var(--text-main)] text-[10px] px-2 py-1 rounded-full border cms-border shadow-sm font-mono">{fs.length}</span><span className="text-[10px] text-[var(--text-muted)]">{col[r] ? '▼' : '▲'}</span></div></div>{!col[r] && <div className="overflow-y-auto px-2 pb-2 space-y-2 kanban-scroll flex-1">{fs.map(f => { const k = `${f.repoName}/${f.fileName}`, c = state.db.colors[k] || 'var(--bg-card)', iD = c !== 'var(--bg-card)' && getContrastYIQ(c) === '#FFFFFF', tc = iD ? '#FFF' : 'var(--text-main)'; return <div key={f.sha} className={`${UI.card} !overflow-visible hover:z-50 p-3`} onClick={() => actions.handleReadArticle(f)} style={{ backgroundColor: c, color: tc }}><div className="relative mb-1 min-w-0"><h4 className="font-bold text-[13px] leading-snug line-clamp-2 peer cursor-default" title={f.name}>{f.name}</h4><div className="absolute top-[-8px] left-[-8px] w-[calc(100%+16px)] p-2.5 border cms-border rounded-xl shadow-2xl opacity-0 pointer-events-none peer-hover:opacity-100 hover:opacity-100 transition-all z-[9999] font-bold text-[13px] leading-snug" style={{ backgroundColor: c === 'var(--bg-card)' ? 'var(--bg-body)' : c, color: tc }}>{f.name}</div></div><div className="text-[10px] mt-1 mb-2 leading-relaxed italic opacity-80 whitespace-pre-line" style={{ color: tc }}>{f.preview}</div><TLs tg={data.getFileTags(f.repoName, f.fileName)} lk={data.getFileLinks(f.repoName, f.fileName)} bg={iD ? 'rgba(255,255,255,0.1)' : 'var(--bg-hover)'} tc={tc} /><div className="flex justify-between items-center mt-2.5 pt-2 border-t cms-border opacity-90 transition"><span className="flex items-center gap-2"><span className="text-[9px] font-mono">{f.fullDate?.split(' ')[0]}</span><span className="flex items-center gap-0.5 text-[9px] font-bold text-[var(--accent)]"><svg className="w-2.5 h-2.5"><use href="#icon-eye"></use></svg> {(state.db.views || {})[k] || 0}</span></span><Acts f={f} k={k} iP={false} tM={iD ? 'rgba(255,255,255,0.8)' : 'var(--text-muted)'} /></div></div>; })}</div>}</div>; })}<div className="w-[300px] shrink-0 bg-[#F9FAFB] dark:bg-[#121212] border cms-border rounded-xl flex flex-col max-h-[80vh] border-dashed border-[#8E44AD]"><div onClick={() => tCol('rnd')} className="p-3 flex justify-between items-center cursor-pointer hover:bg-[var(--bg-hover)] transition rounded-t-xl border-b cms-border mb-2 bg-[var(--bg-card)]"><div className="flex items-center gap-2 min-w-0 flex-1 pr-2"><span className="text-sm">🎲</span><h3 className="truncate uppercase tracking-widest text-xs font-bold text-[#8E44AD]" title="Khám phá ngẫu nhiên">Khám phá ngẫu nhiên</h3></div><div className="flex items-center gap-2 shrink-0"><span className="bg-[var(--bg-body)] text-[var(--text-main)] text-[10px] px-2 py-1 rounded-full border cms-border shadow-sm font-mono">{randomFs.length}</span><span className="text-[10px] text-[var(--text-muted)]">{col.rnd ? '▼' : '▲'}</span></div></div>{!col.rnd && <div className="overflow-y-auto px-2 pb-2 space-y-2 kanban-scroll flex-1">{randomFs.map(f => { const k = `${f.repoName}/${f.fileName}`; return <div key={`rnd-${f.sha}`} className={`${UI.card} !overflow-visible hover:z-50 p-3`} onClick={() => actions.handleReadArticle(f)}><div className="relative mb-1 min-w-0"><h4 className="font-bold text-[13px] leading-snug line-clamp-2 peer cursor-default" title={f.name}>{f.name}</h4><div className="absolute top-[-8px] left-[-8px] w-[calc(100%+16px)] p-2.5 border cms-border rounded-xl shadow-2xl opacity-0 pointer-events-none peer-hover:opacity-100 hover:opacity-100 transition-all z-[9999] font-bold text-[13px] leading-snug bg-[var(--bg-body)] text-[var(--text-main)]">{f.name}</div></div><div className="text-[10px] mt-1 mb-2 leading-relaxed italic opacity-80 whitespace-pre-line text-[var(--text-muted)]">{f.preview}</div><div className="flex justify-between items-center mt-2.5 pt-2 border-t cms-border opacity-90 transition"><span className="flex items-center gap-2"><span className="text-[9px] font-mono">{f.fullDate?.split(' ')[0]}</span><span className="flex items-center gap-0.5 text-[9px] font-bold text-[var(--accent)]"><svg className="w-2.5 h-2.5"><use href="#icon-eye"></use></svg> {(state.db.views || {})[k] || 0}</span></span><Acts f={f} k={k} iP={state.db.pinned.includes(k)} tM="var(--text-muted)" /></div></div>; })}</div>}</div></div>; };
+  const Kan = () => {
+    const randomFs = useMemo(
+      () =>
+        [...data.processedFiles].sort(() => 0.5 - Math.random()).slice(0, 15),
+      [data.processedFiles],
+    );
+    return (
+      <div className="flex overflow-x-auto gap-4 pb-4 w-full items-start kanban-scroll min-h-[70vh]">
+        {pFs.length > 0 && (
+          <div className="w-[300px] shrink-0 bg-[#F9FAFB] dark:bg-[#121212] border cms-border rounded-xl flex flex-col max-h-[80vh]">
+            <div
+              onClick={() => tCol("pinned")}
+              className="p-3 flex justify-between items-center cursor-pointer hover:bg-[var(--bg-hover)] transition rounded-t-xl border-b cms-border mb-2 bg-[var(--bg-card)]"
+            >
+              <div className="flex items-center gap-2 min-w-0 flex-1 pr-2">
+                <svg className="w-4 h-4 shrink-0 text-[#FF9500]">
+                  <use href="#icon-pin-filled"></use>
+                </svg>
+                <h3
+                  className="truncate uppercase tracking-widest text-xs font-bold text-[#FF9500]"
+                  title="Đã ghim"
+                >
+                  Đã ghim
+                </h3>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="bg-[var(--bg-body)] text-[var(--text-main)] text-[10px] px-2 py-1 rounded-full border cms-border shadow-sm font-mono">
+                  {pFs.length}
+                </span>
+                <span className="text-[10px] text-[var(--text-muted)]">
+                  {col.pinned ? "▼" : "▲"}
+                </span>
+              </div>
+            </div>
+            {!col.pinned && (
+              <div className="overflow-y-auto px-2 pb-2 space-y-2 kanban-scroll flex-1">
+                {pFs.map((f) => {
+                  const k = `${f.repoName}/${f.fileName}`,
+                    c = state.db.colors[k] || "var(--bg-card)",
+                    iD =
+                      c !== "var(--bg-card)" && getContrastYIQ(c) === "#FFFFFF",
+                    tc = iD ? "#FFF" : "var(--text-main)";
+                  return (
+                    <div
+                      key={f.sha}
+                      className={`${UI.card} !overflow-visible hover:z-50 p-3`}
+                      onClick={() => actions.handleReadArticle(f)}
+                      style={{ backgroundColor: c, color: tc }}
+                    >
+                      <div className="relative mb-1 min-w-0">
+                        <h4
+                          className="font-bold text-[13px] leading-snug line-clamp-2 peer cursor-default"
+                          title={f.name}
+                        >
+                          {f.name}
+                        </h4>
+                        <div
+                          className="absolute top-[-8px] left-[-8px] w-[calc(100%+16px)] p-2.5 border cms-border rounded-xl shadow-2xl opacity-0 pointer-events-none peer-hover:opacity-100 hover:opacity-100 transition-all z-[9999] font-bold text-[13px] leading-snug"
+                          style={{
+                            backgroundColor:
+                              c === "var(--bg-card)" ? "var(--bg-body)" : c,
+                            color: tc,
+                          }}
+                        >
+                          {f.name}
+                        </div>
+                      </div>
+                      <div
+                        className="text-[10px] mt-1 mb-2 leading-relaxed italic opacity-80 whitespace-pre-line"
+                        style={{ color: tc }}
+                      >
+                        {f.preview}
+                      </div>
+                      <TLs
+                        tg={data.getFileTags(f.repoName, f.fileName)}
+                        lk={data.getFileLinks(f.repoName, f.fileName)}
+                        bg={iD ? "rgba(255,255,255,0.1)" : "var(--bg-hover)"}
+                        tc={tc}
+                      />
+                      <div className="flex justify-between items-center mt-2.5 pt-2 border-t cms-border opacity-90 transition">
+                        <span className="flex items-center gap-2">
+                          <span className="text-[9px] font-mono">
+                            {f.fullDate?.split(" ")[0]}
+                          </span>
+                          <span className="flex items-center gap-0.5 text-[9px] font-bold text-[var(--accent)]">
+                            <svg className="w-2.5 h-2.5">
+                              <use href="#icon-eye"></use>
+                            </svg>{" "}
+                            {(state.db.views || {})[k] || 0}
+                          </span>
+                        </span>
+                        <Acts
+                          f={f}
+                          k={k}
+                          iP={true}
+                          tM={
+                            iD ? "rgba(255,255,255,0.8)" : "var(--text-muted)"
+                          }
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+        {Object.keys(data.groupedFilesByRepo).map((r) => {
+          const g = data.groupedFilesByRepo[r],
+            fs = g.isSub ? Object.values(g.data).flat() : g.data;
+          return (
+            <div
+              key={r}
+              className="w-[300px] shrink-0 bg-[#F9FAFB] dark:bg-[#121212] border cms-border rounded-xl flex flex-col max-h-[80vh]"
+            >
+              <div
+                onClick={() => tCol(r)}
+                className="p-3 flex justify-between items-center cursor-pointer hover:bg-[var(--bg-hover)] transition rounded-t-xl border-b cms-border mb-2 bg-[var(--bg-card)]"
+              >
+                <div className="flex items-center gap-2 min-w-0 flex-1 pr-2">
+                  <svg className="w-4 h-4 opacity-50 shrink-0">
+                    <use href="#icon-folder"></use>
+                  </svg>
+                  <h3
+                    className="truncate uppercase tracking-widest text-xs font-bold text-[var(--text-main)]"
+                    title={r}
+                  >
+                    {r}
+                  </h3>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="bg-[var(--bg-body)] text-[var(--text-main)] text-[10px] px-2 py-1 rounded-full border cms-border shadow-sm font-mono">
+                    {fs.length}
+                  </span>
+                  <span className="text-[10px] text-[var(--text-muted)]">
+                    {col[r] ? "▼" : "▲"}
+                  </span>
+                </div>
+              </div>
+              {!col[r] && (
+                <div className="overflow-y-auto px-2 pb-2 space-y-2 kanban-scroll flex-1">
+                  {fs.map((f) => {
+                    const k = `${f.repoName}/${f.fileName}`,
+                      c = state.db.colors[k] || "var(--bg-card)",
+                      iD =
+                        c !== "var(--bg-card)" &&
+                        getContrastYIQ(c) === "#FFFFFF",
+                      tc = iD ? "#FFF" : "var(--text-main)";
+                    return (
+                      <div
+                        key={f.sha}
+                        className={`${UI.card} !overflow-visible hover:z-50 p-3`}
+                        onClick={() => actions.handleReadArticle(f)}
+                        style={{ backgroundColor: c, color: tc }}
+                      >
+                        <div className="relative mb-1 min-w-0">
+                          <h4
+                            className="font-bold text-[13px] leading-snug line-clamp-2 peer cursor-default"
+                            title={f.name}
+                          >
+                            {f.name}
+                          </h4>
+                          <div
+                            className="absolute top-[-8px] left-[-8px] w-[calc(100%+16px)] p-2.5 border cms-border rounded-xl shadow-2xl opacity-0 pointer-events-none peer-hover:opacity-100 hover:opacity-100 transition-all z-[9999] font-bold text-[13px] leading-snug"
+                            style={{
+                              backgroundColor:
+                                c === "var(--bg-card)" ? "var(--bg-body)" : c,
+                              color: tc,
+                            }}
+                          >
+                            {f.name}
+                          </div>
+                        </div>
+                        <div
+                          className="text-[10px] mt-1 mb-2 leading-relaxed italic opacity-80 whitespace-pre-line"
+                          style={{ color: tc }}
+                        >
+                          {f.preview}
+                        </div>
+                        <TLs
+                          tg={data.getFileTags(f.repoName, f.fileName)}
+                          lk={data.getFileLinks(f.repoName, f.fileName)}
+                          bg={iD ? "rgba(255,255,255,0.1)" : "var(--bg-hover)"}
+                          tc={tc}
+                        />
+                        <div className="flex justify-between items-center mt-2.5 pt-2 border-t cms-border opacity-90 transition">
+                          <span className="flex items-center gap-2">
+                            <span className="text-[9px] font-mono">
+                              {f.fullDate?.split(" ")[0]}
+                            </span>
+                            <span className="flex items-center gap-0.5 text-[9px] font-bold text-[var(--accent)]">
+                              <svg className="w-2.5 h-2.5">
+                                <use href="#icon-eye"></use>
+                              </svg>{" "}
+                              {(state.db.views || {})[k] || 0}
+                            </span>
+                          </span>
+                          <Acts
+                            f={f}
+                            k={k}
+                            iP={false}
+                            tM={
+                              iD ? "rgba(255,255,255,0.8)" : "var(--text-muted)"
+                            }
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
+        <div className="w-[300px] shrink-0 bg-[#F9FAFB] dark:bg-[#121212] border cms-border rounded-xl flex flex-col max-h-[80vh] border-dashed border-[#8E44AD]">
+          <div
+            onClick={() => tCol("rnd")}
+            className="p-3 flex justify-between items-center cursor-pointer hover:bg-[var(--bg-hover)] transition rounded-t-xl border-b cms-border mb-2 bg-[var(--bg-card)]"
+          >
+            <div className="flex items-center gap-2 min-w-0 flex-1 pr-2">
+              <span className="text-sm">🎲</span>
+              <h3
+                className="truncate uppercase tracking-widest text-xs font-bold text-[#8E44AD]"
+                title="Khám phá ngẫu nhiên"
+              >
+                Khám phá ngẫu nhiên
+              </h3>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="bg-[var(--bg-body)] text-[var(--text-main)] text-[10px] px-2 py-1 rounded-full border cms-border shadow-sm font-mono">
+                {randomFs.length}
+              </span>
+              <span className="text-[10px] text-[var(--text-muted)]">
+                {col.rnd ? "▼" : "▲"}
+              </span>
+            </div>
+          </div>
+          {!col.rnd && (
+            <div className="overflow-y-auto px-2 pb-2 space-y-2 kanban-scroll flex-1">
+              {randomFs.map((f) => {
+                const k = `${f.repoName}/${f.fileName}`;
+                return (
+                  <div
+                    key={`rnd-${f.sha}`}
+                    className={`${UI.card} !overflow-visible hover:z-50 p-3`}
+                    onClick={() => actions.handleReadArticle(f)}
+                  >
+                    <div className="relative mb-1 min-w-0">
+                      <h4
+                        className="font-bold text-[13px] leading-snug line-clamp-2 peer cursor-default"
+                        title={f.name}
+                      >
+                        {f.name}
+                      </h4>
+                      <div className="absolute top-[-8px] left-[-8px] w-[calc(100%+16px)] p-2.5 border cms-border rounded-xl shadow-2xl opacity-0 pointer-events-none peer-hover:opacity-100 hover:opacity-100 transition-all z-[9999] font-bold text-[13px] leading-snug bg-[var(--bg-body)] text-[var(--text-main)]">
+                        {f.name}
+                      </div>
+                    </div>
+                    <div className="text-[10px] mt-1 mb-2 leading-relaxed italic opacity-80 whitespace-pre-line text-[var(--text-muted)]">
+                      {f.preview}
+                    </div>
+                    <div className="flex justify-between items-center mt-2.5 pt-2 border-t cms-border opacity-90 transition">
+                      <span className="flex items-center gap-2">
+                        <span className="text-[9px] font-mono">
+                          {f.fullDate?.split(" ")[0]}
+                        </span>
+                        <span className="flex items-center gap-0.5 text-[9px] font-bold text-[var(--accent)]">
+                          <svg className="w-2.5 h-2.5">
+                            <use href="#icon-eye"></use>
+                          </svg>{" "}
+                          {(state.db.views || {})[k] || 0}
+                        </span>
+                      </span>
+                      <Acts
+                        f={f}
+                        k={k}
+                        iP={state.db.pinned.includes(k)}
+                        tM="var(--text-muted)"
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
 
-  const RenderView = ({ fs }) => { return <Grid fs={fs} />; };
+  const RenderView = ({ fs }) => {
+    return <Grid fs={fs} />;
+  };
 
-  if (data.processedFiles.length === 0) return <div className="text-center py-20 font-bold opacity-50">Trống</div>;
-  if (state.currentView === 'kanban') return <Kan />;
-  return <div className="flex flex-col gap-8 w-full">{pFs.length > 0 && <div><h3 onClick={() => tCol('pinned')} className="font-bold text-[16px] mb-3 border-b border-[var(--border)] pb-2 flex items-center gap-2 text-[#FF9500] cursor-pointer hover:opacity-80"><svg className="w-4 h-4"><use href="#icon-pin-filled"></use></svg> Đã ghim <span className="bg-[var(--bg-hover)] text-[var(--text-main)] text-[11px] px-2 py-0.5 rounded-full border cms-border shadow-sm ml-1 font-mono">{pFs.length}</span><span className="ml-auto text-[10px] text-[var(--text-muted)]">{col.pinned ? 'MỞ RA ▼' : 'THU GỌN ▲'}</span></h3>{!col.pinned && <Grid fs={pFs} />}</div>}{Object.keys(data.groupedFilesByRepo).map(r => { const fL = data.groupedFilesByRepo[r].isSub ? Object.values(data.groupedFilesByRepo[r].data).flat().length : data.groupedFilesByRepo[r].data.length; return <div key={r}><h3 onClick={() => tCol(r)} className="font-bold text-[18px] mb-3 border-b border-[var(--border)] pb-2 flex items-center gap-2 cursor-pointer hover:opacity-80"><svg className="w-5 h-5 opacity-70"><use href="#icon-folder"></use></svg> <span className="truncate">{r}</span> <span className="bg-[var(--bg-hover)] text-[var(--text-main)] text-[11px] px-2 py-0.5 rounded-full border cms-border shadow-sm ml-1 font-mono">{fL}</span><span className="ml-auto text-[10px] text-[var(--text-muted)] shrink-0">{col[r] ? 'MỞ RA ▼' : 'THU GỌN ▲'}</span></h3>{!col[r] && (data.groupedFilesByRepo[r].isSub ? <div className="flex flex-col gap-6">{Object.keys(data.groupedFilesByRepo[r].data).map(tl => <div key={tl} className="ml-3 border-l-2 border-[var(--border)] pl-4"><h4 className="font-bold text-xs text-[var(--text-muted)] mb-3">{tl}</h4><Grid fs={data.groupedFilesByRepo[r].data[tl]} /></div>)}</div> : <Grid fs={data.groupedFilesByRepo[r].data} />)}</div> })}</div>;
+  if (data.processedFiles.length === 0)
+    return <div className="text-center py-20 font-bold opacity-50">Trống</div>;
+  if (state.currentView === "kanban") return <Kan />;
+  return (
+    <div className="flex flex-col gap-8 w-full">
+      {pFs.length > 0 && (
+        <div>
+          <h3
+            onClick={() => tCol("pinned")}
+            className="font-bold text-[16px] mb-3 border-b border-[var(--border)] pb-2 flex items-center gap-2 text-[#FF9500] cursor-pointer hover:opacity-80"
+          >
+            <svg className="w-4 h-4">
+              <use href="#icon-pin-filled"></use>
+            </svg>{" "}
+            Đã ghim{" "}
+            <span className="bg-[var(--bg-hover)] text-[var(--text-main)] text-[11px] px-2 py-0.5 rounded-full border cms-border shadow-sm ml-1 font-mono">
+              {pFs.length}
+            </span>
+            <span className="ml-auto text-[10px] text-[var(--text-muted)]">
+              {col.pinned ? "MỞ RA ▼" : "THU GỌN ▲"}
+            </span>
+          </h3>
+          {!col.pinned && <Grid fs={pFs} />}
+        </div>
+      )}
+      {Object.keys(data.groupedFilesByRepo).map((r) => {
+        const fL = data.groupedFilesByRepo[r].isSub
+          ? Object.values(data.groupedFilesByRepo[r].data).flat().length
+          : data.groupedFilesByRepo[r].data.length;
+        return (
+          <div key={r}>
+            <h3
+              onClick={() => tCol(r)}
+              className="font-bold text-[18px] mb-3 border-b border-[var(--border)] pb-2 flex items-center gap-2 cursor-pointer hover:opacity-80"
+            >
+              <svg className="w-5 h-5 opacity-70">
+                <use href="#icon-folder"></use>
+              </svg>{" "}
+              <span className="truncate">{r}</span>{" "}
+              <span className="bg-[var(--bg-hover)] text-[var(--text-main)] text-[11px] px-2 py-0.5 rounded-full border cms-border shadow-sm ml-1 font-mono">
+                {fL}
+              </span>
+              <span className="ml-auto text-[10px] text-[var(--text-muted)] shrink-0">
+                {col[r] ? "MỞ RA ▼" : "THU GỌN ▲"}
+              </span>
+            </h3>
+            {!col[r] &&
+              (data.groupedFilesByRepo[r].isSub ? (
+                <div className="flex flex-col gap-6">
+                  {Object.keys(data.groupedFilesByRepo[r].data).map((tl) => (
+                    <div
+                      key={tl}
+                      className="ml-3 border-l-2 border-[var(--border)] pl-4"
+                    >
+                      <h4 className="font-bold text-xs text-[var(--text-muted)] mb-3">
+                        {tl}
+                      </h4>
+                      <Grid fs={data.groupedFilesByRepo[r].data[tl]} />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <Grid fs={data.groupedFilesByRepo[r].data} />
+              ))}
+          </div>
+        );
+      })}
+    </div>
+  );
 };
