@@ -3,33 +3,34 @@ import { USERNAME } from "../constants/config";
 import { removeAccents, getTimelineLabel } from "../utils/helpers";
 
 export function useSearch(db) {
+  const safeDb = db || {};
   const [searchQuery, setSearchQuery] = useState("");
   const [isDeepSearch, setIsDeepSearch] = useState(false);
   const [activeRepo, setActiveRepo] = useState("all");
   const [activeTag, setActiveTag] = useState("all");
   const [currentView, setCurrentView] = useState("grid");
 
-  const getFileTags = (r, f) => (db.tags || {})[`${r}/${f}`] || [];
-  const getFileLinks = (r, f) => (db.links || {})[`${r}/${f}`] || [];
+  const getFileTags = (r, f) => (safeDb.tags || {})[`${r}/${f}`] || [];
+  const getFileLinks = (r, f) => (safeDb.links || {})[`${r}/${f}`] || [];
 
   const repoKeysList = useMemo(() => {
-    const k = Object.keys(db.repos || {});
+    const k = Object.keys(safeDb.repos || {});
     if (!k.includes(`${USERNAME}.github.io`)) k.unshift(`${USERNAME}.github.io`);
     return k;
-  }, [db.repos]);
+  }, [safeDb.repos]);
 
   const allUniqueTags = useMemo(() => {
     const s = new Set();
-    Object.values(db.tags || {}).forEach((a) => a.forEach((t) => s.add(t)));
+    Object.values(safeDb.tags || {}).forEach((a) => a.forEach((t) => s.add(t)));
     return Array.from(s).sort();
-  }, [db.tags]);
+  }, [safeDb.tags]);
 
   const processedFiles = useMemo(() => {
     let q = removeAccents(searchQuery);
-    return (db.files || [])
+    return (safeDb.files || [])
       .filter((f) => {
         const k = `${f.repoName}/${f.fileName}`;
-        if ((db.deleted || []).includes(k)) return false;
+        if ((safeDb.deleted || []).includes(k)) return false;
         let mt =
             activeTag === "all" ||
             getFileTags(f.repoName, f.fileName).includes(activeTag),
@@ -41,12 +42,12 @@ export function useSearch(db) {
         return mt && mr && mq;
       })
       .sort((a, b) => b.timestamp - a.timestamp);
-  }, [db.files, activeRepo, activeTag, searchQuery, isDeepSearch, (db.tags || {}), db.deleted]);
+  }, [safeDb.files, activeRepo, activeTag, searchQuery, isDeepSearch, (safeDb.tags || {}), safeDb.deleted]);
 
   const groupedFilesByRepo = useMemo(() => {
     const g = {};
     processedFiles
-      .filter((f) => !(db.pinned || []).includes(`${f.repoName}/${f.fileName}`))
+      .filter((f) => !(safeDb.pinned || []).includes(`${f.repoName}/${f.fileName}`))
       .forEach((f) => {
         if (!g[f.repoName]) g[f.repoName] = [];
         g[f.repoName].push(f);
@@ -70,7 +71,7 @@ export function useSearch(db) {
         } else sg[r] = { isSub: false, data: g[r] };
       });
     return sg;
-  }, [processedFiles, currentView, db.pinned]);
+  }, [processedFiles, currentView, safeDb.pinned]);
 
   return {
     searchQuery, setSearchQuery,

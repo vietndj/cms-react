@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { getContrastYIQ, getStringColor, getTimelineLabel } from "./utils/helpers";
 import { UI } from "./constants/theme";
 import { useCMS } from "./hooks/useCMS";
