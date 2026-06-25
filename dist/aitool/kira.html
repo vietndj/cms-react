@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kira 1.0 — Cố vấn MVP & Content Marketing</title>
+  <meta name="description" content="Kira — Trợ lý phỏng vấn MVP & đóng gói chiến lược Content Marketing thực chiến. 4 modules, 1 Mega Prompt.">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:#0d0d0d; --surface:#181818; --s2:#222; --border:#2c2c2c;
+      --text:#e8e8e8; --muted:#777; --dim:#999;
+      --a:#a855f7; --a-dim:rgba(168,85,247,.12); --a-glow:rgba(168,85,247,.28);
+      --ubg:#1a1030; --uborder:#2d1f4a;
+      --g:#22c55e; --g-dim:rgba(34,197,94,.1);
+    }
+    html,body{height:100%}
+    body{font-family:'Inter',-apple-system,sans-serif;background:var(--bg);color:var(--text);
+      display:flex;flex-direction:column;height:100vh;overflow:hidden}
+
+    /* ── HEADER ── */
+    header{display:flex;align-items:center;justify-content:space-between;
+      padding:13px 20px;background:var(--surface);border-bottom:1px solid var(--border);
+      flex-shrink:0;z-index:50}
+    .hl{display:flex;align-items:center;gap:12px}
+    .av-w{position:relative;width:38px;height:38px}
+    .av{width:38px;height:38px;border-radius:11px;
+      background:linear-gradient(135deg,#a855f7,#7c3aed);
+      display:flex;align-items:center;justify-content:center;
+      font-size:16px;font-weight:800;color:#fff;position:relative;z-index:2;
+      box-shadow:0 0 14px rgba(168,85,247,.25)}
+    .av-ring{position:absolute;inset:-4px;border-radius:14px;
+      border:2px solid var(--a);opacity:0;transition:opacity .3s}
+    .av-ring.on{opacity:1;animation:rp 1.6s ease-in-out infinite}
+    @keyframes rp{0%,100%{box-shadow:0 0 0 0 var(--a-glow)}50%{box-shadow:0 0 0 7px transparent}}
+    .hd-title{font-size:14px;font-weight:700;display:flex;align-items:center;gap:7px}
+    .badge{font-size:9px;font-weight:700;padding:2px 7px;border-radius:999px;
+      background:var(--a-dim);color:var(--a);border:1px solid rgba(168,85,247,.3);
+      letter-spacing:.5px;text-transform:uppercase}
+    .hd-sub{font-size:11px;color:var(--dim);display:flex;align-items:center;gap:5px;margin-top:2px}
+    .dot-live{width:6px;height:6px;border-radius:50%;background:var(--g);
+      animation:blink 2.2s ease-in-out infinite}
+    @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+
+    /* Mode badge */
+    .mode-badge{display:flex;align-items:center;gap:5px;padding:4px 10px;border-radius:8px;
+      border:1px solid var(--border);background:var(--s2);
+      font-size:11px;font-weight:600;color:var(--muted);cursor:pointer;transition:all .2s}
+    .mode-badge.on{border-color:rgba(34,197,94,.3);background:var(--g-dim);color:var(--g)}
+    .mode-dot{width:6px;height:6px;border-radius:50%;background:var(--muted)}
+    .mode-badge.on .mode-dot{background:var(--g)}
+    .hr{display:flex;align-items:center;gap:8px}
+    .icon-btn{width:34px;height:34px;border-radius:9px;border:1px solid var(--border);
+      background:transparent;color:var(--muted);display:flex;align-items:center;justify-content:center;
+      cursor:pointer;font-size:13px;transition:all .2s}
+    .icon-btn:hover{background:var(--s2);color:var(--text)}
+
+    /* ── PROGRESS ── */
+    .pt{height:2px;background:var(--border);flex-shrink:0}
+    .pf{height:100%;background:linear-gradient(90deg,#a855f7,#7c3aed);
+      width:0%;transition:width .6s cubic-bezier(.4,0,.2,1)}
+
+    /* ── CHAT ── */
+    #chat{flex:1;overflow-y:auto;padding:28px 16px 0;scroll-behavior:smooth}
+    #chat::-webkit-scrollbar{width:4px}
+    #chat::-webkit-scrollbar-thumb{background:#333;border-radius:999px}
+    .cw{max-width:660px;margin:0 auto;display:flex;flex-direction:column;gap:18px;padding-bottom:20px}
+    .msg{display:flex;gap:10px;animation:rise .28s ease-out}
+    @keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    .msg.user{flex-direction:row-reverse}
+    .mav{width:30px;height:30px;border-radius:9px;display:flex;align-items:center;
+      justify-content:center;font-size:12px;flex-shrink:0;margin-top:2px}
+    .mav.kira{background:linear-gradient(135deg,#a855f7,#7c3aed);font-weight:800;color:#fff}
+    .mav.human{background:var(--s2);border:1px solid var(--border);color:var(--muted)}
+    .bubble{max-width:82%;background:var(--surface);border:1px solid var(--border);
+      border-radius:4px 16px 16px 16px;padding:12px 15px;font-size:13.5px;
+      line-height:1.72;color:var(--text)}
+    .msg.user .bubble{background:var(--ubg);border-color:var(--uborder);
+      border-radius:16px 4px 16px 16px;color:#d4b8ff}
+    .bm{font-size:10px;color:var(--muted);margin-top:7px;display:flex;align-items:center;gap:4px}
+    .qlabel{display:block;font-size:10px;font-weight:700;color:var(--a);
+      text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px}
+    .hint-text{color:var(--muted);font-size:12px;font-style:italic;
+      margin-top:7px;display:block;border-left:2px solid #333;padding-left:10px}
+    .h{color:var(--a);font-weight:600}
+    .hg{color:#4ade80;font-weight:600}
+
+    /* Typewriter cursor (purple) */
+    .cur{display:inline-block;width:2px;height:13px;background:var(--a);
+      margin-left:2px;vertical-align:middle;animation:cb .75s step-end infinite}
+    @keyframes cb{0%,100%{opacity:1}50%{opacity:0}}
+    /* Live AI stream cursor (green) */
+    .stream-cur{display:inline-block;width:2px;height:14px;background:var(--g);
+      vertical-align:middle;margin-left:1px;border-radius:1px;
+      animation:cb .55s step-end infinite}
+
+    /* ACK chip */
+    .chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;
+      color:#4ade80;background:rgba(74,222,128,.08);border:1px solid rgba(74,222,128,.18);
+      border-radius:6px;padding:2px 8px;margin-bottom:8px}
+
+    /* Thinking */
+    .tb{background:var(--surface);border:1px solid var(--border);
+      border-radius:4px 16px 16px 16px;padding:11px 14px;
+      display:flex;align-items:center;gap:9px;font-size:12px;color:var(--muted);font-style:italic}
+    .dots{display:flex;gap:4px}
+    .d{width:5px;height:5px;border-radius:50%;background:var(--a);
+      animation:db 1.4s ease-in-out infinite}
+    .d:nth-child(2){animation-delay:.16s}
+    .d:nth-child(3){animation-delay:.32s}
+    @keyframes db{0%,80%,100%{transform:scale(.65);opacity:.4}40%{transform:scale(1);opacity:1}}
+
+    /* Summary card */
+    .sc{background:rgba(168,85,247,.06);border:1px solid rgba(168,85,247,.2);
+      border-radius:12px;padding:14px 16px;margin:10px 0 4px}
+    .sct{font-size:11px;font-weight:700;color:var(--a);letter-spacing:.4px;
+      text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:6px}
+    .sr{display:flex;gap:8px;align-items:baseline;margin-bottom:5px}
+    .sk{color:var(--muted);min-width:110px;font-size:11px;flex-shrink:0}
+    .sv{color:var(--text);font-weight:500;font-size:12.5px}
+
+    /* Prompt box */
+    .pbox{background:#0a0a0a;border:1px solid var(--border);border-radius:12px;
+      padding:14px;font-family:'Courier New',monospace;font-size:11px;line-height:1.65;
+      color:#8a9ab8;max-height:280px;overflow-y:auto;white-space:pre-wrap;
+      word-break:break-word;margin-top:12px;position:relative}
+    .pbox::-webkit-scrollbar{width:4px}
+    .pbox::-webkit-scrollbar-thumb{background:#333}
+    .cpbtn{position:sticky;top:0;left:100%;display:block;width:fit-content;
+      margin-left:auto;margin-bottom:8px;padding:5px 12px;border-radius:7px;
+      background:var(--s2);border:1px solid var(--border);color:var(--dim);
+      font-size:11px;font-weight:600;cursor:pointer;transition:all .2s;
+      font-family:'Inter',sans-serif}
+    .cpbtn:hover{background:var(--a);color:#fff;border-color:var(--a)}
+
+    /* ── INPUT ── */
+    #inp-area{flex-shrink:0;padding:10px 16px 18px;
+      background:linear-gradient(to top,var(--bg) 75%,transparent)}
+    #qtags{display:flex;gap:7px;overflow-x:auto;padding-bottom:2px;margin-bottom:9px;flex-wrap:wrap}
+    #qtags::-webkit-scrollbar{display:none}
+    .qt{flex-shrink:0;padding:5px 11px;border-radius:8px;background:var(--surface);
+      border:1px solid var(--border);color:var(--dim);font-size:11.5px;cursor:pointer;
+      transition:all .18s;white-space:nowrap;font-family:'Inter',sans-serif}
+    .qt:hover{border-color:var(--a);color:var(--a);background:var(--a-dim)}
+    .irow{display:flex;align-items:center;gap:9px;background:var(--surface);
+      border:1px solid var(--border);border-radius:14px;padding:9px 9px 9px 15px;
+      transition:border-color .2s,box-shadow .2s}
+    .irow:focus-within{border-color:var(--a);box-shadow:0 0 0 3px var(--a-dim)}
+    #uin{flex:1;background:transparent;border:none;outline:none;color:var(--text);
+      font-size:13.5px;font-family:'Inter',sans-serif}
+    #uin::placeholder{color:var(--muted)}
+    #sbtn{width:36px;height:36px;border-radius:10px;background:var(--a);border:none;
+      color:#fff;font-size:13px;display:flex;align-items:center;justify-content:center;
+      cursor:pointer;transition:all .2s;flex-shrink:0}
+    #sbtn:hover:not(:disabled){background:#9333ea;transform:scale(1.06)}
+    #sbtn:disabled{opacity:.35;cursor:default;transform:none}
+
+    /* ── SETTINGS ── */
+    #sov{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:200;
+      display:flex;align-items:flex-end;justify-content:center;
+      opacity:0;pointer-events:none;transition:opacity .25s}
+    #sov.open{opacity:1;pointer-events:all}
+    .ss{background:var(--surface);border:1px solid var(--border);
+      border-radius:20px 20px 0 0;padding:22px 20px 32px;
+      width:100%;max-width:600px;
+      transform:translateY(100%);transition:transform .3s cubic-bezier(.4,0,.2,1)}
+    #sov.open .ss{transform:translateY(0)}
+    .sh{width:36px;height:3px;border-radius:999px;background:var(--border);margin:0 auto 18px}
+    .st{font-size:14px;font-weight:700;color:var(--text);margin-bottom:16px}
+    .sb{margin-bottom:13px}
+    .sl{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;
+      letter-spacing:.5px;margin-bottom:5px;display:flex;align-items:center;gap:6px}
+    .sel{width:100%;background:var(--s2);border:1px solid var(--border);
+      border-radius:10px;padding:9px 12px;color:var(--text);font-size:13px;
+      font-family:'Inter',sans-serif;outline:none;appearance:none;-webkit-appearance:none}
+    .sel:focus{border-color:var(--a)}
+    .abtn{width:100%;padding:12px;border-radius:12px;background:var(--a);border:none;
+      color:#fff;font-size:14px;font-weight:700;cursor:pointer;margin-top:4px;
+      font-family:'Inter',sans-serif;transition:background .2s}
+    .abtn:hover{background:#9333ea}
+
+    /* ── TOAST ── */
+    #toast{position:fixed;bottom:90px;left:50%;
+      transform:translateX(-50%) translateY(16px);
+      background:var(--g);color:#fff;padding:9px 18px;border-radius:12px;
+      font-size:13px;font-weight:600;opacity:0;pointer-events:none;
+      transition:all .28s;z-index:999;white-space:nowrap}
+    #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+    @media(min-width:768px){
+      #chat{padding:36px 32px 0}
+      #inp-area{padding:10px 32px 22px}
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── HEADER ── -->
+<header>
+  <div class="hl">
+    <div class="av-w">
+      <div class="av">K</div>
+      <div class="av-ring" id="av-ring"></div>
+    </div>
+    <div>
+      <div class="hd-title">Kira <span class="badge">1.0</span></div>
+      <div class="hd-sub"><span class="dot-live"></span>Cố vấn MVP & Content Marketing · Thực chiến</div>
+    </div>
+  </div>
+  <div class="hr">
+    <div class="mode-badge" id="mbadge" onclick="openS()">
+      <span class="mode-dot" id="mdot"></span>
+      <span id="mtext">Offline</span>
+    </div>
+    <button class="icon-btn" onclick="openS()" title="Cài đặt"><i class="fas fa-sliders-h"></i></button>
+  </div>
+</header>
+
+<!-- ── PROGRESS ── -->
+<div class="pt"><div class="pf" id="prog"></div></div>
+
+<!-- ── CHAT ── -->
+<div id="chat"><div class="cw" id="cw"></div></div>
+
+<!-- ── INPUT ── -->
+<div id="inp-area">
+  <div id="qtags"></div>
+  <div class="irow">
+    <input id="uin" type="text" autocomplete="off"
+      placeholder="Chọn gợi ý hoặc nhập dữ liệu của bạn..."
+      onkeydown="if(event.key==='Enter'&&!event.shiftKey)send()">
+    <button id="sbtn" onclick="send()"><i class="fas fa-arrow-up"></i></button>
+  </div>
+</div>
+
+<!-- ── SETTINGS ── -->
+<div id="sov" onclick="if(event.target===this)closeS()">
+  <div class="ss">
+    <div class="sh"></div>
+    <div class="st">⚙ Cài đặt chiến dịch MVP</div>
+
+    <div class="sb">
+      <div class="sl">Loại sản phẩm MVP</div>
+      <select class="sel" id="sf">
+        <option value="Mô hình Coaching / Đồng hành thực chiến">Coaching / Đồng hành thực chiến</option>
+        <option value="Sản phẩm số / Template / Công cụ">Sản phẩm số / Template / Công cụ</option>
+        <option value="Dịch vụ tư vấn chuyên gia / Agency">Dịch vụ tư vấn / Agency</option>
+        <option value="Sản phẩm vật lý thiết yếu ngách">Sản phẩm vật lý ngách</option>
+      </select>
+    </div>
+    <div class="sb">
+      <div class="sl">Kênh phân phối chính</div>
+      <select class="sel" id="sch">
+        <option value="TikTok/Reels (Video ngắn)">TikTok / Reels</option>
+        <option value="Facebook/Instagram (Bài viết + Story)">Facebook / Instagram</option>
+        <option value="YouTube (Video dài + SEO)">YouTube</option>
+        <option value="LinkedIn (B2B chuyên nghiệp)">LinkedIn (B2B)</option>
+      </select>
+    </div>
+    <div class="sb">
+      <div class="sl">Giọng điệu Content</div>
+      <select class="sel" id="sto">
+        <option value="Sắc bén, đanh thép, thực chiến — đi thẳng vào vấn đề">Đanh thép, thực chiến</option>
+        <option value="Đồng cảm sâu sắc, kể chuyện chân thực">Đồng cảm, kể chuyện</option>
+        <option value="Kịch tính, tạo cảm giác FOMO và khẩn cấp">Kịch tính, FOMO</option>
+      </select>
+    </div>
+    <button class="abtn" onclick="closeS()">Xác nhận</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════════════════════
+//  4 MODULES — ĐÚNG THEO KAEL
+// ══════════════════════════════════════════════════════════
+const Q = [
+  {
+    q: 'Bạn đang muốn đóng gói <span class="h">sản phẩm MVP hoặc dịch vụ cụ thể</span> nào?',
+    hint: 'Sản phẩm MVP (Minimum Viable Product) là phiên bản làm thử để đo lường. Hãy gọi tên nó ngắn gọn.',
+    h: ['Mô hình Coaching/Đồng hành thực chiến','Sản phẩm số/Template/Công cụ','Dịch vụ tư vấn chuyên gia/Agency','Sản phẩm vật lý thiết yếu ngách']
+  },
+  {
+    q: 'Khách hàng của bạn đang <span class="h">tốn tiền/thời gian nhất</span> ở công đoạn nào mà MVP này giải quyết được?',
+    hint: 'Đây là lõi Insight Marketing. Đừng nói về tính năng, hãy nói về sự chịu đựng của họ hiện tại.',
+    h: ['Quá bí ý tưởng, rào cản đứng trước camera','Chi phí vận hành và thuê ngoài quá lớn','Mua nhiều khóa học nhưng chỉ dạy lý thuyết','Dùng sản phẩm rẻ tiền nhưng mau hỏng']
+  },
+  {
+    q: 'Kẽ hở / điểm yếu chí mạng của <span class="h">các đối thủ hiện tại</span> là gì?',
+    hint: 'Tìm "Vết nứt thị trường". Đối thủ lớn thường bỏ qua điều gì? Đây sẽ là góc Content tấn công.',
+    h: ['Đối thủ bán giá quá cao, khó tiếp cận','Quy trình đối thủ quá cồng kềnh, khó dùng','Bán xong bỏ chợ, không hỗ trợ','Chỉ mạnh branding, thiếu tính thực chiến']
+  },
+  {
+    q: 'Hệ sinh thái marketing sau khi bán MVP sẽ là <span class="h">sản phẩm Upsell</span> gì?',
+    hint: 'Bán MVP chỉ là phễu mồi. Bạn định Upsell sản phẩm/dịch vụ giá cao nào ở ngay phía sau?',
+    h: ['Gói dịch vụ Done-for-you (Làm hộ trọn gói)','Thẻ thành viên Subscription hàng tháng','Chương trình cố vấn Mentor 1-1 dài hạn','Phân phối sỉ, mở đại lý bán lẻ']
+  }
+];
+
+// ACK verbs khi dùng fallback
+const ACK = ['Đã ghi nhận','Capture xong','Data đã lưu','Insight xác định','Locked in','Đã phân tích','Dữ liệu rõ','Pattern xác định'];
+
+// Thinking messages — theo từng bước
+const THK = [
+  'Đang phân tích MVP Core...',
+  'Đang khai thác Behavioral Insight...',
+  'Đang scan Market Gap & đối thủ...',
+  'Đang cấu trúc hóa Phễu Marketing...',
+  'Đang biên dịch Mega Prompt chiến lược...'
+];
+
+// Fallback reactions khi không có AI
+const FR = [
+  _ => 'MVP Core đã được ghi nhận. Toàn bộ chiến lược định vị và USP sẽ xây dựng xung quanh sản phẩm này.',
+  _ => 'Behavioral Insight đã capture. Đây là lõi cảm xúc — sẽ thành Psychological Trigger mạnh nhất trong Content.',
+  _ => 'Market Gap đã xác định. Kẽ hở này sẽ là vũ khí định vị truyền thông tấn công trực diện vào điểm mù đối thủ.',
+  _ => 'Phễu Upsell đã ghi nhận. Dòng tiền sẽ được cấu trúc hóa từ Lead Magnet → MVP → Sản phẩm cao cấp.'
+];
+
+// ══════════════════════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════════════════════
+let step=0, data={}, busy=false;
+const SK='kira_v10';
+const GEMINI_KEY='AQ.Ab8RN6J3jHsCPldwapG22me'+'SezFlOKG-UD7nGKaUh7DEczQ1bQ';
+const cw=document.getElementById('cw');
+const uin=document.getElementById('uin');
+const sbtn=document.getElementById('sbtn');
+const qtags=document.getElementById('qtags');
+const prog=document.getElementById('prog');
+const ring=document.getElementById('av-ring');
+
+// ══════════════════════════════════════════════════════════
+//  AI ENGINE — Chrome Nano → Gemini Flash → Fallback
+// ══════════════════════════════════════════════════════════
+const AI={
+  mode:'fallback', key:'',
+  GURL:'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:streamGenerateContent?alt=sse&key=',
+  GNURL:'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=',
+
+  async init(){
+    if(window.ai?.languageModel){
+      try{
+        const c=await window.ai.languageModel.capabilities();
+        if(c.available==='readily'){this.mode='nano';this.badge();return}
+      }catch(e){}
+    }
+    if(GEMINI_KEY){this.key=GEMINI_KEY;this.mode='gemini'}
+    this.badge();
+  },
+
+  badge(){
+    const mb=document.getElementById('mbadge');
+    const md=document.getElementById('mdot');
+    const mt=document.getElementById('mtext');
+    if(this.mode==='nano'){
+      mb.classList.add('on');md.style.background='var(--g)';mt.textContent='AI · On-device';
+    }else if(this.mode==='gemini'){
+      mb.classList.add('on');md.style.background='var(--g)';mt.textContent='AI · Gemini';
+    }else{
+      mb.classList.remove('on');md.style.background='var(--muted)';mt.textContent='Offline';
+    }
+  },
+
+  // Stream AI reaction vào text element
+  async stream(stepIdx, answer, el){
+    const qtext=Q[stepIdx].q.replace(/<[^>]+>/g,'');
+    const moduleNames=['MVP Lõi','Behavioral Insight','Market Gap','Phễu Upsell'];
+    const prompt=`Bạn là Kira — chuyên gia tư vấn MVP và Content Marketing thực chiến. Tiếng Việt. Không emoji. Không "cảm ơn". Không mở đầu bằng "Tôi đã ghi nhận" hay "Thú vị".
+
+Module đang xử lý: ${moduleNames[stepIdx]}
+Câu hỏi: "${qtext}"
+Câu trả lời của người dùng: "${answer}"
+
+Viết phản hồi 2-3 câu theo phong cách chuyên gia MVP & Marketing:
+- Trích dẫn trực tiếp 1-2 từ/cụm từ cốt lõi từ câu trả lời (dùng dấu "")
+- Phân tích ngắn tại sao data này quan trọng cho chiến lược đóng gói và Marketing
+- Nêu cụ thể nó sẽ xuất hiện ở bảng matrix nào và tác động chiến lược gì
+Văn phong: đanh thép, tự tin, như expert MVP đang đọc brief — không như chatbot xác nhận form.`;
+
+    try{
+      if(this.mode==='nano') return await this._nano(prompt,el);
+      if(this.mode==='gemini') return await this._gemini(prompt,el,180);
+    }catch(e){}
+    await chunk(el,FR[stepIdx]?.(answer)||'',3,16);
+  },
+
+  // Generate dynamic chips dựa trên TOÀN BỘ data đã thu thập
+  async hints(collectedData, nextIdx){
+    if(this.mode==='fallback') return null;
+    const nq=Q[nextIdx]?.q.replace(/<[^>]+>/g,'')||'';
+    const moduleNames=['MVP Lõi','Nỗi đau khách hàng','Kẽ hở đối thủ','Phễu Upsell'];
+    const contextLines=Object.entries(collectedData)
+      .map(([k,v],i)=>`- ${moduleNames[i]||k}: ${v}`)
+      .join('\n');
+    const p=`Dữ liệu MVP đã thu thập:\n${contextLines}\n\nCâu hỏi tiếp theo: "${nq}".\n3 gợi ý ví dụ ngắn (≤8 từ/cái) liên quan trực tiếp đến sản phẩm và dữ liệu trên. Trả về CHỈ JSON array. Tiếng Việt đời thường.`;
+    try{
+      if(this.mode==='nano'){
+        const s=await window.ai.languageModel.create();
+        const r=await s.prompt(p);
+        const m=r.match(/\[.*?\]/s);
+        return m?JSON.parse(m[0]):null;
+      }
+      if(this.mode==='gemini'){
+        const r=await fetch(this.GNURL+this.key,{
+          method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({contents:[{parts:[{text:p}]}],
+            generationConfig:{maxOutputTokens:100,temperature:.75}})
+        });
+        const j=await r.json();
+        const raw=j.candidates?.[0]?.content?.parts?.[0]?.text||'';
+        const m=raw.match(/\[.*?\]/s);
+        return m?JSON.parse(m[0]):null;
+      }
+    }catch(e){return null}
+  },
+
+  async _gemini(prompt,el,max=180){
+    const r=await fetch(this.GURL+this.key,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({contents:[{parts:[{text:prompt}]}],
+        generationConfig:{maxOutputTokens:max,temperature:.85}})
+    });
+    if(!r.ok) throw new Error(r.status);
+    const cur=document.createElement('span');
+    cur.className='stream-cur';
+    el.appendChild(cur);
+    const reader=r.body.getReader();
+    const dec=new TextDecoder();
+    let buf='';
+    while(true){
+      const{done,value}=await reader.read();
+      if(done) break;
+      buf+=dec.decode(value,{stream:true});
+      const lines=buf.split('\n');
+      buf=lines.pop()||'';
+      for(const ln of lines){
+        if(!ln.startsWith('data: ')||ln.includes('[DONE]')) continue;
+        try{
+          const j=JSON.parse(ln.slice(6));
+          const t=j.candidates?.[0]?.content?.parts?.[0]?.text||'';
+          if(t){el.insertBefore(document.createTextNode(t),cur);scrollB()}
+        }catch(e){}
+      }
+    }
+    cur.remove();
+  },
+
+  async _nano(prompt,el){
+    const s=await window.ai.languageModel.create({
+      systemPrompt:'Bạn là Kira, chuyên gia MVP & Content Marketing. Phản hồi ngắn, đanh thép, Tiếng Việt.'
+    });
+    const cur=document.createElement('span');
+    cur.className='stream-cur';
+    el.appendChild(cur);
+    const st=s.promptStreaming(prompt);
+    let prev=0;
+    for await(const ch of st){
+      const d=ch.slice(prev); prev=ch.length;
+      if(d){el.insertBefore(document.createTextNode(d),cur);scrollB()}
+    }
+    cur.remove();
+  }
+};
+
+// ══════════════════════════════════════════════════════════
+//  CHUNK TYPEWRITER
+// ══════════════════════════════════════════════════════════
+function chunk(el,html,n=3,ms=16){
+  return new Promise(res=>{
+    el.innerHTML='';
+    const tokens=[];
+    const re=/(<[^>]+>|&[^;]+;|[\s\S])/g;
+    let m;
+    while((m=re.exec(html))!==null) tokens.push(m[0]);
+    let i=0;
+    const CUR='<span class="cur"></span>';
+    function tick(){
+      if(i>=tokens.length){el.innerHTML=html;res();return}
+      let added=0;
+      while(i<tokens.length&&added<n){
+        i++;
+        if(!tokens[i-1].startsWith('<')) added++;
+      }
+      el.innerHTML=tokens.slice(0,i).join('')+CUR;
+      scrollB();
+      const last=tokens[i-1]||'';
+      const delay=last==='.'||last==='!'||last==='?'?120:last===','?60:ms;
+      setTimeout(tick,delay);
+    }
+    tick();
+  });
+}
+
+// ══════════════════════════════════════════════════════════
+//  MESSAGE RENDERERS
+// ══════════════════════════════════════════════════════════
+async function kiraSay(html){
+  busy=true;active(true);setIn(false);
+  const row=mkRow('kira');
+  const txt=row.querySelector('.txt');
+  cw.appendChild(row);scrollB();
+  await chunk(txt,html,3,16);
+  busy=false;active(false);
+}
+
+function userSay(text){
+  const row=mkRow('user');
+  row.querySelector('.txt').textContent=text;
+  cw.appendChild(row);scrollB();
+}
+
+function showThink(msg){
+  const id='t'+Date.now();
+  const el=document.createElement('div');
+  el.id=id;el.className='msg';
+  el.innerHTML=`<div class="mav kira"><i class="fas fa-bolt" style="font-size:11px"></i></div>
+    <div class="tb"><div class="dots"><div class="d"></div><div class="d"></div><div class="d"></div></div><span>${msg}</span></div>`;
+  cw.appendChild(el);scrollB();return id;
+}
+
+function mkRow(who){
+  const r=document.createElement('div');
+  r.className='msg'+(who==='user'?' user':'');
+  const u=who==='user';
+  r.innerHTML=`<div class="mav ${u?'human':'kira'}">${u?'<i class="fas fa-user" style="font-size:11px"></i>':'K'}</div>
+    <div class="bubble"><div class="txt"></div>
+    <div class="bm"><i class="fas fa-check-double" style="color:${u?'#555':'var(--a)'}"></i> ${now()}</div></div>`;
+  return r;
+}
+
+// ══════════════════════════════════════════════════════════
+//  FLOW
+// ══════════════════════════════════════════════════════════
+async function askQ(n){
+  const moduleLabel=['MODULE 1 — MVP LÕI','MODULE 2 — INSIGHT','MODULE 3 — ĐỐI THỦ','MODULE 4 — PHỄU MKT'];
+  await kiraSay(
+    `<span class="qlabel">${moduleLabel[n]} &nbsp;·&nbsp; ${n+1}/4</span>`+
+    Q[n].q+
+    `<span class="hint-text">${Q[n].hint}</span>`
+  );
+  tags(Q[n].h);setIn(true);uin.focus();
+}
+
+async function send(){
+  const val=uin.value.trim();
+  if(!val||busy||step>=4) return;
+  data[`q${step+1}`]=val;
+  userSay(val);uin.value='';clearTags();setIn(false);save();
+
+  const s=step; step++; setP(step,4);
+  const thinkDelay=600+Math.min(val.length*14,1600)+Math.random()*300;
+  const tid=showThink(THK[s]);
+  active(true);
+
+  // Gọi AI hints cho câu tiếp theo song song với thinkDelay
+  let dynHints=null;
+  const hintWindow=Math.max(thinkDelay,800)+800;
+  const [,hints]=await Promise.all([
+    sleep(thinkDelay),
+    (step<4&&data.q1&&AI.mode!=='fallback')
+      ? Promise.race([
+          AI.hints(data,step).catch(()=>null),
+          sleep(hintWindow).then(()=>null)
+        ])
+      : Promise.resolve(null)
+  ]);
+  dynHints=hints;
+  rm(tid);active(false);
+
+  if(step<4){
+    const row=mkRow('kira');
+    const txt=row.querySelector('.txt');
+    cw.appendChild(row);active(true);
+
+    if(AI.mode!=='fallback'){
+      try{
+        await AI.stream(s,val,txt);
+      }catch(e){
+        const chip=document.createElement('span');
+        chip.className='chip';
+        chip.innerHTML=`<i class="fas fa-check"></i> ${ACK[s%ACK.length]}`;
+        txt.appendChild(chip);
+        const sp=document.createElement('span');
+        sp.innerHTML=' '+(FR[s]?.('')||'');txt.appendChild(sp);
+      }
+    }else{
+      const chip=document.createElement('span');
+      chip.className='chip';
+      chip.innerHTML=`<i class="fas fa-check"></i> ${ACK[s%ACK.length]}`;
+      txt.appendChild(chip);
+      const sp=document.createElement('span');
+      sp.innerHTML=' '+(FR[s]?.('')||'');txt.appendChild(sp);
+    }
+    active(false);
+    await sleep(350);
+    await askQ(step);
+    tags(dynHints||Q[step].h);
+    setIn(true);uin.focus();
+  }else{
+    await genPrompt();
+  }
+}
+
+// ══════════════════════════════════════════════════════════
+//  GENERATION — Hiển thị summary + Mega Prompt
+// ══════════════════════════════════════════════════════════
+async function genPrompt(){
+  const tid=showThink(THK[4]);active(true);
+  await sleep(2000);rm(tid);active(false);
+
+  const fmt=document.getElementById('sf').value;
+  const sch=document.getElementById('sch').value;
+  const tone=document.getElementById('sto').value;
+  const prompt=buildP(fmt,sch,tone);
+
+  // Summary card
+  await kiraSay(
+    `<span class="hg"><i class="fas fa-check-circle"></i> Đóng gói hoàn tất!</span><br><br>`+
+    `<span style="color:var(--muted);font-size:12.5px">Kira đã xử lý toàn bộ 4 modules và biên dịch thành Mega Prompt chiến lược. Tóm tắt chiến dịch:</span>`+
+    `<div class="sc"><div class="sct"><i class="fas fa-layer-group"></i> Tóm tắt MVP</div>`+
+    `<div class="sr"><span class="sk">MVP Lõi</span><span class="sv">${esc(data.q1||'—')}</span></div>`+
+    `<div class="sr"><span class="sk">Nỗi đau KH</span><span class="sv">${esc((data.q2||'').slice(0,55))}</span></div>`+
+    `<div class="sr"><span class="sk">Kẽ hở đối thủ</span><span class="sv">${esc((data.q3||'').slice(0,55))}</span></div>`+
+    `<div class="sr"><span class="sk">Phễu Upsell</span><span class="sv">${esc((data.q4||'').slice(0,45))}</span></div>`+
+    `<div class="sr"><span class="sk">Kênh & Giọng</span><span class="sv">${esc(sch.split('/')[0].trim())} · ${esc(tone.split(',')[0])}</span></div></div>`
+  );
+
+  // Prompt box
+  const pid='pr'+Date.now();
+  const row=document.createElement('div');
+  row.className='msg';
+  row.innerHTML=`
+    <div class="mav kira" style="background:linear-gradient(135deg,#22c55e,#0d9488)"><i class="fas fa-code" style="font-size:11px"></i></div>
+    <div class="bubble" style="max-width:100%;border-color:#22c55e22">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Copy và paste vào <strong style="color:var(--text)">ChatGPT / Claude / Gemini</strong>:</div>
+      <div class="pbox" id="${pid}"><button class="cpbtn" onclick="copyP('${pid}')"><i class="fas fa-copy"></i> Copy</button>${esc(prompt)}</div>
+    </div>`;
+  cw.appendChild(row);
+  setP(4,4);clearTags();
+  uin.disabled=true;uin.placeholder='✓ Đóng gói hoàn tất';sbtn.disabled=true;
+  clearSess();
+
+  const rb=document.createElement('button');
+  rb.className='qt';
+  rb.innerHTML='<i class="fas fa-redo" style="margin-right:6px;font-size:10px"></i>Bắt đầu chiến dịch mới';
+  rb.onclick=()=>location.reload();
+  qtags.appendChild(rb);
+  scrollB();
+}
+
+// ══════════════════════════════════════════════════════════
+//  MEGA PROMPT BUILDER — BÁM SÁT TEMPLATE KAEL
+// ══════════════════════════════════════════════════════════
+function buildP(fmt,sch,tone){
+const d=data;
+return `Bạn là Kael, một AI chuyên gia kiến trúc dữ liệu và cố vấn đóng gói sản phẩm Marketing xuất sắc. Nhiệm vụ của bạn là tiếp nhận tập dữ liệu phỏng vấn thô về MVP của tôi để phân tích chuyên sâu, đóng gói lại và tạo ra bức tranh chiến lược kinh doanh, định vị truyền thông hoàn chỉnh.
+
+[DỮ LIỆU ĐẦU VÀO TỪ KIRA SYSTEM]:
+- Sản phẩm MVP Lõi: ${d.q1} (${fmt})
+- Nỗi đau hành vi khách hàng: ${d.q2}
+- Điểm mù của đối thủ: ${d.q3}
+- Phễu sản phẩm Upsell Marketing: ${d.q4}
+- Kênh phân phối chính: ${sch}
+- Giọng điệu Content bắt buộc: ${tone}
+
+[QUY TRÌNH EXPORT DỮ LIỆU - YÊU CẦU TUÂN THỦ 100% CẤU TRÚC SAU]:
+
+1. BƯỚC 1 - VẼ ASCII MINDMAP:
+Xuất ngay một sơ đồ tư duy bằng ký tự ASCII trực quan để mô tả hệ sinh thái sản phẩm và định vị (Sử dụng các ký tự nét liền ───, │, └───).
+
+2. BƯỚC 2 - ĐÓNG GÓI CÁC BẢNG MATRIX MARKETING (TIÊU ĐỀ IN HOA TOÀN BỘ):
+
+# BẢNG 1: ĐỊNH VỊ MVP VÀ THỊ TRƯỜNG NGÁCH
+- Phân tích bản chất giải pháp MVP và điểm độc bản (USP) để truyền thông.
+- Chỉ ra phân khúc khách hàng mục tiêu sẵn sàng xuống tiền ngay.
+
+# BẢNG 2: BẢN ĐỒ ĐỐI THỦ & CHIẾN LƯỢC TẤN CÔNG KHÔNG GIAN TRỐNG
+- Phân tích kẽ hở/lỗ hổng vận hành của đối thủ.
+- Đưa ra chiến lược định vị truyền thông đánh trực diện vào điểm yếu này để kéo traffic.
+
+# BẢNG 3: BỘ TỪ KHÓA TÂM LÝ (PSYCHOLOGICAL TRIGGERS)
+- Bóc tách nỗi sợ hãi thầm kín và rào cản mua hàng dựa trên Insight.
+- Cung cấp bộ 10 từ khóa "thôi miên" nên dùng trên Video/Landing Page để tăng tỷ lệ chuyển đổi.
+
+# BẢNG 4: HỆ SINH THÁI PHỄU MARKETING & DÒNG TIỀN
+- Cấu trúc hóa mô hình: Quà tặng (Lead Magnet) -> Sản phẩm MVP -> Sản phẩm Upsell cao cấp.
+- Giải thích tính liền mạch của dòng tiền trong phễu này.
+
+# BỘ TÀI NGUYÊN CONTENT: 5 KỊCH BẢN VIDEO NGẮN MỞ PHỄU
+- Đóng gói 5 ý tưởng định hướng nội dung video (${sch}) đánh mạnh vào nỗi đau hành vi thực tế, tích hợp CTA khéo léo để kéo khách về phễu MVP.
+- Giọng điệu bắt buộc cho toàn bộ kịch bản: ${tone}
+
+3. BƯỚC 3 - KHỞI TẠO VÒNG LẶP (LOOP):
+Sau khi xuất xong, đặt câu hỏi chính xác như sau: "Dữ liệu Marketing đã được Kael đóng gói. Bạn muốn tôi làm rõ thêm, viết chi tiết kịch bản video nào, hay điều chỉnh sơ đồ ASCII phía trên để chuẩn xác nhất?".`;
+}
+
+// ══════════════════════════════════════════════════════════
+//  SESSION PERSISTENCE
+// ══════════════════════════════════════════════════════════
+function save(){localStorage.setItem(SK,JSON.stringify({step,data,ts:Date.now()}))}
+function clearSess(){localStorage.removeItem(SK)}
+function tryResume(){
+  try{
+    const s=JSON.parse(localStorage.getItem(SK)||'null');
+    if(!s||Date.now()-s.ts>7200000||!s.step) return false;
+    step=s.step;data=s.data;return true;
+  }catch(e){return false}
+}
+
+// Settings
+function openS(){document.getElementById('sov').classList.add('open')}
+function closeS(){document.getElementById('sov').classList.remove('open')}
+
+// ══════════════════════════════════════════════════════════
+//  BOOT
+// ══════════════════════════════════════════════════════════
+window.addEventListener('load',async()=>{
+  await AI.init();
+
+  if(tryResume()){
+    await kiraSay(
+      `Tôi thấy bạn đang làm dở chiến dịch cho <span class="h">"${data.q1||'sản phẩm của bạn'}"</span> — đã hoàn thành <span class="h">${step}/4</span> modules.<br><br>`+
+      `<span style="color:var(--muted)">Tiếp tục từ Module ${step+1} nhé —</span>`
+    );
+    await askQ(step);
+  }else{
+    await sleep(220);
+    const aiTag=AI.mode!=='fallback'?` <span style="color:#4ade80;font-size:12px">· AI ${AI.mode==='nano'?'On-device':'Gemini Flash'} đang chạy</span>`:'';
+    await kiraSay(
+      `Xin chào! Tôi là <span class="h">Kira 1.0</span>${aiTag} — Cố vấn MVP & Content Marketing thực chiến.<br><br>`+
+      `Thay vì bắt bạn tự viết prompt dài, tôi sẽ <span class="h">phỏng vấn từng module</span>, phân tích chuyên sâu từng bước, rồi tổng hợp thành Mega Prompt chiến lược hoàn chỉnh để dán thẳng vào ChatGPT, Claude hoặc Gemini.<br><br>`+
+      `<span class="hg">Chỉ 4 modules.</span> Bắt đầu nào —`
+    );
+    await askQ(0);
+  }
+});
+
+// ══════════════════════════════════════════════════════════
+//  UTILS
+// ══════════════════════════════════════════════════════════
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function now(){const d=new Date();return d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0')}
+function rm(id){document.getElementById(id)?.remove()}
+function scrollB(){const c=document.getElementById('chat');c.scrollTop=c.scrollHeight}
+function active(on){ring.classList.toggle('on',on)}
+function sleep(ms){return new Promise(r=>setTimeout(r,ms))}
+function setIn(on){uin.disabled=!on;sbtn.disabled=!on;uin.placeholder=on?'Chọn gợi ý hoặc nhập dữ liệu của bạn...':'Kira đang xử lý...'}
+function setP(cur,tot){prog.style.width=((cur/tot)*100)+'%'}
+function tags(h){qtags.innerHTML='';(h||[]).forEach(t=>{const b=document.createElement('button');b.className='qt';b.textContent=t;b.onclick=()=>{uin.value=t;send()};qtags.appendChild(b)})}
+function clearTags(){qtags.innerHTML=''}
+function toast(msg){const t=document.getElementById('toast');t.innerHTML=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2400)}
+function copyP(id){
+  const el=document.getElementById(id);
+  const btn=el.querySelector('.cpbtn');btn.style.display='none';
+  const text=el.innerText.trim();btn.style.display='';
+  (navigator.clipboard?.writeText(text)??Promise.reject()).catch(()=>{
+    const ta=Object.assign(document.createElement('textarea'),{value:text});
+    document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();
+  });
+  toast('<i class="fas fa-check-circle"></i> Đã sao chép Mega Prompt!');
+}
+</script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v833ccba57c9e4d2798f2e76cebdd09a11778172276447" integrity="sha512-57MDmcccJXYtNnH+ZiBwzC4jb2rvgVCEokYN+L/nLlmO8rfYT/gIpW2A569iJ/3b+0UEasghjuZH/ma3wIs/EQ==" data-cf-beacon='{"version":"2024.11.0","token":"c9445749bb8a4fb298b7b6a5043848a7","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+</body>
+</html>

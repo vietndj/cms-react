@@ -142,7 +142,7 @@ const StatisticsBoard = ({ cms: { state, data, actions } }) => {
 };
 
 const TrashBin = ({ cms: { state, actions } }) => {
-  const tFs = state.db.files.filter((f) =>
+  const tFs = (state.db.files || []).filter((f) =>
     (state.db.deleted || []).includes(`${f.repoName}/${f.fileName}`),
   );
   return (
@@ -220,7 +220,7 @@ const RecentFiles = ({ cms: { state, actions } }) => {
     state.activeTag === "all" &&
     state.activeRepo === "all" &&
     !state.searchQuery
-      ? [...state.db.files]
+      ? [...(state.db.files || [])]
           .filter(
             (f) =>
               !(state.db.deleted || []).includes(`${f.repoName}/${f.fileName}`),
@@ -298,7 +298,7 @@ const RecentFiles = ({ cms: { state, actions } }) => {
 const MasterViews = ({ cms }) => {
   const { state, data, actions } = cms,
     pFs = data.processedFiles.filter((f) =>
-      state.db.pinned.includes(`${f.repoName}/${f.fileName}`),
+      (state.db.pinned || []).includes(`${f.repoName}/${f.fileName}`),
     );
   const [col, setCol] = useState({ pinned: true, rnd: false });
   const tCol = (k) => setCol((p) => ({ ...p, [k]: !p[k] }));
@@ -385,8 +385,8 @@ const MasterViews = ({ cms }) => {
     <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-3 w-full">
       {fs.map((f) => {
         const k = `${f.repoName}/${f.fileName}`,
-          iP = state.db.pinned.includes(k),
-          c = state.db.colors[k] || "var(--bg-card)",
+          iP = (state.db.pinned || []).includes(k),
+          c = (state.db.colors || {})[k] || "var(--bg-card)",
           iD = c !== "var(--bg-card)" && getContrastYIQ(c) === "#FFFFFF",
           tc = iD ? "#FFF" : "var(--text-main)",
           tl = data.getFileTags(f.repoName, f.fileName),
@@ -534,7 +534,7 @@ const MasterViews = ({ cms }) => {
               <div className="overflow-y-auto px-2 pb-2 space-y-2 kanban-scroll flex-1">
                 {pFs.map((f) => {
                   const k = `${f.repoName}/${f.fileName}`,
-                    c = state.db.colors[k] || "var(--bg-card)",
+                    c = (state.db.colors || {})[k] || "var(--bg-card)",
                     iD =
                       c !== "var(--bg-card)" && getContrastYIQ(c) === "#FFFFFF",
                     tc = iD ? "#FFF" : "var(--text-main)";
@@ -639,7 +639,7 @@ const MasterViews = ({ cms }) => {
                 <div className="overflow-y-auto px-2 pb-2 space-y-2 kanban-scroll flex-1">
                   {fs.map((f) => {
                     const k = `${f.repoName}/${f.fileName}`,
-                      c = state.db.colors[k] || "var(--bg-card)",
+                      c = (state.db.colors || {})[k] || "var(--bg-card)",
                       iD =
                         c !== "var(--bg-card)" &&
                         getContrastYIQ(c) === "#FFFFFF",
@@ -772,7 +772,7 @@ const MasterViews = ({ cms }) => {
                       <Acts
                         f={f}
                         k={k}
-                        iP={state.db.pinned.includes(k)}
+                        iP={(state.db.pinned || []).includes(k)}
                         tM="var(--text-muted)"
                       />
                     </div>

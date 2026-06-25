@@ -9,8 +9,8 @@ export function useSearch(db) {
   const [activeTag, setActiveTag] = useState("all");
   const [currentView, setCurrentView] = useState("grid");
 
-  const getFileTags = (r, f) => db.tags[`${r}/${f}`] || [];
-  const getFileLinks = (r, f) => db.links[`${r}/${f}`] || [];
+  const getFileTags = (r, f) => (db.tags || {})[`${r}/${f}`] || [];
+  const getFileLinks = (r, f) => (db.links || {})[`${r}/${f}`] || [];
 
   const repoKeysList = useMemo(() => {
     const k = Object.keys(db.repos || {});
@@ -20,7 +20,7 @@ export function useSearch(db) {
 
   const allUniqueTags = useMemo(() => {
     const s = new Set();
-    Object.values(db.tags).forEach((a) => a.forEach((t) => s.add(t)));
+    Object.values(db.tags || {}).forEach((a) => a.forEach((t) => s.add(t)));
     return Array.from(s).sort();
   }, [db.tags]);
 
@@ -41,7 +41,7 @@ export function useSearch(db) {
         return mt && mr && mq;
       })
       .sort((a, b) => b.timestamp - a.timestamp);
-  }, [db.files, activeRepo, activeTag, searchQuery, isDeepSearch, db.tags, db.deleted]);
+  }, [db.files, activeRepo, activeTag, searchQuery, isDeepSearch, (db.tags || {}), db.deleted]);
 
   const groupedFilesByRepo = useMemo(() => {
     const g = {};

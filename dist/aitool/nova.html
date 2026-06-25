@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nova 2.0 — Trợ lý kịch bản video 3 module</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:#0d0d0d; --surface:#181818; --s2:#222; --border:#2c2c2c;
+      --text:#e8e8e8; --muted:#777; --dim:#999;
+      --a:#3b82f6; --a-dim:rgba(59,130,246,.12); --a-glow:rgba(59,130,246,.25);
+      --ubg:#1c2235; --uborder:#283047;
+      --g:#22c55e; --g-dim:rgba(34,197,94,.1);
+    }
+    html,body{height:100%}
+    body{font-family:'Inter',-apple-system,sans-serif;background:var(--bg);color:var(--text);
+      display:flex;flex-direction:column;height:100vh;overflow:hidden}
+
+    /* ── HEADER ── */
+    header{display:flex;align-items:center;justify-content:space-between;
+      padding:13px 20px;background:var(--surface);border-bottom:1px solid var(--border);
+      flex-shrink:0;z-index:50}
+    .hl{display:flex;align-items:center;gap:12px}
+    .av-w{position:relative;width:38px;height:38px}
+    .av{width:38px;height:38px;border-radius:11px;
+      background:linear-gradient(135deg,#3b82f6,#6366f1);
+      display:flex;align-items:center;justify-content:center;
+      font-size:16px;font-weight:800;color:#fff;position:relative;z-index:2;
+      box-shadow:0 0 14px rgba(59,130,246,.3)}
+    .av-ring{position:absolute;inset:-4px;border-radius:14px;
+      border:2px solid var(--a);opacity:0;transition:opacity .3s}
+    .av-ring.on{opacity:1;animation:rp 1.6s ease-in-out infinite}
+    @keyframes rp{0%,100%{box-shadow:0 0 0 0 var(--a-glow)}50%{box-shadow:0 0 0 7px transparent}}
+    .hd-title{font-size:14px;font-weight:700;display:flex;align-items:center;gap:7px}
+    .badge{font-size:9px;font-weight:700;padding:2px 7px;border-radius:999px;
+      background:var(--a-dim);color:var(--a);border:1px solid rgba(59,130,246,.25);
+      letter-spacing:.5px;text-transform:uppercase}
+    .hd-sub{font-size:11px;color:var(--dim);display:flex;align-items:center;gap:5px;margin-top:2px}
+    .dot-live{width:6px;height:6px;border-radius:50%;background:var(--g);
+      animation:blink 2.2s ease-in-out infinite}
+    @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+
+    /* Mode badge */
+    .mode-badge{display:flex;align-items:center;gap:5px;padding:4px 10px;border-radius:8px;
+      border:1px solid var(--border);background:var(--s2);
+      font-size:11px;font-weight:600;color:var(--muted);cursor:pointer;transition:all .2s}
+    .mode-badge.on{border-color:rgba(34,197,94,.3);background:var(--g-dim);color:var(--g)}
+    .mode-dot{width:6px;height:6px;border-radius:50%;background:var(--muted)}
+    .mode-badge.on .mode-dot{background:var(--g)}
+    .hr{display:flex;align-items:center;gap:8px}
+    .icon-btn{width:34px;height:34px;border-radius:9px;border:1px solid var(--border);
+      background:transparent;color:var(--muted);display:flex;align-items:center;justify-content:center;
+      cursor:pointer;font-size:13px;transition:all .2s}
+    .icon-btn:hover{background:var(--s2);color:var(--text)}
+
+    /* ── PROGRESS ── */
+    .pt{height:2px;background:var(--border);flex-shrink:0}
+    .pf{height:100%;background:linear-gradient(90deg,var(--a),#6366f1);
+      width:0%;transition:width .6s cubic-bezier(.4,0,.2,1)}
+
+    /* ── CHAT ── */
+    #chat{flex:1;overflow-y:auto;padding:28px 16px 0;scroll-behavior:smooth}
+    #chat::-webkit-scrollbar{width:4px}
+    #chat::-webkit-scrollbar-thumb{background:#333;border-radius:999px}
+    .cw{max-width:660px;margin:0 auto;display:flex;flex-direction:column;gap:18px;padding-bottom:20px}
+    .msg{display:flex;gap:10px;animation:rise .28s ease-out}
+    @keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    .msg.user{flex-direction:row-reverse}
+    .mav{width:30px;height:30px;border-radius:9px;display:flex;align-items:center;
+      justify-content:center;font-size:12px;flex-shrink:0;margin-top:2px}
+    .mav.nova{background:linear-gradient(135deg,#3b82f6,#6366f1);font-weight:800;color:#fff}
+    .mav.human{background:var(--s2);border:1px solid var(--border);color:var(--muted)}
+    .bubble{max-width:82%;background:var(--surface);border:1px solid var(--border);
+      border-radius:4px 16px 16px 16px;padding:12px 15px;font-size:13.5px;
+      line-height:1.72;color:var(--text)}
+    .msg.user .bubble{background:var(--ubg);border-color:var(--uborder);
+      border-radius:16px 4px 16px 16px;color:#c9d8f8}
+    .bm{font-size:10px;color:var(--muted);margin-top:7px;display:flex;align-items:center;gap:4px}
+    .qlabel{display:block;font-size:10px;font-weight:700;color:var(--muted);
+      text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px}
+    .h{color:var(--a);font-weight:600}
+    .hg{color:#4ade80;font-weight:600}
+
+    /* Typewriter cursor (blue) */
+    .cur{display:inline-block;width:2px;height:13px;background:var(--a);
+      margin-left:2px;vertical-align:middle;animation:cb .75s step-end infinite}
+    @keyframes cb{0%,100%{opacity:1}50%{opacity:0}}
+    /* Live AI stream cursor (green) */
+    .stream-cur{display:inline-block;width:2px;height:14px;background:var(--g);
+      vertical-align:middle;margin-left:1px;border-radius:1px;
+      animation:cb .55s step-end infinite}
+
+    /* ACK chip */
+    .chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;
+      color:#4ade80;background:rgba(74,222,128,.08);border:1px solid rgba(74,222,128,.18);
+      border-radius:6px;padding:2px 8px;margin-bottom:8px}
+
+    /* Thinking */
+    .tb{background:var(--surface);border:1px solid var(--border);
+      border-radius:4px 16px 16px 16px;padding:11px 14px;
+      display:flex;align-items:center;gap:9px;font-size:12px;color:var(--muted);font-style:italic}
+    .dots{display:flex;gap:4px}
+    .d{width:5px;height:5px;border-radius:50%;background:var(--a);
+      animation:db 1.4s ease-in-out infinite}
+    .d:nth-child(2){animation-delay:.16s}
+    .d:nth-child(3){animation-delay:.32s}
+    @keyframes db{0%,80%,100%{transform:scale(.65);opacity:.4}40%{transform:scale(1);opacity:1}}
+
+    /* Framework badge */
+    .fw-card{background:rgba(59,130,246,.06);border:1px solid rgba(59,130,246,.2);
+      border-radius:12px;padding:14px 16px;margin:10px 0 4px}
+    .fw-title{font-size:11px;font-weight:700;color:var(--a);letter-spacing:.4px;
+      text-transform:uppercase;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+    .fw-name{font-size:15px;font-weight:700;color:var(--text);margin-bottom:4px}
+    .fw-desc{font-size:12px;color:var(--muted);line-height:1.6}
+
+    /* Prompt box */
+    .pbox{background:#0a0a0a;border:1px solid var(--border);border-radius:12px;
+      padding:14px;font-family:'Courier New',monospace;font-size:11px;line-height:1.65;
+      color:#8a9ab8;max-height:340px;overflow-y:auto;white-space:pre-wrap;
+      word-break:break-word;margin-top:12px;position:relative}
+    .pbox::-webkit-scrollbar{width:4px}
+    .pbox::-webkit-scrollbar-thumb{background:#333}
+    .cpbtn{position:sticky;top:0;left:100%;display:block;width:fit-content;
+      margin-left:auto;margin-bottom:8px;padding:5px 12px;border-radius:7px;
+      background:var(--s2);border:1px solid var(--border);color:var(--dim);
+      font-size:11px;font-weight:600;cursor:pointer;transition:all .2s;
+      font-family:'Inter',sans-serif}
+    .cpbtn:hover{background:var(--a);color:#fff;border-color:var(--a)}
+
+    /* Open AI buttons */
+    .btn-row{display:flex;gap:8px;margin-top:12px}
+    .open-ai-btn{display:flex;align-items:center;justify-content:center;gap:8px;
+      flex:1;padding:12px 10px;border-radius:12px;border:none;
+      color:#fff;font-size:13px;font-weight:700;cursor:pointer;transition:all .2s;
+      font-family:'Inter',sans-serif;white-space:nowrap}
+    .open-ai-btn.chatgpt{background:linear-gradient(135deg,#3b82f6,#6366f1)}
+    .open-ai-btn.gemini{background:linear-gradient(135deg,#1a73e8,#0d9488)}
+    .open-ai-btn:hover{opacity:.9;transform:translateY(-1px)}
+
+    /* ── INPUT ── */
+    #inp-area{flex-shrink:0;padding:10px 16px 18px;
+      background:linear-gradient(to top,var(--bg) 75%,transparent)}
+    #qtags{display:flex;gap:7px;overflow-x:auto;padding-bottom:2px;margin-bottom:9px}
+    #qtags::-webkit-scrollbar{display:none}
+    .qt{flex-shrink:0;padding:5px 11px;border-radius:8px;background:var(--surface);
+      border:1px solid var(--border);color:var(--dim);font-size:11.5px;cursor:pointer;
+      transition:all .18s;white-space:nowrap;font-family:'Inter',sans-serif}
+    .qt:hover{border-color:var(--a);color:var(--a);background:var(--a-dim)}
+    .irow{display:flex;align-items:center;gap:9px;background:var(--surface);
+      border:1px solid var(--border);border-radius:14px;padding:9px 9px 9px 15px;
+      transition:border-color .2s,box-shadow .2s}
+    .irow:focus-within{border-color:var(--a);box-shadow:0 0 0 3px var(--a-dim)}
+    #uin{flex:1;background:transparent;border:none;outline:none;color:var(--text);
+      font-size:13.5px;font-family:'Inter',sans-serif}
+    #uin::placeholder{color:var(--muted)}
+    #sbtn{width:36px;height:36px;border-radius:10px;background:var(--a);border:none;
+      color:#fff;font-size:13px;display:flex;align-items:center;justify-content:center;
+      cursor:pointer;transition:all .2s;flex-shrink:0}
+    #sbtn:hover:not(:disabled){background:#2563eb;transform:scale(1.06)}
+    #sbtn:disabled{opacity:.35;cursor:default;transform:none}
+
+    /* ── TOAST ── */
+    #toast{position:fixed;bottom:90px;left:50%;
+      transform:translateX(-50%) translateY(16px);
+      background:var(--g);color:#fff;padding:9px 18px;border-radius:12px;
+      font-size:13px;font-weight:600;opacity:0;pointer-events:none;
+      transition:all .28s;z-index:999;white-space:nowrap}
+    #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+    @media(min-width:768px){
+      #chat{padding:36px 32px 0}
+      #inp-area{padding:10px 32px 22px}
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── HEADER ── -->
+<header>
+  <div class="hl">
+    <div class="av-w">
+      <div class="av"><i class="fa-solid fa-layer-group" style="font-size:15px"></i></div>
+      <div class="av-ring" id="av-ring"></div>
+    </div>
+    <div>
+      <div class="hd-title">Nova <span class="badge">2.0</span></div>
+      <div class="hd-sub"><span class="dot-live"></span>Trợ lý kịch bản 3 module · Hook - Body - CTA</div>
+    </div>
+  </div>
+  <div class="hr">
+    <div class="mode-badge" id="mbadge">
+      <span class="mode-dot" id="mdot"></span>
+      <span id="mtext">Offline</span>
+    </div>
+  </div>
+</header>
+
+<!-- ── PROGRESS ── -->
+<div class="pt"><div class="pf" id="prog"></div></div>
+
+<!-- ── CHAT ── -->
+<div id="chat"><div class="cw" id="cw"></div></div>
+
+<!-- ── INPUT ── -->
+<div id="inp-area">
+  <div id="qtags"></div>
+  <div class="irow">
+    <input id="uin" type="text" autocomplete="off"
+      placeholder="Nhập câu trả lời của bạn..."
+      onkeydown="if(event.key==='Enter'&&!event.shiftKey)send()">
+    <button id="sbtn" onclick="send()"><i class="fas fa-arrow-up"></i></button>
+  </div>
+</div>
+
+<!-- ── TOAST ── -->
+<div id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════════════════════
+//  FLOW QUESTIONS (Nova 3-step)
+// ══════════════════════════════════════════════════════════
+const Q = [
+  {
+    q: 'Hiện tại, bạn đang muốn làm nội dung cho <span class="h">lĩnh vực nào?</span>',
+    h: ['📦 Bán lẻ / Sản phẩm vật lý', '🎓 Dịch vụ / Khóa học / Chuyên gia', '🎬 Xây kênh Viral / Giải trí']
+  },
+  {
+    q: 'Đâu là <span class="h">rào cản tâm lý, định kiến hoặc nỗi lo sợ lớn nhất</span> khiến khách hàng chưa chịu mua sản phẩm/dịch vụ của bạn?',
+    h: ['Sợ giá cao, không đủ tiền', 'Sợ mỹ phẩm dị ứng, không hợp da', 'Lười học, không có thời gian']
+  }
+];
+
+const THK = [
+  'Đang phân loại ngành hàng và chọn framework...',
+  'Đang khai thác insight tâm lý khách hàng...',
+  'Đang đóng gói Mega Prompt cá nhân hóa...'
+];
+
+const FR = [
+  ans => `Ngành hàng đã được phân loại. Framework Marketing xương sống đang được xác định dựa trên đặc thù tâm lý mua hàng của segment này.`,
+  ans => `Insight về rào cản tâm lý đã ghi nhận. Dữ liệu này sẽ được đưa trực tiếp vào các Hook để phá vỡ sức đề kháng ngay giây đầu tiên.`
+];
+
+// ══════════════════════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════════════════════
+let step = 0, userData = { industry: '', framework: '', frameworkReason: '', painPoint: '' };
+let busy = false;
+
+// API key — shared with Leo
+const GEMINI_KEY = 'AIzaSyB_DnMYS9pCfWY4vMVREFqcwtxPUCaMdIc';
+
+const cw = document.getElementById('cw');
+const uin = document.getElementById('uin');
+const sbtn = document.getElementById('sbtn');
+const qtags = document.getElementById('qtags');
+const prog = document.getElementById('prog');
+const ring = document.getElementById('av-ring');
+
+// ══════════════════════════════════════════════════════════
+//  AI ENGINE — Gemini Flash
+// ══════════════════════════════════════════════════════════
+const AI = {
+  mode: 'fallback', key: '',
+  GURL: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:streamGenerateContent?alt=sse&key=',
+  GNURL: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=',
+
+  async init() {
+    if (GEMINI_KEY) { this.key = GEMINI_KEY; this.mode = 'gemini'; }
+    this.badge();
+  },
+
+  badge() {
+    const mb = document.getElementById('mbadge');
+    const md = document.getElementById('mdot');
+    const mt = document.getElementById('mtext');
+    if (this.mode === 'gemini') {
+      mb.classList.add('on'); md.style.background = 'var(--g)'; mt.textContent = 'AI · Gemini';
+    } else {
+      mb.classList.remove('on'); md.style.background = 'var(--muted)'; mt.textContent = 'Offline';
+    }
+  },
+
+  // Stream phản hồi AI sau mỗi câu trả lời
+  async stream(stepIdx, answer, el) {
+    const qtext = Q[stepIdx].q.replace(/<[^>]+>/g, '');
+    let contextLine = '';
+    if (stepIdx === 0) {
+      contextLine = `Framework đã chọn: ${userData.framework}.`;
+    } else if (stepIdx === 1) {
+      contextLine = `Ngành hàng: ${userData.industry}. Framework: ${userData.framework}.`;
+    }
+
+    const prompt = `Bạn là Nova — chuyên gia chiến lược nội dung video ngắn (TikTok/Reels). Tiếng Việt. Không emoji. Không "cảm ơn". Không mở đầu bằng "Tôi đã ghi nhận" hay "Thú vị".
+
+Câu hỏi vừa hỏi: "${qtext}"
+Câu trả lời của người dùng: "${answer}"
+${contextLine}
+
+Viết phản hồi 2-3 câu theo phong cách chuyên gia thực chiến:
+- Trích dẫn trực tiếp 1-2 từ/cụm từ cốt lõi từ câu trả lời (dùng dấu "")
+- Phân tích ngắn tại sao data này quan trọng cho kịch bản video
+- Nêu cụ thể nó sẽ ảnh hưởng như thế nào đến Hook/Body/CTA
+Văn phong: đanh thép, tự tin, như content strategist đang đọc brief — không như chatbot xác nhận form.`;
+
+    try {
+      if (this.mode === 'gemini') return await this._gemini(prompt, el, 150);
+    } catch (e) {}
+    await chunk(el, FR[stepIdx]?.(answer) || '', 3, 16);
+  },
+
+  // Gợi ý hints động dựa trên ngành hàng và câu trả lời trước
+  async hints(industry, nextIdx) {
+    if (this.mode === 'fallback') return null;
+    const nq = Q[nextIdx]?.q.replace(/<[^>]+>/g, '') || '';
+    const p = `Ngành hàng: "${industry}". Câu hỏi tiếp theo: "${nq}".
+3 gợi ý ví dụ ngắn (≤10 từ/cái) thực tế và phù hợp với ngành hàng này. Trả về CHỈ JSON array. Tiếng Việt đời thường.`;
+    try {
+      if (this.mode === 'gemini') {
+        const r = await fetch(this.GNURL + this.key, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ contents: [{ parts: [{ text: p }] }],
+            generationConfig: { maxOutputTokens: 100, temperature: .7 } })
+        });
+        const j = await r.json();
+        const raw = j.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        const m = raw.match(/\[.*?\]/s);
+        return m ? JSON.parse(m[0]) : null;
+      }
+    } catch (e) { return null; }
+  },
+
+  async _gemini(prompt, el, max = 150) {
+    const r = await fetch(this.GURL + this.key, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { maxOutputTokens: max, temperature: .85 } })
+    });
+    if (!r.ok) throw new Error(r.status);
+    const cur = document.createElement('span');
+    cur.className = 'stream-cur';
+    el.appendChild(cur);
+    const reader = r.body.getReader();
+    const dec = new TextDecoder();
+    let buf = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const lines = buf.split('\n');
+      buf = lines.pop() || '';
+      for (const ln of lines) {
+        if (!ln.startsWith('data: ') || ln.includes('[DONE]')) continue;
+        try {
+          const j = JSON.parse(ln.slice(6));
+          const t = j.candidates?.[0]?.content?.parts?.[0]?.text || '';
+          if (t) { el.insertBefore(document.createTextNode(t), cur); scrollB(); }
+        } catch (e) {}
+      }
+    }
+    cur.remove();
+  }
+};
+
+// ══════════════════════════════════════════════════════════
+//  CHUNK TYPEWRITER
+// ══════════════════════════════════════════════════════════
+function chunk(el, html, n = 3, ms = 16) {
+  return new Promise(res => {
+    el.innerHTML = '';
+    const tokens = [];
+    const re = /(<[^>]+>|&[^;]+;|[\s\S])/g;
+    let m;
+    while ((m = re.exec(html)) !== null) tokens.push(m[0]);
+    let i = 0;
+    const CUR = '<span class="cur"></span>';
+    function tick() {
+      if (i >= tokens.length) { el.innerHTML = html; res(); return; }
+      let added = 0;
+      while (i < tokens.length && added < n) {
+        i++;
+        if (!tokens[i - 1].startsWith('<')) added++;
+      }
+      el.innerHTML = tokens.slice(0, i).join('') + CUR;
+      scrollB();
+      const last = tokens[i - 1] || '';
+      const delay = last === '.' || last === '!' || last === '?' ? 120 : last === ',' ? 60 : ms;
+      setTimeout(tick, delay);
+    }
+    tick();
+  });
+}
+
+// ══════════════════════════════════════════════════════════
+//  MESSAGE RENDERERS
+// ══════════════════════════════════════════════════════════
+async function novaSay(html) {
+  busy = true; active(true); setIn(false);
+  const row = mkRow('nova');
+  const txt = row.querySelector('.txt');
+  cw.appendChild(row); scrollB();
+  await chunk(txt, html, 3, 16);
+  busy = false; active(false);
+}
+
+function userSay(text) {
+  const row = mkRow('user');
+  row.querySelector('.txt').textContent = text;
+  cw.appendChild(row); scrollB();
+}
+
+function showThink(msg) {
+  const id = 't' + Date.now();
+  const el = document.createElement('div');
+  el.id = id; el.className = 'msg';
+  el.innerHTML = `<div class="mav nova"><i class="fas fa-bolt" style="font-size:11px"></i></div>
+    <div class="tb"><div class="dots"><div class="d"></div><div class="d"></div><div class="d"></div></div><span>${msg}</span></div>`;
+  cw.appendChild(el); scrollB(); return id;
+}
+
+function mkRow(who) {
+  const r = document.createElement('div');
+  r.className = 'msg' + (who === 'user' ? ' user' : '');
+  const u = who === 'user';
+  r.innerHTML = `<div class="mav ${u ? 'human' : 'nova'}">${u ? '<i class="fas fa-user" style="font-size:11px"></i>' : '<i class="fas fa-layer-group" style="font-size:10px"></i>'}</div>
+    <div class="bubble"><div class="txt"></div>
+    <div class="bm"><i class="fas fa-check-double" style="color:${u ? '#555' : 'var(--a)'}"></i> ${now()}</div></div>`;
+  return r;
+}
+
+// ══════════════════════════════════════════════════════════
+//  FRAMEWORK LOGIC (Nova core)
+// ══════════════════════════════════════════════════════════
+function detectFramework(answer) {
+  const txt = answer.toLowerCase();
+  if (txt.includes('vật lý') || txt.includes('bán lẻ') || txt.includes('sản phẩm')) {
+    return {
+      name: 'PAS — Vấn đề · Kích động · Giải pháp',
+      code: 'PAS',
+      desc: 'Sản phẩm vật lý giải quyết nhu cầu cụ thể. PAS chỉ thẳng vào vấn đề → xoáy sâu nỗi đau → đưa ra giải pháp. Tỷ lệ chuyển đổi cao nhất cho FMCG và hàng hóa.'
+    };
+  } else if (txt.includes('dịch vụ') || txt.includes('khóa học') || txt.includes('đào tạo') || txt.includes('chuyên gia')) {
+    return {
+      name: 'AIDA — Chú ý · Thích thú · Khao khát · Hành động',
+      code: 'AIDA',
+      desc: 'Bán dịch vụ và tri thức là bán niềm tin. AIDA xây dựng sự tin tưởng từng tầng, khơi gợi khao khát từ từ trước khi chốt sale — phù hợp với high-ticket offer.'
+    };
+  } else {
+    return {
+      name: 'HRR — Hook · Retain · Reward',
+      code: 'HRR',
+      desc: 'Với kênh giải trí/viral, tỷ lệ giữ chân là vua. HRR tạo tò mò ngay giây đầu → giữ chân bằng nhịp điệu → thưởng bằng kết quả bất ngờ ở cuối video.'
+    };
+  }
+}
+
+// ══════════════════════════════════════════════════════════
+//  FLOW
+// ══════════════════════════════════════════════════════════
+async function askQ(n) {
+  const label = n === 0 ? 'Bước 1 / 2' : 'Bước 2 / 2';
+  await novaSay(`<span class="qlabel">${label}</span>${Q[n].q}`);
+  tags(Q[n].h); setIn(true); uin.focus();
+}
+
+async function send() {
+  const val = uin.value.trim();
+  if (!val || busy || step > 2) return;
+
+  userSay(val);
+  uin.value = '';
+  clearTags();
+  setIn(false);
+
+  const s = step; step++;
+  setP(step, 3);
+
+  const thinkDelay = 700 + Math.min(val.length * 12, 1400) + Math.random() * 300;
+  const tid = showThink(THK[s]);
+  active(true);
+
+  // Step 0: detect framework + get hints for step 1 concurrently
+  let dynHints = null;
+  if (s === 0) {
+    const fw = detectFramework(val);
+    userData.industry = val;
+    userData.framework = fw.name;
+    userData.frameworkReason = fw.desc;
+    userData.fwCode = fw.code;
+
+    // Fetch dynamic hints while waiting
+    const hintWindow = Math.max(thinkDelay, 800) + 600;
+    const [, hints] = await Promise.all([
+      sleep(thinkDelay),
+      AI.mode !== 'fallback'
+        ? Promise.race([
+            AI.hints(val, 1).catch(() => null),
+            sleep(hintWindow).then(() => null)
+          ])
+        : Promise.resolve(null)
+    ]);
+    dynHints = hints;
+
+    rm(tid); active(false);
+
+    // Show AI reaction
+    const row = mkRow('nova');
+    const txt = row.querySelector('.txt');
+    cw.appendChild(row); active(true);
+
+    if (AI.mode !== 'fallback') {
+      try { await AI.stream(s, val, txt); }
+      catch (e) { txt.textContent = FR[s]?.(val) || ''; }
+    } else {
+      txt.textContent = FR[s]?.(val) || '';
+    }
+    active(false);
+
+    // Show framework card
+    await sleep(300);
+    await novaSay(
+      `Với ngành hàng này, framework marketing xương sống được chọn là:<br><br>` +
+      `<div class="fw-card">` +
+      `<div class="fw-title"><i class="fas fa-chart-network"></i> Framework</div>` +
+      `<div class="fw-name">${fw.name}</div>` +
+      `<div class="fw-desc">${fw.desc}</div>` +
+      `</div>`
+    );
+
+    await sleep(350);
+    await askQ(1);
+    tags(dynHints || Q[1].h);
+    setIn(true); uin.focus();
+
+  } else if (s === 1) {
+    userData.painPoint = val;
+
+    await sleep(thinkDelay);
+    rm(tid); active(false);
+
+    // AI reaction
+    const row = mkRow('nova');
+    const txt = row.querySelector('.txt');
+    cw.appendChild(row); active(true);
+
+    if (AI.mode !== 'fallback') {
+      try { await AI.stream(s, val, txt); }
+      catch (e) { txt.textContent = FR[s]?.(val) || ''; }
+    } else {
+      txt.textContent = FR[s]?.(val) || '';
+    }
+    active(false);
+
+    await sleep(500);
+    const tid2 = showThink(THK[2]);
+    active(true);
+    await sleep(1800);
+    rm(tid2); active(false);
+
+    await genPrompt();
+  }
+}
+
+// ══════════════════════════════════════════════════════════
+//  GENERATION
+// ══════════════════════════════════════════════════════════
+async function genPrompt() {
+  setP(3, 3);
+
+  await novaSay(
+    `<span class="hg"><i class="fas fa-check-circle"></i> Dữ liệu đã đầy đủ!</span><br><br>` +
+    `<span style="color:var(--muted);font-size:12.5px">Mega Prompt đã được đóng gói với framework <strong style="color:var(--a)">${userData.fwCode}</strong> và insight về rào cản tâm lý của khách hàng. Copy và paste vào ChatGPT/Claude để bắt đầu:</span>`
+  );
+
+  const prompt = buildPrompt();
+
+  const pid = 'pr' + Date.now();
+  const row = document.createElement('div');
+  row.className = 'msg';
+  row.innerHTML = `
+    <div class="mav nova" style="background:linear-gradient(135deg,#22c55e,#0d9488)"><i class="fas fa-code" style="font-size:10px"></i></div>
+    <div class="bubble" style="max-width:100%;border-color:#22c55e22">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Copy và paste vào <strong style="color:var(--text)">ChatGPT / Claude / Gemini</strong>:</div>
+      <div class="pbox" id="${pid}"><button class="cpbtn" onclick="copyP('${pid}')"><i class="fas fa-copy"></i> Copy</button>${esc(prompt)}</div>
+      <div class="btn-row">
+        <button class="open-ai-btn chatgpt" onclick="copyAndOpen('${pid}')">
+          <i class="fas fa-robot" style="font-size:12px"></i> ChatGPT
+        </button>
+        <button class="open-ai-btn gemini" onclick="copyAndOpenGemini('${pid}')">
+          <i class="fas fa-gem" style="font-size:12px"></i> Gemini
+        </button>
+      </div>
+    </div>`;
+  cw.appendChild(row);
+
+  clearTags();
+  uin.disabled = true; uin.placeholder = '✓ Mega Prompt đã sẵn sàng'; sbtn.disabled = true;
+
+  const rb = document.createElement('button');
+  rb.className = 'qt';
+  rb.innerHTML = '<i class="fas fa-redo" style="margin-right:6px;font-size:10px"></i>Thiết lập lại';
+  rb.onclick = () => location.reload();
+  qtags.appendChild(rb);
+  scrollB();
+}
+
+// ══════════════════════════════════════════════════════════
+//  PROMPT BUILDER (Nova logic — giống bản gốc)
+// ══════════════════════════════════════════════════════════
+function buildPrompt() {
+  const d = userData;
+  return `Hãy đóng vai trò là một Giám đốc Chiến lược Nội dung (Senior Content Strategist) và Copywriter thực chiến. Nhiệm vụ của bạn là đồng hành tư vấn 1-1 để giúp tôi tạo ra kịch bản video dọc (Tiktok/Reels) tối ưu chuyển đổi, thời lượng STRICTLY dưới 75 giây (tối đa 210 từ).
+
+BỐI CẢNH DỰ ÁN CỦA TÔI:
+- Ngành hàng / Sản phẩm: ${d.industry}
+- Rào cản / Nỗi đau lớn nhất của khách hàng: "${d.painPoint}"
+- Công thức Marketing xương sống: ${d.framework}
+
+CHIẾN LƯỢC SẢN XUẤT CÔNG NGHIỆP (3 MODULE):
+Video sẽ được cấu trúc thành 3 phần tách biệt để tôi tối ưu thời gian quay dựng:
+- Phần 1 (Hook - 15-20s): Thay đổi linh hoạt theo từng video để test A/B thị trường.
+- Phần 2 (Body - 40s): LÕI CỐ ĐỊNH. Áp dụng chuẩn công thức [${d.fwCode}]. Phần này mang thông điệp chính, tôi SẼ CHỈ QUAY 1 LẦN để ghép vào giữa mọi video.
+- Phần 3 (CTA - 10s): Thay đổi linh hoạt sao cho nối mượt với Hook.
+
+QUY TẮC LÀM VIỆC CỦA BẠN (BẮT BUỘC):
+1. KHÔNG BAO GIỜ tự ý nhả toàn bộ kịch bản ra trong 1 lần trả lời. Phải làm việc theo TỪNG BƯỚC HỎI ĐÁP bên dưới. Đợi tôi trả lời xong bước này mới được qua bước sau.
+2. Ngôn ngữ giao tiếp điềm đạm, thực tế, đúng chất chuyên gia. Tuyệt đối không dùng những từ ngữ sáo rỗng, viễn tưởng.
+3. Kịch bản xuất ra phải là "văn nói" tự nhiên, có nhịp điệu, động từ mạnh.
+
+QUY TRÌNH THỰC HIỆN TỪNG BƯỚC:
+
+BƯỚC 1 (Tạo Body cố định): Đặt cho tôi 1 hoặc 2 câu hỏi làm rõ về Ưu điểm nổi bật (USP) của sản phẩm tôi đang bán. Sau khi tôi cung cấp, hãy viết phần Lõi Body (khoảng 90-100 từ) áp dụng đúng cấu trúc ${d.framework}. (Chờ tôi duyệt hoặc sửa).
+
+BƯỚC 2 (Đề xuất Hook): Dựa vào Insight và Body đã chốt, hãy đưa ra 4 phương án Hook khác nhau (~40-50 từ/Hook). Phân loại rõ 4 hướng tiếp cận: (1) Đâm thẳng vào nỗi đau, (2) Lật ngược định kiến, (3) Bằng chứng thực tế, (4) Storytelling. (Yêu cầu tôi chọn 1 số).
+
+BƯỚC 3 (Đề xuất CTA): Dựa vào Hook tôi đã chọn, đề xuất 3 câu CTA (~25 từ) nối mượt mà từ Body sang chốt sale. (Yêu cầu tôi chọn).
+
+BƯỚC 4 (Lắp ráp & Tối ưu): Ghép [Hook] + [Body] + [CTA]. Chuốt lại các từ nối. BẮT BUỘC: Đếm chính xác tổng số từ, đảm bảo tuyệt đối dưới 210 từ.
+
+Nếu bạn đã hiểu quy trình chuyên nghiệp này, hãy xác nhận ngắn gọn và bắt đầu ngay BƯỚC 1 bằng cách hỏi tôi về USP của sản phẩm!`;
+}
+
+// ══════════════════════════════════════════════════════════
+//  UTILS
+// ══════════════════════════════════════════════════════════
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') }
+function now() { const d = new Date(); return d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0') }
+function rm(id) { document.getElementById(id)?.remove() }
+function scrollB() { const c = document.getElementById('chat'); c.scrollTop = c.scrollHeight }
+function active(on) { ring.classList.toggle('on', on) }
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)) }
+function setIn(on) { uin.disabled = !on; sbtn.disabled = !on; uin.placeholder = on ? 'Nhập câu trả lời của bạn...' : 'Nova đang xử lý...' }
+function setP(cur, tot) { prog.style.width = ((cur / tot) * 100) + '%' }
+function tags(h) {
+  qtags.innerHTML = '';
+  (h || []).forEach(t => {
+    const b = document.createElement('button');
+    b.className = 'qt'; b.textContent = t;
+    b.onclick = () => { uin.value = t; send(); };
+    qtags.appendChild(b);
+  });
+}
+function clearTags() { qtags.innerHTML = '' }
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.innerHTML = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2400);
+}
+function copyP(id) {
+  const el = document.getElementById(id);
+  const btn = el.querySelector('.cpbtn'); btn.style.display = 'none';
+  const text = el.innerText.trim(); btn.style.display = '';
+  (navigator.clipboard?.writeText(text) ?? Promise.reject()).catch(() => {
+    const ta = Object.assign(document.createElement('textarea'), { value: text });
+    document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove();
+  });
+  toast('<i class="fas fa-check-circle"></i> Đã sao chép Mega Prompt!');
+}
+function copyAndOpen(id) {
+  copyP(id);
+  window.open('https://chatgpt.com', '_blank');
+}
+function copyAndOpenGemini(id) {
+  copyP(id);
+  window.open('https://gemini.google.com', '_blank');
+}
+
+// ══════════════════════════════════════════════════════════
+//  BOOT
+// ══════════════════════════════════════════════════════════
+window.addEventListener('load', async () => {
+  await AI.init();
+  await sleep(220);
+  const aiTag = AI.mode !== 'fallback'
+    ? ` <span style="color:#4ade80;font-size:12px">· AI Gemini Flash đang chạy</span>`
+    : '';
+  await novaSay(
+    `Chào bạn! Tôi là <span class="h">Nova 2.0</span>${aiTag} — trợ lý lên chiến lược sản xuất video ngắn.<br><br>` +
+    `Nhiệm vụ của tôi là giúp bạn thiết lập một quy trình sản xuất video dưới 75 giây được bóc tách làm <span class="h">3 module</span>: <strong>Hook linh hoạt — Body cố định — CTA linh hoạt</strong>.<br><br>` +
+    `<span class="hg">Chỉ 2 câu hỏi.</span> Bắt đầu nào —`
+  );
+  await askQ(0);
+});
+</script>
+</body>
+</html>
