@@ -113,7 +113,7 @@ export default function Header({ cms: { state, actions } }) {
             actions.setIsSlugEdited(false);
             actions.setUploadLinks([]);
           }}
-          className={UI.btnSave}
+          className={UI.btnAccent}
         >
           <svg className="w-4 h-4">
             <use href="#icon-plus"></use>

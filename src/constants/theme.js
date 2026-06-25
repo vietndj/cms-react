@@ -6,6 +6,8 @@ export const UI = {
     "px-3 py-2 rounded-xl text-xs font-bold transition text-[var(--text-main)] bg-[var(--bg-hover)] border border-transparent hover:border-[var(--border)] flex items-center gap-1",
   btnSave:
     "bg-[var(--accent)] text-white px-8 py-3 rounded-xl font-bold shadow-lg hover:scale-105 transition disabled:opacity-50",
+  btnAccent:
+    "bg-[var(--accent)] text-white px-4 py-2 rounded-xl text-xs font-bold transition hover:scale-105 flex items-center gap-1 shadow-sm disabled:opacity-50",
   tagBase:
     "text-[9px] px-2 py-0.5 rounded uppercase font-bold tracking-tight border border-[var(--border)]",
   iconBtn:
