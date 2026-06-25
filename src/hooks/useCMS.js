@@ -453,11 +453,19 @@ export function useCMS() {
       type: "loading",
     });
     try {
-      const r1 = await fetch(
-        `https://api.github.com/repos/${USERNAME}/${tR}/branches/main`,
+      const rInfo = await fetch(
+        `https://api.github.com/repos/${USERNAME}/${tR}`,
         { headers: { Authorization: `Bearer ${auth.token}` } },
       );
-      if (!r1.ok) throw new Error("Không thấy nhánh main");
+      if (!rInfo.ok) throw new Error("Không lấy được thông tin repo");
+      const dInfo = await rInfo.json();
+      const defaultBranch = dInfo.default_branch || "main";
+
+      const r1 = await fetch(
+        `https://api.github.com/repos/${USERNAME}/${tR}/branches/${defaultBranch}`,
+        { headers: { Authorization: `Bearer ${auth.token}` } },
+      );
+      if (!r1.ok) throw new Error(`Không thấy nhánh ${defaultBranch}`);
       const d1 = await r1.json(),
         r2 = await fetch(
           `https://api.github.com/repos/${USERNAME}/${tR}/git/trees/${d1.commit.commit.tree.sha}?recursive=1`,
