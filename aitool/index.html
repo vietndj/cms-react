@@ -38,6 +38,10 @@
       --landing-primary: #06b6d4;
       --landing-glow: rgba(6, 182, 212, 0.35);
       --landing-bg: radial-gradient(circle at 50% 50%, rgba(6, 182, 212, 0.12) 0%, transparent 70%);
+      
+      --ugc-primary: #6366f1;
+      --ugc-glow: rgba(99, 102, 241, 0.35);
+      --ugc-bg: radial-gradient(circle at 75% 25%, rgba(99, 102, 241, 0.15) 0%, transparent 60%);
     }
 
     html {
@@ -511,6 +515,15 @@
       background: var(--landing-bg);
     }
 
+    #block-ugc {
+      --accent-color: var(--ugc-primary);
+      --accent-glow: var(--ugc-glow);
+      background: var(--bg);
+    }
+    #block-ugc .block-bg {
+      background: var(--ugc-bg);
+    }
+
     /* Navigation dots indicator */
     .nav-dots {
       position: fixed;
@@ -775,6 +788,7 @@
       <a href="#block-plan" class="header-link"><i class="fa-solid fa-compass"></i> Plan AI</a>
       <a href="#block-video" class="header-link"><i class="fa-solid fa-play"></i> Video AI</a>
       <a href="#block-landing" class="header-link"><i class="fa-solid fa-code"></i> Landing AI</a>
+      <a href="#block-ugc" class="header-link"><i class="fa-solid fa-video"></i> UGC Video</a>
       <a href="reel12.html" class="header-btn"><i class="fa-solid fa-wand-magic-sparkles"></i> Combo Reel12</a>
     </div>
   </header>
@@ -785,6 +799,7 @@
     <div class="nav-dot" data-target="block-plan"></div>
     <div class="nav-dot" data-target="block-video"></div>
     <div class="nav-dot" data-target="block-landing"></div>
+    <div class="nav-dot" data-target="block-ugc"></div>
   </div>
 
   <!-- HERO SECTION WITH ANTIGRAVITY ENGINE -->
@@ -988,6 +1003,69 @@
               </div>
             </div>
             <i class="fa-solid fa-laptop-code" style="color: var(--landing-primary); opacity: 0.7;"></i>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- BLOCK 4: UGC VIDEO AI (UGC DIRECTOR) -->
+  <section id="block-ugc">
+    <div class="block-bg"></div>
+    <div class="block-grid-pattern"></div>
+    <div class="block-container">
+      <div class="block-info">
+        <div class="block-num">Assistant 04 // UGC Director</div>
+        <h2 class="block-title">UGC Video</h2>
+        <p class="block-desc">Moi sâu trải nghiệm vật lý và cảm xúc thật của khách hàng để tạo 3 kịch bản UGC (Cấp 1, 2, 3) có tỷ lệ chuyển đổi cao vượt bậc.</p>
+        
+        <div class="feature-list">
+          <div class="feature-item">
+            <div class="feature-icon-wrapper"><i class="fa-solid fa-microphone"></i></div>
+            <span>Khai quật nỗi đau vi mô qua 5 giác quan</span>
+          </div>
+          <div class="feature-item">
+            <div class="feature-icon-wrapper"><i class="fa-solid fa-eye"></i></div>
+            <span>Thực nghiệm bằng chứng vật lý chân thực, thô mộc</span>
+          </div>
+          <div class="feature-item">
+            <div class="feature-icon-wrapper"><i class="fa-solid fa-hand-fist"></i></div>
+            <span>Xây dựng kịch bản ASMR, Before-After, Skeptic bạo lực</span>
+          </div>
+        </div>
+
+        <a href="ugc.html" class="btn-action">
+          <span>Kích hoạt UGC Video</span>
+          <i class="fa-solid fa-arrow-right"></i>
+        </a>
+      </div>
+
+      <div class="block-visual">
+        <div class="interactive-glow"></div>
+        <div class="visual-card">
+          <div class="card-top">
+            <div class="card-badge">UGC Script Engine</div>
+            <div class="card-dots">
+              <div class="card-dot"></div>
+              <div class="card-dot"></div>
+              <div class="card-dot"></div>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="body-line accented" style="background: linear-gradient(90deg, var(--ugc-primary), rgba(255,255,255,0.1));"></div>
+            <div class="body-line"></div>
+            <div class="body-line medium"></div>
+            <div class="body-line short"></div>
+          </div>
+          <div class="card-bottom">
+            <div class="avatar-mock">
+              <div class="avatar-img" style="background: linear-gradient(135deg, var(--ugc-primary), #fff)">U</div>
+              <div>
+                <div class="avatar-name">UGC Director</div>
+                <div class="avatar-role">Performance Video Producer</div>
+              </div>
+            </div>
+            <i class="fa-solid fa-video" style="color: var(--ugc-primary); opacity: 0.7;"></i>
           </div>
         </div>
       </div>
