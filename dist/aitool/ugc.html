@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>UGC Director — Đạo diễn Kịch bản Performance Ads</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:#09090b; --surface:#18181b; --s2:#27272a; --border:#3f3f46;
+      --text:#f4f4f5; --muted:#a1a1aa; --dim:#d4d4d8;
+      --a:#a855f7; --a-dim:rgba(168,85,247,.12); --a-glow:rgba(168,85,247,.25);
+      --ubg:#1e1b4b; --uborder:#312e81;
+      --g:#10b981; --g-dim:rgba(16,185,129,.1);
+    }
+    html,body{height:100%}
+    body{font-family:'Inter',-apple-system,sans-serif;background:var(--bg);color:var(--text);
+      display:flex;flex-direction:column;height:100vh;overflow:hidden}
+
+    /* ── HEADER ── */
+    header{display:flex;align-items:center;justify-content:space-between;
+      padding:13px 20px;background:var(--surface);border-bottom:1px solid var(--border);
+      flex-shrink:0;z-index:50}
+    .hl{display:flex;align-items:center;gap:12px}
+    .av-w{position:relative;width:38px;height:38px}
+    .av{width:38px;height:38px;border-radius:11px;
+      background:linear-gradient(135deg,#a855f7,#ec4899);
+      display:flex;align-items:center;justify-content:center;
+      font-size:16px;font-weight:800;color:#fff;position:relative;z-index:2;
+      box-shadow:0 0 14px rgba(168,85,247,.25)}
+    .av-ring{position:absolute;inset:-4px;border-radius:14px;
+      border:2px solid var(--a);opacity:0;transition:opacity .3s}
+    .av-ring.on{opacity:1;animation:rp 1.6s ease-in-out infinite}
+    @keyframes rp{0%,100%{box-shadow:0 0 0 0 var(--a-glow)}50%{box-shadow:0 0 0 7px transparent}}
+    .hd-title{font-size:14px;font-weight:700;display:flex;align-items:center;gap:7px}
+    .badge{font-size:9px;font-weight:700;padding:2px 7px;border-radius:999px;
+      background:var(--a-dim);color:var(--a);border:1px solid rgba(168,85,247,.25);
+      letter-spacing:.5px;text-transform:uppercase}
+    .hd-sub{font-size:11px;color:var(--dim);display:flex;align-items:center;gap:5px;margin-top:2px}
+    .dot-live{width:6px;height:6px;border-radius:50%;background:var(--g);
+      animation:blink 2.2s ease-in-out infinite}
+    @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+
+    .hr{display:flex;align-items:center;gap:8px}
+    .icon-btn{width:34px;height:34px;border-radius:9px;border:1px solid var(--border);
+      background:transparent;color:var(--muted);display:flex;align-items:center;justify-content:center;
+      cursor:pointer;font-size:13px;transition:all .2s}
+    .icon-btn:hover{background:var(--s2);color:var(--text)}
+
+    /* ── PROGRESS ── */
+    .pt{height:2px;background:var(--border);flex-shrink:0}
+    .pf{height:100%;background:linear-gradient(90deg,var(--a),#ec4899);
+      width:0%;transition:width .6s cubic-bezier(.4,0,.2,1)}
+
+    /* ── CHAT ── */
+    #chat{flex:1;overflow-y:auto;padding:28px 16px 0;scroll-behavior:smooth}
+    #chat::-webkit-scrollbar{width:4px}
+    #chat::-webkit-scrollbar-thumb{background:#333;border-radius:999px}
+    .cw{max-width:660px;margin:0 auto;display:flex;flex-direction:column;gap:18px;padding-bottom:20px}
+    .msg{display:flex;gap:10px;animation:rise .28s ease-out}
+    @keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    .msg.user{flex-direction:row-reverse}
+    .mav{width:30px;height:30px;border-radius:9px;display:flex;align-items:center;
+      justify-content:center;font-size:12px;flex-shrink:0;margin-top:2px}
+    .mav.leo{background:linear-gradient(135deg,#a855f7,#ec4899);font-weight:800;color:#fff}
+    .mav.human{background:var(--s2);border:1px solid var(--border);color:var(--muted)}
+    .bubble{max-width:82%;background:var(--surface);border:1px solid var(--border);
+      border-radius:4px 16px 16px 16px;padding:12px 15px;font-size:13.5px;
+      line-height:1.72;color:var(--text)}
+    .msg.user .bubble{background:var(--ubg);border-color:var(--uborder);
+      border-radius:16px 4px 16px 16px;color:#c9d8f8}
+    .bm{font-size:10px;color:var(--muted);margin-top:7px;display:flex;align-items:center;gap:4px}
+    .qlabel{display:block;font-size:10px;font-weight:700;color:var(--muted);
+      text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px}
+    .h{color:var(--a);font-weight:600}
+    .hg{color:#4ade80;font-weight:600}
+
+    .cur{display:inline-block;width:2px;height:13px;background:var(--a);
+      margin-left:2px;vertical-align:middle;animation:cb .75s step-end infinite}
+    @keyframes cb{0%,100%{opacity:1}50%{opacity:0}}
+    .stream-cur{display:inline-block;width:2px;height:14px;background:var(--g);
+      vertical-align:middle;margin-left:1px;border-radius:1px;
+      animation:cb .55s step-end infinite}
+
+    .chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;
+      color:#4ade80;background:rgba(74,222,128,.08);border:1px solid rgba(74,222,128,.18);
+      border-radius:6px;padding:2px 8px;margin-bottom:8px}
+
+    .tb{background:var(--surface);border:1px solid var(--border);
+      border-radius:4px 16px 16px 16px;padding:11px 14px;
+      display:flex;align-items:center;gap:9px;font-size:12px;color:var(--muted);font-style:italic}
+    .dots{display:flex;gap:4px}
+    .d{width:5px;height:5px;border-radius:50%;background:var(--a);
+      animation:db 1.4s ease-in-out infinite}
+    .d:nth-child(2){animation-delay:.16s}
+    .d:nth-child(3){animation-delay:.32s}
+    @keyframes db{0%,80%,100%{transform:scale(.65);opacity:.4}40%{transform:scale(1);opacity:1}}
+
+    .sc{background:rgba(168,85,247,.04);border:1px solid rgba(168,85,247,.15);
+      border-radius:12px;padding:14px 16px;margin:10px 0 4px}
+    .sct{font-size:11px;font-weight:700;color:var(--a);letter-spacing:.4px;
+      text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:6px}
+    .sr{display:flex;gap:8px;align-items:baseline;margin-bottom:5px}
+    .sk{color:var(--muted);min-width:110px;font-size:11px;flex-shrink:0}
+    .sv{color:var(--text);font-weight:500;font-size:12.5px}
+
+    .pbox{background:#0a0a0a;border:1px solid var(--border);border-radius:12px;
+      padding:14px;font-family:'Courier New',monospace;font-size:11px;line-height:1.65;
+      color:#8a9ab8;max-height:280px;overflow-y:auto;white-space:pre-wrap;
+      word-break:break-word;margin-top:12px;position:relative}
+    .pbox::-webkit-scrollbar{width:4px}
+    .pbox::-webkit-scrollbar-thumb{background:#333}
+    .cpbtn{position:sticky;top:0;left:100%;display:block;width:fit-content;
+      margin-left:auto;margin-bottom:8px;padding:5px 12px;border-radius:7px;
+      background:var(--s2);border:1px solid var(--border);color:var(--dim);
+      font-size:11px;font-weight:600;cursor:pointer;transition:all .2s;
+      font-family:'Inter',sans-serif}
+    .cpbtn:hover{background:var(--a);color:#fff;border-color:var(--a)}
+
+    /* ── INPUT ── */
+    #inp-area{flex-shrink:0;padding:10px 16px 18px;
+      background:linear-gradient(to top,var(--bg) 75%,transparent)}
+    #qtags{display:flex;gap:7px;overflow-x:auto;padding-bottom:2px;margin-bottom:9px}
+    #qtags::-webkit-scrollbar{display:none}
+    .qt{flex-shrink:0;padding:5px 11px;border-radius:8px;background:var(--surface);
+      border:1px solid var(--border);color:var(--dim);font-size:11.5px;cursor:pointer;
+      transition:all .18s;white-space:nowrap;font-family:'Inter',sans-serif}
+    .qt:hover{border-color:var(--a);color:var(--a);background:var(--a-dim)}
+    .irow{display:flex;align-items:center;gap:9px;background:var(--surface);
+      border:1px solid var(--border);border-radius:14px;padding:9px 9px 9px 15px;
+      transition:border-color .2s,box-shadow .2s}
+    .irow:focus-within{border-color:var(--a);box-shadow:0 0 0 3px var(--a-dim)}
+    #uin{flex:1;background:transparent;border:none;outline:none;color:var(--text);
+      font-size:13.5px;font-family:'Inter',sans-serif}
+    #uin::placeholder{color:var(--muted)}
+    #sbtn{width:36px;height:36px;border-radius:10px;background:var(--a);border:none;
+      color:#fff;font-size:13px;display:flex;align-items:center;justify-content:center;
+      cursor:pointer;transition:all .2s;flex-shrink:0}
+    #sbtn:hover:not(:disabled){background:#9333ea;transform:scale(1.06)}
+    #sbtn:disabled{opacity:.35;cursor:default;transform:none}
+
+    /* ── TOAST ── */
+    #toast{position:fixed;bottom:90px;left:50%;
+      transform:translateX(-50%) translateY(16px);
+      background:var(--g);color:#fff;padding:9px 18px;border-radius:12px;
+      font-size:13px;font-weight:600;opacity:0;pointer-events:none;
+      transition:all .28s;z-index:999;white-space:nowrap}
+    #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+    @media(min-width:768px){
+      #chat{padding:36px 32px 0}
+      #inp-area{padding:10px 32px 22px}
+    }
+  </style>
+
+  <!-- Aeonik Font -->
+  <style>
+    @font-face {
+      font-family: 'SVN-Aeonik';
+      src: url('https://fedu.vn/typo/fonts/SVN-AEONIK-REGULAR.TTF') format('truetype');
+      font-weight: 400;
+      font-style: normal;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'SVN-Aeonik';
+      src: url('https://fedu.vn/typo/fonts/SVN-AEONIK-BOLD.TTF') format('truetype');
+      font-weight: 700;
+      font-style: normal;
+      font-display: swap;
+    }
+    * {
+      font-family: 'SVN-Aeonik', 'Inter', -apple-system, sans-serif !important;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── HEADER ── -->
+<header>
+  <div class="hl">
+    <div class="av-w">
+      <div class="av">U</div>
+      <div class="av-ring" id="av-ring"></div>
+    </div>
+    <div>
+      <div class="hd-title">UGC Director <span class="badge">Performance</span></div>
+      <div class="hd-sub"><span class="dot-live"></span>Đạo diễn & Chuyên gia Tâm lý Ads</div>
+    </div>
+  </div>
+  <div class="hr">
+    <div class="mode-badge" style="display:flex;align-items:center;gap:5px;padding:4px 10px;border-radius:8px;border:1px solid rgba(168,85,247,.3);background:var(--a-dim);color:var(--a);font-size:11px;font-weight:600;">
+      <span style="width:6px;height:6px;border-radius:50%;background:var(--a)"></span>
+      <span>UGC Flow</span>
+    </div>
+  </div>
+</header>
+
+<!-- ── PROGRESS ── -->
+<div class="pt"><div class="pf" id="prog"></div></div>
+
+<!-- ── CHAT ── -->
+<div id="chat"><div class="cw" id="cw"></div></div>
+
+<!-- ── INPUT ── -->
+<div id="inp-area">
+  <div id="qtags"></div>
+  <div class="irow">
+    <input id="uin" type="text" autocomplete="off"
+      placeholder="Nhập câu trả lời của bạn..."
+      onkeydown="if(event.key==='Enter'&&!event.shiftKey)send()">
+    <button id="sbtn" onclick="send()"><i class="fas fa-arrow-up"></i></button>
+  </div>
+</div>
+
+<!-- ── TOAST ── -->
+<div id="toast"></div>
+
+<script>
+const Q = [
+  {
+    q: 'Sản phẩm bạn định quay kịch bản UGC là gì?',
+    h: ['Cốc giữ nhiệt văn phòng', 'Chuột không dây công thái học', 'Bàn chải điện sóng âm']
+  },
+  {
+    q: 'Khán giả mục tiêu của video này là ai?',
+    h: ['Dân văn phòng ngồi máy tính nhiều', 'Sinh viên muốn setup bàn làm việc đẹp', 'Người thích du lịch bụi, dã ngoại']
+  },
+  {
+    q: 'Thời lượng video mong muốn của bạn là bao nhiêu?',
+    h: ['15s (Nhanh, dồn dập)', '30s (Tiêu chuẩn, trực diện)', '45s (Có kể chuyện/Review sâu)']
+  }
+];
+
+const ACK = ['Đã ghi nhận sản phẩm', 'Đã lưu khán giả mục tiêu', 'Đã chọn thời lượng'];
+
+const THK = [
+  'Đang xác nhận sản phẩm...',
+  'Đang phân tích tệp khán giả mục tiêu...',
+  'Đang tối ưu hóa cấu trúc thời lượng...',
+  'Đang chuẩn bị Mega Prompt phỏng vấn chuyên sâu...'
+];
+
+const FR = [
+  answer => `Sản phẩm "${answer}" đã được thiết lập làm trọng tâm.`,
+  answer => `Đã ghi nhận insight về tệp khán giả: "${answer}".`,
+  answer => `Thời lượng ${answer} đã được chốt. Đang tiến hành chuẩn bị xuất Mega Prompt phỏng vấn.`
+];
+
+let step = 0, data = {}, busy = false;
+const SK = 'ugc_v1';
+const cw = document.getElementById('cw');
+const uin = document.getElementById('uin');
+const sbtn = document.getElementById('sbtn');
+const qtags = document.getElementById('qtags');
+const prog = document.getElementById('prog');
+const ring = document.getElementById('av-ring');
+
+function chunk(el, html, n = 3, ms = 16) {
+  return new Promise(res => {
+    el.innerHTML = '';
+    const tokens = [];
+    const re = /(<[^>]+>|&[^;]+;|[\s\S])/g;
+    let m;
+    while ((m = re.exec(html)) !== null) tokens.push(m[0]);
+    let i = 0;
+    const CUR = '<span class="cur"></span>';
+    function tick() {
+      if (i >= tokens.length) { el.innerHTML = html; res(); return; }
+      let added = 0;
+      while (i < tokens.length && added < n) {
+        i++;
+        if (!tokens[i-1].startsWith('<')) added++;
+      }
+      el.innerHTML = tokens.slice(0, i).join('') + CUR;
+      scrollB();
+      const last = tokens[i-1] || '';
+      const delay = last === '.' || last === '!' || last === '?' ? 120 : last === ',' ? 60 : ms;
+      setTimeout(tick, delay);
+    }
+    tick();
+  });
+}
+
+async function directorSay(html) {
+  busy = true; active(true); setIn(false);
+  const row = mkRow('leo');
+  const txt = row.querySelector('.txt');
+  cw.appendChild(row); scrollB();
+  await chunk(txt, html, 3, 16);
+  busy = false; active(false);
+}
+
+function userSay(text) {
+  const row = mkRow('user');
+  row.querySelector('.txt').textContent = text;
+  cw.appendChild(row); scrollB();
+}
+
+function showThink(msg) {
+  const id = 't' + Date.now();
+  const el = document.createElement('div');
+  el.id = id; el.className = 'msg';
+  el.innerHTML = `<div class="mav leo"><i class="fas fa-bolt" style="font-size:11px"></i></div>
+    <div class="tb"><div class="dots"><div class="d"></div><div class="d"></div><div class="d"></div></div><span>${msg}</span></div>`;
+  cw.appendChild(el); scrollB(); return id;
+}
+
+function mkRow(who) {
+  const r = document.createElement('div');
+  r.className = 'msg' + (who === 'user' ? ' user' : '');
+  const u = who === 'user';
+  r.innerHTML = `<div class="mav ${u ? 'human' : 'leo'}">${u ? '<i class="fas fa-user" style="font-size:11px"></i>' : 'D'}</div>
+    <div class="bubble"><div class="txt"></div>
+    <div class="bm"><i class="fas fa-check-double" style="color:${u ? '#555' : 'var(--a)'}"></i> ${now()}</div></div>`;
+  return r;
+}
+
+async function askQ(n) {
+  await directorSay(`<span class="qlabel">Bước 1: Khởi tạo · Câu ${n+1} / 3</span>${Q[n].q}`);
+  tags(Q[n].h); setIn(true); uin.focus();
+}
+
+async function send() {
+  const val = uin.value.trim();
+  if (!val || busy || step >= 3) return;
+  data[`q${step+1}`] = val;
+  userSay(val); uin.value = ''; clearTags(); setIn(false); save();
+
+  const s = step; step++; setP(step, 3);
+  const thinkDelay = 500 + Math.min(val.length * 10, 1000);
+  const tid = showThink(THK[s]);
+  active(true);
+
+  await sleep(thinkDelay);
+  rm(tid); active(false);
+
+  if (step < 3) {
+    const row = mkRow('leo');
+    const txt = row.querySelector('.txt');
+    cw.appendChild(row); active(true);
+    
+    const chip = document.createElement('span');
+    chip.className = 'chip';
+    chip.innerHTML = `<i class="fas fa-check"></i> ${ACK[s]}`;
+    txt.appendChild(chip);
+    const sp = document.createElement('span');
+    sp.innerHTML = ' ' + FR[s](val); txt.appendChild(sp);
+    
+    active(false);
+    await sleep(350);
+    await askQ(step);
+  } else {
+    await genPrompt();
+  }
+}
+
+async function genPrompt() {
+  const tid = showThink(THK[3]); active(true);
+  await sleep(1500); rm(tid); active(false);
+
+  const prompt = buildP();
+
+  await directorSay(
+    `<span class="hg"><i class="fas fa-check-circle"></i> Bước 1 (Khởi tạo) hoàn tất!</span><br><br>` +
+    `<span style="color:var(--muted);font-size:12.5px">Để kịch bản UGC đạt <b>độ sâu và cá nhân hóa tối đa</b>, các bước phỏng vấn chuyên sâu tiếp theo (Khai quật Nỗi đau Vi mô, Bằng chứng Giác quan, Rào cản Hoài nghi) nên được thực hiện trên các mô hình ngôn ngữ lớn (như Claude hoặc ChatGPT).</span>` +
+    `<div class="sc"><div class="sct"><i class="fas fa-video"></i> Tóm tắt Setup</div>` +
+    `<div class="sr"><span class="sk">Sản phẩm</span><span class="sv">${esc(data.q1 || '—')}</span></div>` +
+    `<div class="sr"><span class="sk">Khán giả</span><span class="sv">${esc(data.q2 || '—')}</span></div>` +
+    `<div class="sr"><span class="sk">Thời lượng</span><span class="sv">${esc(data.q3 || '—')}</span></div></div>`
+  );
+
+  const pid = 'pr' + Date.now();
+  const row = document.createElement('div');
+  row.className = 'msg';
+  row.innerHTML = `
+    <div class="mav leo" style="background:linear-gradient(135deg,#10b981,#059669)"><i class="fas fa-code" style="font-size:11px"></i></div>
+    <div class="bubble" style="max-width:100%;border-color:#10b98122">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Hãy copy Mega Prompt này và dán vào <b>ChatGPT / Claude / Gemini</b> để tiếp tục phỏng vấn:</div>
+      <div class="pbox" id="${pid}"><button class="cpbtn" onclick="copyP('${pid}')"><i class="fas fa-copy"></i> Copy</button>${esc(prompt)}</div>
+    </div>`;
+  cw.appendChild(row);
+  setP(3, 3); clearTags();
+  uin.disabled = true; uin.placeholder = '✓ Mega Prompt đã sẵn sàng'; sbtn.disabled = true;
+  clearSess();
+
+  const rb = document.createElement('button');
+  rb.className = 'qt';
+  rb.innerHTML = '<i class="fas fa-redo" style="margin-right:6px;font-size:10px"></i>Tạo kịch bản mới';
+  rb.onclick = () => location.reload();
+  qtags.appendChild(rb);
+  scrollB();
+}
+
+function buildP() {
+  const d = data;
+  return `[BỐI CẢNH & VAI TRÒ]
+Bạn là một Đạo diễn Performance Video Ads và Chuyên gia Tâm lý Hành vi xuất sắc. Nhiệm vụ của bạn là phỏng vấn tôi để moi ra "trải nghiệm vật lý và cảm xúc thật" về một sản phẩm, từ đó nhào nặn ra 3 kịch bản UGC (Cấp 1, 2, 3) có tỷ lệ chuyển đổi cao.
+
+[NGUYÊN TẮC PHỎNG VẤN - BẮT BUỘC TUÂN THỦ]
+1. Tuyệt đối KHÔNG hỏi dồn dập. Hãy hỏi TỪNG BƯỚC MỘT. Chờ tôi trả lời xong mới được hỏi tiếp.
+2. Ở mỗi câu hỏi, LUÔN CUNG CẤP 3 GỢI Ý (A, B, C...) cực kỳ chi tiết, miêu tả bằng GIÁC QUAN (nhìn, sờ, nghe, hành động) để tôi dễ hình dung và chọn (giúp tôi không bị bí ý tưởng).
+3. Tuyệt đối KHÔNG dùng từ ngữ Marketing sáo rỗng (như hoàn hảo, tối ưu, siêu phẩm).
+
+[DỮ LIỆU ĐÃ KHỞI TẠO (BƯỚC 1)]
+- Sản phẩm: ${d.q1}
+- Khán giả mục tiêu: ${d.q2}
+- Thời lượng video mong muốn: ${d.q3}
+
+[QUY TRÌNH PHỎNG VẤN 4 BƯỚC]
+- Bước 1: Khởi tạo (ĐÃ HOÀN THÀNH - xem dữ liệu ở trên).
+- Bước 2: Khai quật "Nỗi đau Vi mô" (Micro-pain). Hỏi tôi: Chi tiết vật lý hay hành động nhỏ nhặt nào ở đồ cũ khiến bạn ức chế, cáu bẳn nhất? (Hãy tả giác quan, không tả chung chung). Gợi ý (AI tự suy luận theo sản phẩm ở B1): A, B, C.
+- Bước 3: Bằng chứng Giác quan (Sensory Proof). Hỏi tôi: Chi tiết vật lý nào của đồ mới khiến bạn "sướng" nhất? Động tác tay của bạn khi "test" nó để chứng minh sự sung sướng đó là gì?
+- Bước 4: Rào cản Hoài nghi (The Skeptic). Hỏi tôi: Trước khi mua, bạn hoặc người khác thường nghi ngờ, chê bai điều gì nhất về món đồ này?
+
+[GIAI ĐOẠN XUẤT KỊCH BẢN]
+Sau khi tôi trả lời xong Bước 4, hãy tổng hợp dữ liệu và in ra 3 kịch bản dạng Bảng (Thời lượng | Hình ảnh B-roll & Cỡ cảnh | Âm thanh & Voice-over). Lời thoại phải thô mộc, đời thường, cục súc.
+
+- CẤP ĐỘ 1: UNBOXING & ASMR (Công thức T.T.R - Tease, Touch, Reveal). Không lộ mặt, ít hoặc không Voice-over. Trọng tâm B-roll quay cận cảnh (Macro) lớp vật liệu và thiết kế Sound Design dựa trên Bước 3.
+- CẤP ĐỘ 2: B.A.B (Nỗi đau & Giải pháp). Hook bằng sự ức chế tột độ ở Bước 2 (Before). Cắt cảnh gắt (Match-cut) sang giải pháp sung sướng ở Bước 3 (After).
+- CẤP ĐỘ 3: THE SKEPTIC (Đảo chiều Tâm lý). Hook bằng sự hoài nghi/chê bai ở Bước 4. Chuyển sang dùng Bằng chứng ở Bước 3 làm một bài "Test rủi ro cao" (Thực nghiệm tàn bạo) ngay trên camera để "tự vả mặt".
+
+Bây giờ, hãy đóng vai Đạo diễn, chào tôi thật ngầu bằng phong cách chuyên nghiệp/cục súc của đạo diễn ads, xác nhận lại thông tin Bước 1 đã nhận được từ web app, rồi hỏi tôi câu hỏi của Bước 2 kèm gợi ý giác quan cụ thể tương ứng cho sản phẩm!`;
+}
+
+function save() { localStorage.setItem(SK, JSON.stringify({ step, data, ts: Date.now() })) }
+function clearSess() { localStorage.removeItem(SK) }
+function tryResume() {
+  try {
+    const s = JSON.parse(localStorage.getItem(SK) || 'null');
+    if (!s || Date.now() - s.ts > 7200000 || !s.step) return false;
+    step = s.step; data = s.data; return true;
+  } catch (e) { return false; }
+}
+
+window.addEventListener('load', async () => {
+  if (tryResume()) {
+    await directorSay(
+      `Chào bạn quay lại! Dự án UGC cho sản phẩm <span class="h">"${data.q1 || 'sản phẩm của bạn'}"</span> đang dừng ở bước ${step}/3.<br><br>` +
+      `<span style="color:var(--muted)">Tiếp tục nhé —</span>`
+    );
+    await askQ(step);
+    return;
+  }
+  await sleep(220);
+  await directorSay(
+    `Chào bạn! Tôi là <span class="h">UGC Director AI</span> — Trợ lý thiết lập kịch bản Performance Ads chuyên nghiệp.<br><br>` +
+    `Tôi sẽ giúp bạn khởi tạo Bước 1 nhanh chóng, sau đó đóng gói dữ liệu thành một Mega Prompt phỏng vấn cực sâu để dán vào Claude/ChatGPT để phỏng vấn tiếp các bước sau. Cách này giúp bạn có được kịch bản chất lượng, sâu sắc nhất.`
+  );
+  await askQ(0);
+});
+
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function now() { const d = new Date(); return d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0'); }
+function rm(id) { document.getElementById(id)?.remove(); }
+function scrollB() { const c = document.getElementById('chat'); c.scrollTop = c.scrollHeight; }
+function active(on) { ring.classList.toggle('on', on); }
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+function setIn(on) { uin.disabled = !on; sbtn.disabled = !on; uin.placeholder = on ? 'Nhập câu trả lời của bạn...' : 'Đạo diễn đang ghi chép...'; }
+function setP(cur, tot) { prog.style.width = ((cur / tot) * 100) + '%'; }
+function tags(h) { qtags.innerHTML = ''; (h || []).forEach(t => { const b = document.createElement('button'); b.className = 'qt'; b.textContent = t; b.onclick = () => { uin.value = t; send(); }; qtags.appendChild(b); }); }
+function clearTags() { qtags.innerHTML = ''; }
+function toast(msg) { const t = document.getElementById('toast'); t.innerHTML = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2400); }
+function copyP(id) {
+  const el = document.getElementById(id);
+  const btn = el.querySelector('.cpbtn'); btn.style.display = 'none';
+  const text = el.innerText.trim(); btn.style.display = '';
+  (navigator.clipboard?.writeText(text) ?? Promise.reject()).catch(() => {
+    const ta = Object.assign(document.createElement('textarea'), { value: text });
+    document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove();
+  });
+  toast('<i class="fas fa-check-circle"></i> Đã copy Mega Prompt thành công!');
+}
+</script>
+</body>
+</html>
