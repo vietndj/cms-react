@@ -307,30 +307,64 @@
 <div id="toast"></div>
 
 <script>
-// ══════════════════════════════════════════════════════════
-//  FLOW QUESTIONS (Nova 3-step)
-// ══════════════════════════════════════════════════════════
 const Q = [
   {
-    q: 'Hiện tại, bạn đang muốn làm nội dung cho <span class="h">lĩnh vực nào?</span>',
-    h: ['📦 Bán lẻ / Sản phẩm vật lý', '🎓 Dịch vụ / Khóa học / Chuyên gia', '🎬 Xây kênh Viral / Giải trí']
+    q: 'Hiện tại, bạn đang muốn làm video quảng cáo cho <span class="h">lĩnh vực / sản phẩm nào?</span>',
+    h: ['📦 Mỹ phẩm / Thời trang', '🎓 Khóa học / Dịch vụ tư vấn', '🏠 Bất động sản / Gia dụng']
   },
   {
-    q: 'Đâu là <span class="h">rào cản tâm lý, định kiến hoặc nỗi lo sợ lớn nhất</span> khiến khách hàng chưa chịu mua sản phẩm/dịch vụ của bạn?',
-    h: ['Sợ giá cao, không đủ tiền', 'Sợ mỹ phẩm dị ứng, không hợp da', 'Lười học, không có thời gian']
+    q: 'Đâu là <span class="h">rào cản tâm lý hoặc nỗi sợ lớn nhất</span> khiến khách hàng chưa chịu mua sản phẩm này?',
+    h: ['Sợ giá cao, không hiệu quả', 'Sợ kích ứng da, hàng giả', 'Sợ học xong không làm được']
   }
 ];
 
-const THK = [
-  'Đang phân loại ngành hàng và chọn framework...',
-  'Đang khai thác insight tâm lý khách hàng...',
-  'Đang đóng gói Mega Prompt cá nhân hóa...'
-];
+// Dynamic thinking states for high-tech AI feel
+const THINKING_STEPS = {
+  0: [
+    'Đang phân loại ngành hàng và chọn framework quảng cáo chuyển đổi...',
+    'Đang phân tích cấu trúc đối thủ cạnh tranh trên nền tảng dọc...',
+    'Đang định vị chân dung khách hàng mục tiêu từ sản phẩm...',
+    'Đang kết nối mô hình phân tích phễu nội dung...'
+  ],
+  1: [
+    'Đang bóc tách rào cản tâm lý và phân tích cơ chế phòng vệ khách hàng...',
+    'Đang đối chiếu dữ liệu insight để thiết kế Hook chặn ngón tay...',
+    'Đang tính toán điểm thắt nút kích hoạt hành động mua hàng...',
+    'Đang tối ưu hóa mức độ thuyết phục lý tính trong thông điệp...'
+  ],
+  2: [
+    'Đang khởi tạo thuật toán đóng gói kịch bản quảng cáo...',
+    'Đang tích hợp cấu trúc 3 module Hook-Body-CTA độc lập...',
+    'Đang cân đối tỷ lệ phân bổ từ ngữ (strictly dưới 200 từ)...',
+    'Đang thiết lập nhịp điệu cắt cảnh [//] tối ưu tỷ lệ giữ chân...'
+  ]
+};
 
-const FR = [
-  ans => `Ngành hàng đã được phân loại. Framework Marketing xương sống đang được xác định dựa trên đặc thù tâm lý mua hàng của segment này.`,
-  ans => `Insight về rào cản tâm lý đã ghi nhận. Dữ liệu này sẽ được đưa trực tiếp vào các Hook để phá vỡ sức đề kháng ngay giây đầu tiên.`
-];
+// Intelligent randomized fallback responses
+const FR_RESPONSES = {
+  0: [
+    ans => `Lĩnh vực <strong>"${ans}"</strong> là một ngách có độ nhiễu thông tin rất cao trên nền tảng dọc. Tôi đã xác lập Framework tối ưu để định hình thông điệp của bạn không bị lẫn lộn giữa hàng ngàn video khác.`,
+    ans => `Phân tích dữ liệu ngành hàng <strong>"${ans}"</strong>: Khách hàng phân khúc này có xu hướng lướt rất nhanh nhưng bộ lọc đề kháng quảng cáo cực nhạy. Cấu trúc kịch bản sẽ được tối ưu để vượt qua điều này.`,
+    ans => `Ghi nhận thông tin về ngành <strong>"${ans}"</strong>. Framework marketing xương sống đã được thiết lập nhằm đảm bảo kịch bản tập trung tối đa vào mục tiêu chuyển đổi thực tế.`
+  ],
+  1: [
+    ans => `Rào cản tâm lý <strong>"${ans}"</strong> là một insight cực kỳ đắt giá. Đây là điểm thắt nút chính mà chúng ta sẽ dùng làm chất liệu để viết các Hook phá vỡ sự đề kháng của khách hàng ngay giây đầu tiên.`,
+    ans => `Insight <strong>"${ans}"</strong> rất phổ biến nhưng ít bên xử lý khéo léo. Trong video quảng cáo dọc, việc gọi tên và hóa giải rào cản này trong 5 giây đầu sẽ giữ chân người xem lâu hơn 40%.`,
+    ans => `Đã ghi nhận rào cản <strong>"${ans}"</strong>. Tôi sẽ tích hợp điểm chạm này trực tiếp vào kịch bản để tạo ra sự đồng cảm cao độ từ phía khách hàng trước khi đưa ra lời kêu gọi hành động (CTA).`
+  ]
+};
+
+function getThinkMsg(stepIdx) {
+  const arr = THINKING_STEPS[stepIdx] || ['Đang xử lý dữ liệu...'];
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+function getFallbackResponse(stepIdx, ans) {
+  const arr = FR_RESPONSES[stepIdx];
+  if (!arr) return '';
+  const fn = arr[Math.floor(Math.random() * arr.length)];
+  return fn(ans);
+}
 
 // ══════════════════════════════════════════════════════════
 //  STATE
@@ -359,6 +393,21 @@ const AI = {
   async init() {
     if (GEMINI_KEY) { this.key = GEMINI_KEY; this.mode = 'gemini'; }
     this.badge();
+    
+    // Randomize assistant name on initialization
+    const ASSISTANT_NAMES = ['Nova', 'Kael', 'Astra', 'Juno', 'Orion', 'Vesper', 'Lyra', 'Zephyr', 'Apex', 'Helius'];
+    window.assistantName = ASSISTANT_NAMES[Math.floor(Math.random() * ASSISTANT_NAMES.length)];
+    
+    // Update dynamic UI texts
+    document.title = `${window.assistantName} — Trợ lý kịch bản video quảng cáo`;
+    const titleEl = document.querySelector('.hd-title');
+    if (titleEl) titleEl.innerHTML = `${window.assistantName} <span class="badge">Script</span>`;
+    const avEl = document.querySelector('.av');
+    if (avEl) {
+      avEl.innerHTML = window.assistantName[0];
+      avEl.style.fontWeight = '800';
+      avEl.style.fontSize = '16px';
+    }
   },
 
   badge() {
@@ -382,15 +431,15 @@ const AI = {
       contextLine = `Ngành hàng: ${userData.industry}. Framework: ${userData.framework}.`;
     }
 
-    const prompt = `Bạn là Nova — chuyên gia chiến lược nội dung video ngắn (TikTok/Reels). Tiếng Việt. Không emoji. Không "cảm ơn". Không mở đầu bằng "Tôi đã ghi nhận" hay "Thú vị".
-
+    const prompt = `Bạn là ${window.assistantName || 'Nova'} — chuyên gia chiến lược nội dung video ngắn (TikTok/Reels). Tiếng Việt. Không emoji. Không "cảm ơn". Không mở đầu bằng "Tôi đã ghi nhận" hay "Thú vị".
+  
 Câu hỏi vừa hỏi: "${qtext}"
 Câu trả lời của người dùng: "${answer}"
 ${contextLine}
 
 Viết phản hồi 2-3 câu theo phong cách chuyên gia thực chiến:
 - Trích dẫn trực tiếp 1-2 từ/cụm từ cốt lõi từ câu trả lời (dùng dấu "")
-- Phân tích ngắn tại sao data này quan trọng cho kịch bản video
+- Phân tích ngắn tại sao data này quan trọng cho kịch bản video quảng cáo chuyển đổi
 - Nêu cụ thể nó sẽ ảnh hưởng như thế nào đến Hook/Body/CTA
 Văn phong: đanh thép, tự tin, như content strategist đang đọc brief — không như chatbot xác nhận form.`;
 
@@ -520,27 +569,25 @@ function mkRow(who) {
 }
 
 // ══════════════════════════════════════════════════════════
-//  FRAMEWORK LOGIC (Nova core)
-// ══════════════════════════════════════════════════════════
 function detectFramework(answer) {
   const txt = answer.toLowerCase();
-  if (txt.includes('vật lý') || txt.includes('bán lẻ') || txt.includes('sản phẩm')) {
+  if (txt.includes('vật lý') || txt.includes('bán lẻ') || txt.includes('sản phẩm') || txt.includes('mỹ phẩm') || txt.includes('thời trang') || txt.includes('gia dụng')) {
     return {
       name: 'PAS — Vấn đề · Kích động · Giải pháp',
       code: 'PAS',
-      desc: 'Sản phẩm vật lý giải quyết nhu cầu cụ thể. PAS chỉ thẳng vào vấn đề → xoáy sâu nỗi đau → đưa ra giải pháp. Tỷ lệ chuyển đổi cao nhất cho FMCG và hàng hóa.'
+      desc: 'Phù hợp nhất cho sản phẩm vật lý giải quyết nỗi đau vật chất hoặc nhu cầu cấp bách (mụn, béo, hỏng hóc, rụng tóc...). PAS đi từ Vấn đề -> Xoáy sâu nỗi đau -> Đưa ra Giải pháp tối ưu.'
     };
-  } else if (txt.includes('dịch vụ') || txt.includes('khóa học') || txt.includes('đào tạo') || txt.includes('chuyên gia')) {
+  } else if (txt.includes('dịch vụ') || txt.includes('khóa học') || txt.includes('đào tạo') || txt.includes('chuyên gia') || txt.includes('tư vấn') || txt.includes('bất động sản')) {
     return {
       name: 'AIDA — Chú ý · Thích thú · Khao khát · Hành động',
       code: 'AIDA',
-      desc: 'Bán dịch vụ và tri thức là bán niềm tin. AIDA xây dựng sự tin tưởng từng tầng, khơi gợi khao khát từ từ trước khi chốt sale — phù hợp với high-ticket offer.'
+      desc: 'Phù hợp nhất cho dịch vụ, khóa học, bán tri thức, tư vấn, sản phẩm giá trị cao cần xây dựng niềm tin lớn. AIDA dẫn dắt từ Chú ý -> Thích thú -> Khao khát -> Chốt hành động.'
     };
   } else {
     return {
       name: 'HRR — Hook · Retain · Reward',
       code: 'HRR',
-      desc: 'Với kênh giải trí/viral, tỷ lệ giữ chân là vua. HRR tạo tò mò ngay giây đầu → giữ chân bằng nhịp điệu → thưởng bằng kết quả bất ngờ ở cuối video.'
+      desc: 'Phù hợp nhất cho xây kênh thương hiệu kết hợp bán hàng khéo léo. HRR gây tò mò cực mạnh đầu video (Hook) -> Giữ chân bằng thông điệp trung tâm (Retain) -> Trao kết quả bất ngờ ở cuối (Reward).'
     };
   }
 }
@@ -567,7 +614,7 @@ async function send() {
   setP(step, 3);
 
   const thinkDelay = 700 + Math.min(val.length * 12, 1400) + Math.random() * 300;
-  const tid = showThink(THK[s]);
+  const tid = showThink(getThinkMsg(s));
   active(true);
 
   // Step 0: detect framework + get hints for step 1 concurrently
@@ -601,9 +648,9 @@ async function send() {
 
     if (AI.mode !== 'fallback') {
       try { await AI.stream(s, val, txt); }
-      catch (e) { txt.textContent = FR[s]?.(val) || ''; }
+      catch (e) { txt.textContent = getFallbackResponse(s, val); }
     } else {
-      txt.textContent = FR[s]?.(val) || '';
+      txt.textContent = getFallbackResponse(s, val);
     }
     active(false);
 
@@ -636,14 +683,14 @@ async function send() {
 
     if (AI.mode !== 'fallback') {
       try { await AI.stream(s, val, txt); }
-      catch (e) { txt.textContent = FR[s]?.(val) || ''; }
+      catch (e) { txt.textContent = getFallbackResponse(s, val); }
     } else {
-      txt.textContent = FR[s]?.(val) || '';
+      txt.textContent = getFallbackResponse(s, val);
     }
     active(false);
 
     await sleep(500);
-    const tid2 = showThink(THK[2]);
+    const tid2 = showThink(getThinkMsg(2));
     active(true);
     await sleep(1800);
     rm(tid2); active(false);
@@ -700,35 +747,142 @@ async function genPrompt() {
 // ══════════════════════════════════════════════════════════
 function buildPrompt() {
   const d = userData;
-  return `Hãy đóng vai trò là một Giám đốc Chiến lược Nội dung (Senior Content Strategist) và Copywriter thực chiến. Nhiệm vụ của bạn là đồng hành tư vấn 1-1 để giúp tôi tạo ra kịch bản video dọc (Tiktok/Reels) tối ưu chuyển đổi, thời lượng STRICTLY dưới 75 giây (tối đa 210 từ).
+  const name = window.assistantName || 'Nova';
+  
+  // 1. Random Tone style description
+  const TONE_STYLES = [
+    { name: 'Đanh thép & Thực chiến', desc: 'đi thẳng vào vấn đề, sử dụng các động từ mạnh mẽ, nhịp độ nhanh và dứt khoát' },
+    { name: 'Cuốn hút & Bắt trend', desc: 'ngôn từ hiện đại, trẻ trung, bắt nhịp nhanh với thị hiếu người xem video ngắn hiện nay' },
+    { name: 'Thuyết phục & Chiều sâu', desc: 'tập trung vào giá trị cốt lõi, lập luận chặt chẽ, tạo niềm tin lớn bằng ngôn ngữ chuyên gia' },
+    { name: 'Hài hước & Châm biếm nhẹ', desc: 'sử dụng phép so sánh phóng đại hóm hỉnh để tạo sự thích thú và bất ngờ cho người xem' },
+    { name: 'Kể chuyện & Gợi mở cảm xúc', desc: 'phong cách storytelling, tạo sự đồng cảm sâu sắc với nỗi đau trước khi giới thiệu giải pháp' }
+  ];
+  const chosenTone = TONE_STYLES[Math.floor(Math.random() * TONE_STYLES.length)];
+  
+  // 2. Random Separators
+  const DIVIDERS = [
+    '═══════════════════════════════════════════',
+    '───────────────────────────────────────────',
+    '❖❖❖❖❖❖❖❖❖❖❖❖❖❖❖❖❖❖❖❖❖❖❖❖❖❖❖❖❖❖❖❖❖❖❖❖❖❖❖❖❖❖❖',
+    '◆◆◆◆◆◆◆◆◆◆◆◆◆◆◆◆◆◆◆◆◆◆◆◆◆◆◆◆◆◆◆◆◆◆◆◆◆◆◆◆◆◆◆'
+  ];
+  const div = DIVIDERS[Math.floor(Math.random() * DIVIDERS.length)];
+  
+  // 3. Random Bullets
+  const BULLETS = [
+    { main: '▸', sub: '▪', arrow: '=>' },
+    { main: '✦', sub: '▫', arrow: '→' },
+    { main: '❖', sub: '•', arrow: '->' }
+  ];
+  const bul = BULLETS[Math.floor(Math.random() * BULLETS.length)];
+  
+  // 4. Random Intro phrasing
+  const INTRUS = [
+    `Bạn là ${name} — Giám đốc Sáng tạo kiêm Chuyên gia biên kịch Video Quảng cáo chuyển đổi (Conversion Ad Video Director).`,
+    `Hãy đóng vai trò là ${name} — Senior Copywriter kiêm Creative Director chuyên trách video ngắn thương mại dưới 60s.`,
+    `Nhập vai ${name} — Chuyên gia sản xuất kịch bản TikTok Ads & Reels chuyển đổi cao.`
+  ];
+  const chosenIntro = INTRUS[Math.floor(Math.random() * INTRUS.length)];
 
-BỐI CẢNH DỰ ÁN CỦA TÔI:
-- Ngành hàng / Sản phẩm: ${d.industry}
-- Rào cản / Nỗi đau lớn nhất của khách hàng: "${d.painPoint}"
-- Công thức Marketing xương sống: ${d.framework}
+  return `${chosenIntro} 
+Nhiệm vụ của bạn là đồng hành thiết kế kịch bản video quảng cáo ngắn (dưới 60 giây, tối đa 200 từ) có tỷ lệ chuyển đổi cao. 
 
-CHIẾN LƯỢC SẢN XUẤT CÔNG NGHIỆP (3 MODULE):
-Video sẽ được cấu trúc thành 3 phần tách biệt để tôi tối ưu thời gian quay dựng:
-- Phần 1 (Hook - 15-20s): Thay đổi linh hoạt theo từng video để test A/B thị trường.
-- Phần 2 (Body - 40s): LÕI CỐ ĐỊNH. Áp dụng chuẩn công thức [${d.fwCode}]. Phần này mang thông điệp chính, tôi SẼ CHỈ QUAY 1 LẦN để ghép vào giữa mọi video.
-- Phần 3 (CTA - 10s): Thay đổi linh hoạt sao cho nối mượt với Hook.
+Quy trình làm việc của chúng ta gồm 5 bước tương tác tuyến tính. Hãy tuân thủ nghiêm ngặt quy tắc: "Chỉ hiển thị nội dung của bước hiện tại, tuyệt đối không hiển thị trước câu hỏi hay nội dung của bước sau".
 
-QUY TẮC LÀM VIỆC CỦA BẠN (BẮT BUỘC):
-1. KHÔNG BAO GIỜ tự ý nhả toàn bộ kịch bản ra trong 1 lần trả lời. Phải làm việc theo TỪNG BƯỚC HỎI ĐÁP bên dưới. Đợi tôi trả lời xong bước này mới được qua bước sau.
-2. Ngôn ngữ giao tiếp điềm đạm, thực tế, đúng chất chuyên gia. Tuyệt đối không dùng những từ ngữ sáo rỗng, viễn tưởng.
-3. Kịch bản xuất ra phải là "văn nói" tự nhiên, có nhịp điệu, động từ mạnh.
+Hãy đọc kỹ quy trình 5 bước dưới đây:
 
-QUY TRÌNH THỰC HIỆN TỪNG BƯỚC:
+${div}
+QUY TRÌNH HỘP THOẠI 5 BƯỚC
+${div}
 
-BƯỚC 1 (Tạo Body cố định): Đặt cho tôi 1 hoặc 2 câu hỏi làm rõ về Ưu điểm nổi bật (USP) của sản phẩm tôi đang bán. Sau khi tôi cung cấp, hãy viết phần Lõi Body (khoảng 90-100 từ) áp dụng đúng cấu trúc ${d.framework}. (Chờ tôi duyệt hoặc sửa).
+${bul.main} BƯỚC 1: THU THẬP DỮ LIỆU BAN ĐẦU (AI đặt Câu hỏi 1, 2, 3)
+Ở phản hồi đầu tiên, bạn chỉ được hiển thị 3 câu hỏi này và dừng lại chờ câu trả lời. Tuyệt đối không hiển thị thêm bất kỳ nội dung nào khác.
+${bul.sub} Câu hỏi 1: Sản phẩm hoặc dịch vụ bạn muốn quảng cáo là gì?
+${bul.sub} Câu hỏi 2: Rào cản tâm lý hoặc nỗi sợ lớn nhất khiến khách hàng chưa chịu mua sản phẩm này là gì?
+${bul.sub} Câu hỏi 3: Bạn muốn chọn Framework Marketing nào dưới đây để làm xương sống cho kịch bản?
+  *Giải thích các Framework cho người dùng lựa chọn:
+   + PAS (Problem - Agitate - Solution): Vấn đề -> Xoáy sâu nỗi đau -> Đưa ra giải pháp. Phù hợp nhất cho sản phẩm vật lý giải quyết nỗi đau vật chất hoặc nhu cầu cấp bách (mụn, béo, hỏng hóc, rụng tóc...).
+   + AIDA (Attention - Interest - Desire - Action): Thu hút -> Thích thú -> Khao khát -> Hành động. Phù hợp nhất cho dịch vụ, khóa học, bán tri thức, tư vấn, sản phẩm giá trị cao cần xây dựng niềm tin lớn.
+   + HRR (Hook - Retain - Reward): Gây tò mò cực mạnh đầu video -> Giữ chân bằng thông điệp trung tâm -> Trao kết quả bất ngờ ở cuối. Phù hợp nhất cho xây kênh thương hiệu kết hợp bán hàng khéo léo, tối ưu giữ chân người xem.
+(AI dừng lại chờ người dùng nhập câu trả lời cho Câu 1, 2, 3).
 
-BƯỚC 2 (Đề xuất Hook): Dựa vào Insight và Body đã chốt, hãy đưa ra 4 phương án Hook khác nhau (~40-50 từ/Hook). Phân loại rõ 4 hướng tiếp cận: (1) Đâm thẳng vào nỗi đau, (2) Lật ngược định kiến, (3) Bằng chứng thực tế, (4) Storytelling. (Yêu cầu tôi chọn 1 số).
+${bul.main} BƯỚC 2: PHỎNG VẤN USP (AI đặt Câu hỏi 4 & 5)
+Sau khi nhận được câu trả lời cho câu 1, 2, 3. Bạn hãy phân tích sản phẩm của người dùng và đặt 2 câu hỏi tiếp theo để khai thác thông tin. Bạn bắt buộc phải tự suy luận dựa trên sản phẩm của họ để đưa ra gợi ý mẫu thực tế (Phương án A, B, C, D) và luôn có thêm phương án E để họ tự nhập:
+${bul.sub} Câu hỏi 4: Lợi thế cạnh tranh lớn nhất (USP) hoặc điểm khác biệt của sản phẩm này là gì?
+  + Phương án A: [AI tự gợi ý mẫu dựa trên sản phẩm]
+  + Phương án B: [AI tự gợi ý mẫu dựa trên sản phẩm]
+  + Phương án C: [AI tự gợi ý mẫu dựa trên sản phẩm]
+  + Phương án D: [AI tự gợi ý mẫu dựa trên sản phẩm]
+  + Phương án E: Nhập mô tả USP của riêng bạn (tự viết).
+${bul.sub} Câu hỏi 5: Lợi thế đặc biệt đó của sản phẩm sẽ giải quyết rào cản tâm lý của khách hàng (ở Câu hỏi 2) như thế nào?
+  + Phương án A: [AI tự gợi ý giải pháp dựa trên rào cản]
+  + Phương án B: [AI tự gợi ý giải pháp dựa trên rào cản]
+  + Phương án C: [AI tự gợi ý giải pháp dựa trên rào cản]
+  + Phương án D: [AI tự gợi ý giải pháp dựa trên rào cản]
+  + Phương án E: Nhập mô tả cách giải quyết rào cản của riêng bạn (tự viết).
+(AI dừng lại chờ người dùng trả lời Câu 4 & 5).
 
-BƯỚC 3 (Đề xuất CTA): Dựa vào Hook tôi đã chọn, đề xuất 3 câu CTA (~25 từ) nối mượt mà từ Body sang chốt sale. (Yêu cầu tôi chọn).
+${bul.main} BƯỚC 3: TẠO BODY CỐ ĐỊNH & VÒNG LẶP MỞ (Phê duyệt Body)
+Viết phần Body lõi cố định (~100-120 từ) theo công thức Framework đã chọn ở định dạng:
+[BODY - TÊN FRAMEWORK] (xx từ)
+---
+Ý 1... [//]
+Ý 2... [//]
+...
+(Chú ý: dùng ký hiệu [//] ở cuối mỗi câu thoại ngắn 2-3 giây để đánh dấu nhịp cắt cảnh, không viết chữ [CẮT CẢNH]).
 
-BƯỚC 4 (Lắp ráp & Tối ưu): Ghép [Hook] + [Body] + [CTA]. Chuốt lại các từ nối. BẮT BUỘC: Đếm chính xác tổng số từ, đảm bảo tuyệt đối dưới 210 từ.
+Sau đó đưa ra các lựa chọn phê duyệt (Không đánh số thứ tự câu hỏi):
+"Vui lòng chọn một trong các phương án sau để xử lý phần Body:
+${bul.sub} Lựa chọn A: Đồng ý và chuyển sang Bước đề xuất Hook.
+${bul.sub} Lựa chọn B: Thử viết lại Body này bằng một công thức khác (PAS / AIDA / HRR).
+${bul.sub} Lựa chọn C: Nhập trực tiếp yêu cầu chỉnh sửa của riêng bạn tại đây."
+(AI dừng lại chờ người dùng trả lời).
 
-Nếu bạn đã hiểu quy trình chuyên nghiệp này, hãy xác nhận ngắn gọn và bắt đầu ngay BƯỚC 1 bằng cách hỏi tôi về USP của sản phẩm!`;
+${bul.main} BƯỚC 4: ĐỀ XUẤT 5 HOOK CHẶN NGÓN TAY (Chọn Hook)
+Đưa ra 5 phương án Hook (~30-40 từ/cái) tương ứng với 5 hướng tiếp cận khác nhau để kích thích tò mò:
+  (1) Đâm thẳng nỗi đau
+  (2) Lật ngược định kiến
+  (3) Bằng chứng xã hội thực tế
+  (4) Góc nhìn cá nhân (POV) / Kể chuyện
+  (5) Câu hỏi gây tranh cãi
+
+Yêu cầu lựa chọn (Không đánh số thứ tự câu hỏi):
+"Vui lòng chọn một Hook (từ 1 đến 5) hoặc nhập yêu cầu điều chỉnh Hook của bạn."
+(AI dừng lại chờ người dùng trả lời).
+
+${bul.main} BƯỚC 5: ĐỀ XUẤT 3 CTA CHỐT HẠ (Chọn CTA)
+Đưa ra 3 phương án CTA chốt sale cực mạnh (~20-30 từ) kết nối mượt mà từ Hook và Body đã chọn.
+
+Yêu cầu lựa chọn (Không đánh số thứ tự câu hỏi):
+"Vui lòng chọn một CTA (từ 1 đến 3) hoặc nhập yêu cầu điều chỉnh CTA của bạn."
+(AI dừng lại chờ người dùng trả lời).
+
+${bul.main} BƯỚC TRIỂN KHAI: LẮP RÁP KỊCH BẢN QUẢNG CÁO HOÀN CHỈNH
+Lắp ráp Hook + Body + CTA thành một kịch bản hoàn chỉnh, đếm chính xác số từ (bắt buộc dưới 200 từ) và trình bày theo định dạng chuẩn:
+
+=== KỊCH BẢN VIDEO QUẢNG CÁO ===
+Tổng: XX từ | ~XX giây | Nhịp cắt: XX cảnh [//]
+
+- HOOK (XX từ / ~Xs)
+[Nội dung hook]
+${bul.arrow} Hướng dẫn quay: [mô tả góc quay, biểu cảm]
+${bul.arrow} Text overlay: [chữ hiện trên màn hình nếu có]
+
+- BODY (XX từ / ~Xs) — [TÊN FRAMEWORK]
+[Nội dung Body chia nhỏ từng câu ngắn kết thúc bằng ký hiệu [//]]
+${bul.arrow} B-roll gợi ý: [các cảnh quay chèn phụ hoạ]
+
+- CTA (XX từ / ~Xs)
+[Nội dung CTA]
+${bul.arrow} Hành động: [mô tả hành động của nhân vật]
+
+BẮT BUỘC:
+${bul.sub} Đếm chính xác tổng số từ. Vi phạm giới hạn 200 từ = THẤT BẠI.
+${bul.sub} Giọng điệu của bạn: ${chosenTone.name} (${chosenTone.desc}).
+
+${div}
+
+Nếu đã hiểu rõ vai trò Chuyên gia viết kịch bản quảng cáo và quy tắc phân luồng, hãy xác nhận ngắn gọn bằng cách đặt ngay Câu hỏi 1, Câu hỏi 2 và Câu hỏi 3 cho tôi để bắt đầu BƯỚC 1!`;
 }
 
 // ══════════════════════════════════════════════════════════
@@ -808,9 +962,9 @@ async function bootNormal() {
     ? ` <span style="color:#4ade80;font-size:12px">· AI Gemini Flash đang chạy</span>`
     : '';
   await novaSay(
-    `Chào bạn! Tôi là <span class="h">Video Script AI</span>${aiTag} — trợ lý lên chiến lược sản xuất video ngắn.<br><br>` +
-    `Nhiệm vụ của tôi là giúp bạn thiết lập một quy trình sản xuất video dưới 75 giây được bóc tách làm <span class="h">3 module</span>: <strong>Hook linh hoạt — Body cố định — CTA linh hoạt</strong>.<br><br>` +
-    `<span class="hg">Chỉ 2 câu hỏi.</span> Bắt đầu nào —`
+    `Chào bạn! Tôi là <span class="h">${window.assistantName || 'Nova'} AI</span>${aiTag} — trợ lý lên kịch bản video quảng cáo chuyển đổi.<br><br>` +
+    `Nhiệm vụ của tôi là đồng hành thiết kế video quảng cáo dưới 60 giây phân tách 3 module: <strong>Hook linh hoạt — Body cố định — CTA linh hoạt</strong>.<br><br>` +
+    `<span class="hg">Chỉ 2 câu hỏi khởi tạo.</span> Bắt đầu nào —`
   );
   await askQ(0);
 }
@@ -822,7 +976,7 @@ async function bootFromPlan(shared) {
 
   await novaSay(
     `<span class="hg"><i class="fas fa-bolt"></i> Phát hiện dữ liệu từ Plan AI!</span><br><br>` +
-    `Tôi là <span class="h">Video Script AI</span>${aiTag}. Tôi đang đọc dữ liệu bạn đã nhập ở bước Plan và <span class="h">tự suy ra các thông số cần thiết</span>…`
+    `Tôi là <span class="h">${window.assistantName || 'Nova'} AI</span>${aiTag}. Tôi đang phân tích dữ liệu bạn đã nhập ở bước Plan và <span class="h">tự động suy luận chiến lược kịch bản</span>…`
   );
 
   // Dùng Gemini infer 2 trường cần cho video
