@@ -388,28 +388,72 @@ const Q = [
 
 const ACK = ['Đã ghi nhận','Capture xong','Insight đã lưu','Dữ liệu rõ','Đã phân tích','Locked in','Đã xử lý','Pattern xác định'];
 
-const THK = [
-  'Đang phân tích tên sản phẩm...',
-  'Đang xây dựng chân dung khách hàng...',
-  'Đang khai thác cấu trúc cảm xúc...',
-  'Đang phân tích vòng lặp thất bại...',
-  'Đang xây dựng mô hình chuyển đổi...',
-  'Đang calibrate timeframe hứa hẹn...',
-  'Đang đánh giá mức độ authority...',
-  'Đang thiết kế ma trận giá...',
-  'Đang biên dịch Mega Prompt...'
-];
+const THINKING_STEPS = {
+  0: ['Đang phân tích tên sản phẩm và cấu trúc Hero Section...', 'Đang trích xuất định vị sản phẩm số...', 'Đang lập bản đồ thông điệp ban đầu...'],
+  1: ['Đang xây dựng chân dung khách hàng ICP...', 'Đang bóc tách tâm lý học hành vi của khách hàng...', 'Đang lập cấu trúc phân khúc đối tượng...'],
+  2: ['Đang khai thác cấu trúc cảm xúc và nỗi đau đêm khuya...', 'Đang giải mã điểm thắt nút cảm xúc cốt lõi...', 'Đang ánh xạ nỗi sợ vào bộ lọc nội dung...'],
+  3: ['Đang phân tích vòng lặp thất bại và rào cản...', 'Đang trích xuất các nỗ lực không thành công trong quá khứ...', 'Đang lập bản đồ giải pháp thay thế...'],
+  4: ['Đang xây dựng mô hình chuyển đổi hành vi...', 'Đang thiết lập Headline hứa hẹn chính...', 'Đang cấu trúc kết quả chuyển đổi mong muốn...'],
+  5: ['Đang calibrate timeframe hứa hẹn của sản phẩm...', 'Đang chuẩn hóa mốc thời gian chuyển đổi...', 'Đang tối ưu hóa mong muốn có kết quả nhanh...'],
+  6: ['Đang đánh giá mức độ authority của tác giả...', 'Đang định dạng các bằng chứng uy tín...', 'Đang thiết kế phần phá vỡ hoài nghi...'],
+  7: ['Đang thiết kế ma trận giá và FOMO...', 'Đang neo giá và tạo tính khan hiếm...', 'Đang tính toán tỷ lệ giảm giá ưu đãi...'],
+  8: ['Đang biên dịch Mega Prompt 11 Section chuyên sâu...', 'Đang đóng gói dữ liệu và tối ưu hóa prompt...', 'Đang kết xuất cấu trúc kịch bản Sales Page hoàn chỉnh...']
+};
 
-const FR = [
-  _=>'Tên sản phẩm đã được ghi nhận. Hero Section và toàn bộ CTA sẽ được xây dựng xung quanh tên này.',
-  _=>'Chân dung khách hàng đã capture. Ngôn ngữ thấu cảm sẽ được xây dựng trực tiếp cho nhóm này.',
-  _=>'Nỗi đau đêm khuya đã ghi nhận. Đây sẽ là điểm neo cảm xúc mở đầu Section 2.',
-  _=>'Lịch sử thất bại đã capture. Đây sẽ là vũ khí tâm lý mạnh nhất ở Section 3.',
-  _=>'Kết quả chuyển đổi đã ghi nhận. Sẽ trở thành Headline hứa hẹn chính ở Hero Section.',
-  _=>'Timeframe đã ghi nhận. Sẽ được lặp ít nhất 3 lần trong toàn bộ copy để kích Desire.',
-  _=>'Authority đã được đánh giá. Section 10 sẽ được xây kỹ để phá rào cản hoài nghi.',
-  _=>'Chiến lược giá đã ghi nhận. Neo giá và FOMO sẽ được kích hoạt ở Section 5, 7 và 11.'
-];
+const FR_RESPONSES = {
+  0: [
+    _=>`Tên sản phẩm số đã được ghi nhận. Phễu Hero Section và toàn bộ CTA sẽ được xây dựng xoay quanh định vị này.`,
+    _=>`Đã capture tên sản phẩm. Đây sẽ là từ khóa trung tâm xuất hiện lặp lại ở các điểm chạm quan trọng trên trang.`,
+    _=>`Tên sản phẩm được định vị thành công. Cấu trúc outline sẽ tối ưu hóa để làm nổi bật sản phẩm này.`
+  ],
+  1: [
+    _=>`Chân dung khách hàng ICP đã được phân tích. Ngôn ngữ thấu cảm Direct Response sẽ được thiết lập riêng cho nhóm này.`,
+    _=>`Insight đối tượng mục tiêu đã lưu. Chúng ta sẽ dùng chính giọng văn và nỗi lo của họ để viết tiêu đề.`,
+    _=>`Đã khóa mục tiêu ICP. Lộ trình Sales Page sẽ giải quyết chính xác vấn đề thực tế của nhóm đối tượng này.`
+  ],
+  2: [
+    _=>`Nỗi đau đêm khuya đã được ghi nhận. Đây sẽ là điểm neo cảm xúc mạnh nhất để mở đầu Section 2 của trang.`,
+    _=>`Đã lưu nỗi sợ cốt lõi. Đây là chất liệu cực tốt để tạo sự đồng cảm sâu sắc ngay khi khách hàng lướt đến.`,
+    _=>`Ghi nhận tâm tư đêm muộn. Section Establising Pain sẽ khai thác triệt để điểm chạm tâm lý này.`
+  ],
+  3: [
+    _=>`Lịch sử thất bại đã được bóc tách. Đây sẽ là vũ khí phá vỡ rào cản nghi ngờ ở Section 3.`,
+    _=>`Vòng lặp thất bại đã lưu. Chúng ta sẽ chỉ ra tại sao các cách làm cũ của họ không hiệu quả.`,
+    _=>`Ghi nhận nỗ lực trong quá khứ. Cấu trúc trang sẽ định vị sản phẩm của bạn là giải pháp cuối cùng.`
+  ],
+  4: [
+    _=>`Kết quả chuyển đổi mong muốn đã xác định. Sẽ trở thành Headline hứa hẹn chính (Transformation Promise).`,
+    _=>`Sự thay đổi sau khi dùng sản phẩm đã lưu. Sẽ được dùng làm kết quả minh chứng ở Hero Section.`,
+    _=>`Đã lưu điểm đích chuyển đổi. Outline sẽ thể hiện rõ sự lột xác trước/sau khi dùng sản phẩm.`
+  ],
+  5: [
+    _=>`Mốc thời gian (Timeframe) đã ghi nhận. Sẽ được lặp ít nhất 3 lần để gia tăng ham muốn sở hữu.`,
+    _=>`Đã khóa mốc thời gian cam kết. Giúp gia tăng tính thực tế và tăng độ tin tưởng cho lời chào hàng.`,
+    _=>`Ghi nhận timeframe. Đây là biến số quan trọng cho phần Sub-headline của trang chủ.`
+  ],
+  6: [
+    _=>`Authority của bạn đã được đánh giá. Section 10 (About Author) sẽ được thiết kế để đập tan sự hoài nghi.`,
+    _=>`Uy tín tác giả đã lưu. Giúp tạo nền tảng vững chắc cho việc bán hàng dựa trên niềm tin.`,
+    _=>`Đã ghi nhận thế mạnh tác giả. Đây là chất liệu làm tăng giá trị nhận thức cho sản phẩm.`
+  ],
+  7: [
+    _=>`Chiến lược giá đã được lưu trữ. Neo giá và FOMO sẽ được tự động kích hoạt tại Section 5, 7 và 11.`,
+    _=>`Đã khóa ma trận giá. Kỹ thuật neo giá (Price Anchoring) sẽ giúp giảm cảm giác tốn tiền của người mua.`,
+    _=>`Ghi nhận thông tin giá. Phần chốt sale (Offer Section) sẽ được thiết kế rất rõ ràng và mạch lạc.`
+  ]
+};
+
+function getThinkMsg(stepIdx) {
+  const arr = THINKING_STEPS[stepIdx] || ['Đang xử lý dữ liệu...'];
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+function getFallbackResponse(stepIdx) {
+  const arr = FR_RESPONSES[stepIdx];
+  if (!arr) return '';
+  const fn = arr[Math.floor(Math.random() * arr.length)];
+  return fn();
+}
 
 // ══════════════════════════════════════════════════════════
 //  STATE
@@ -610,7 +654,7 @@ function mkRow(who){
   const r=document.createElement('div');
   r.className='msg'+(who==='user'?' user':'');
   const u=who==='user';
-  r.innerHTML=`<div class="mav ${u?'human':'leo'}">${u?'<i class="fas fa-user" style="font-size:11px"></i>':'L'}</div>
+  r.innerHTML=`<div class="mav ${u?'human':'leo'}">${u?'<i class="fas fa-user" style="font-size:11px"></i>':(window.assistantName ? window.assistantName[0] : 'L')}</div>
     <div class="bubble"><div class="txt"></div>
     <div class="bm"><i class="fas fa-check-double" style="color:${u?'#555':'var(--a)'}"></i> ${now()}</div></div>`;
   return r;
@@ -632,7 +676,7 @@ async function send(){
 
   const s=step; step++; setP(step,8);
   const thinkDelay=600+Math.min(val.length*14,1600)+Math.random()*300;
-  const tid=showThink(THK[s]);
+  const tid=showThink(getThinkMsg(s));
   active(true);
 
   let dynHints=null;
@@ -663,7 +707,7 @@ async function send(){
         chip.innerHTML=`<i class="fas fa-check"></i> ${ACK[s%ACK.length]}`;
         txt.appendChild(chip);
         const sp=document.createElement('span');
-        sp.innerHTML=' '+(FR[s]?.('')||'');txt.appendChild(sp);
+        sp.innerHTML=' '+getFallbackResponse(s);txt.appendChild(sp);
       }
     }else{
       const chip=document.createElement('span');
@@ -671,7 +715,7 @@ async function send(){
       chip.innerHTML=`<i class="fas fa-check"></i> ${ACK[s%ACK.length]}`;
       txt.appendChild(chip);
       const sp=document.createElement('span');
-      sp.innerHTML=' '+(FR[s]?.('')||'');txt.appendChild(sp);
+      sp.innerHTML=' '+getFallbackResponse(s);txt.appendChild(sp);
     }
     active(false);
     await sleep(350);
@@ -687,7 +731,7 @@ async function send(){
 //  GENERATION
 // ══════════════════════════════════════════════════════════
 async function genPrompt(){
-  const tid=showThink(THK[8]);active(true);
+  const tid=showThink(getThinkMsg(8));active(true);
   await sleep(1800);rm(tid);active(false);
 
   const tone=document.getElementById('sto').value;
@@ -988,9 +1032,9 @@ function loadSharedLanding(){
 // ── Boot bình thường ──
 async function bootLandingNormal(){
   await sleep(220);
-  const aiTag=AI.mode!=='fallback'?` <span style="color:#4ade80;font-size:12px">· AI ${AI.mode==='nano'?'On-device':'Gemini Flash'} đang chạy</span>`:'';
+  const aiTag = ` <span style="color:#4ade80;font-size:12px">· AI Local Engine đang chạy</span>`;
   await leoSay(
-    `Chào bạn! Tôi là <span class="h">Landing Page AI</span>${aiTag} — trợ lý xây dựng phễu Sales Page cho sản phẩm số.<br><br>`+
+    `Chào bạn! Tôi là <span class="h">${window.assistantName || 'Leo'} AI</span>${aiTag} — trợ lý xây dựng phễu Sales Page cho sản phẩm số.<br><br>`+
     `Thay vì bắt bạn tự viết prompt dài, tôi sẽ <span class="h">phân tích dữ liệu từng bước</span>, rồi tạo Mega Prompt hoàn chỉnh để dán thẳng vào ChatGPT, Claude hoặc Gemini.<br><br>`+
     `<span class="hg">Chỉ 8 câu hỏi.</span> Bắt đầu nào —`
   );
@@ -1000,11 +1044,11 @@ async function bootLandingNormal(){
 // ── Boot thông minh từ Plan data ──
 async function bootLandingFromPlan(shared){
   await sleep(220);
-  const aiTag=AI.mode!=='fallback'?` <span style="color:#4ade80;font-size:12px">· AI Gemini Flash</span>`:'';
+  const aiTag = ` <span style="color:#4ade80;font-size:12px">· AI Local Engine</span>`;
 
   await leoSay(
     `<span class="hg"><i class="fas fa-bolt"></i> Phát hiện dữ liệu từ Plan AI!</span><br><br>`+
-    `Tôi là <span class="h">Landing Page AI</span>${aiTag}. Tôi đang đọc dữ liệu từ bước Plan và <span class="h">tự điền 4 câu đầu</span> — bạn chỉ cần trả lời <span class="h">4 câu còn thiếu</span> là xong.`
+    `Tôi là <span class="h">${window.assistantName || 'Leo'} AI</span>${aiTag}. Tôi đang đọc dữ liệu từ bước Plan và <span class="h">tự điền 4 câu đầu</span> — bạn chỉ cần trả lời <span class="h">4 câu còn thiếu</span> là xong.`
   );
 
   const tid=showThink('Đang suy ra tên sản phẩm, chân dung KH, nỗi đau và rào cản từ dữ liệu Plan...');

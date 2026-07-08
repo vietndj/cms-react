@@ -353,11 +353,10 @@ const ring = document.getElementById('av-ring');
 // ══════════════════════════════════════════════════════════
 const AI = {
   mode: 'fallback', key: '',
-  GURL: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:streamGenerateContent?alt=sse&key=',
-  GNURL: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=',
+  GURL: '', GNURL: '',
 
   async init() {
-    if (GEMINI_KEY) { this.key = GEMINI_KEY; this.mode = 'gemini'; }
+    this.mode = 'fallback';
     this.badge();
   },
 
@@ -365,91 +364,15 @@ const AI = {
     const mb = document.getElementById('mbadge');
     const md = document.getElementById('mdot');
     const mt = document.getElementById('mtext');
-    if (this.mode === 'gemini') {
-      mb.classList.add('on'); md.style.background = 'var(--g)'; mt.textContent = 'AI · Gemini';
-    } else {
-      mb.classList.remove('on'); md.style.background = 'var(--muted)'; mt.textContent = 'Offline';
-    }
+    mb.classList.add('on'); md.style.background = 'var(--g)'; mt.textContent = 'AI · Local Engine';
   },
 
-  // Stream phản hồi AI sau mỗi câu trả lời
   async stream(stepIdx, answer, el) {
-    const qtext = Q[stepIdx].q.replace(/<[^>]+>/g, '');
-    let contextLine = '';
-    if (stepIdx === 0) {
-      contextLine = `Framework đã chọn: ${userData.framework}.`;
-    } else if (stepIdx === 1) {
-      contextLine = `Ngành hàng: ${userData.industry}. Framework: ${userData.framework}.`;
-    }
-
-    const prompt = `Bạn là Nova — chuyên gia chiến lược nội dung video ngắn (TikTok/Reels). Tiếng Việt. Không emoji. Không "cảm ơn". Không mở đầu bằng "Tôi đã ghi nhận" hay "Thú vị".
-
-Câu hỏi vừa hỏi: "${qtext}"
-Câu trả lời của người dùng: "${answer}"
-${contextLine}
-
-Viết phản hồi 2-3 câu theo phong cách chuyên gia thực chiến:
-- Trích dẫn trực tiếp 1-2 từ/cụm từ cốt lõi từ câu trả lời (dùng dấu "")
-- Phân tích ngắn tại sao data này quan trọng cho kịch bản video
-- Nêu cụ thể nó sẽ ảnh hưởng như thế nào đến Hook/Body/CTA
-Văn phong: đanh thép, tự tin, như content strategist đang đọc brief — không như chatbot xác nhận form.`;
-
-    try {
-      if (this.mode === 'gemini') return await this._gemini(prompt, el, 150);
-    } catch (e) {}
     await chunk(el, FR[stepIdx]?.(answer) || '', 3, 16);
   },
 
-  // Gợi ý hints động dựa trên ngành hàng và câu trả lời trước
   async hints(industry, nextIdx) {
-    if (this.mode === 'fallback') return null;
-    const nq = Q[nextIdx]?.q.replace(/<[^>]+>/g, '') || '';
-    const p = `Ngành hàng: "${industry}". Câu hỏi tiếp theo: "${nq}".
-3 gợi ý ví dụ ngắn (≤10 từ/cái) thực tế và phù hợp với ngành hàng này. Trả về CHỈ JSON array. Tiếng Việt đời thường.`;
-    try {
-      if (this.mode === 'gemini') {
-        const r = await fetch(this.GNURL + this.key, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ contents: [{ parts: [{ text: p }] }],
-            generationConfig: { maxOutputTokens: 100, temperature: .7 } })
-        });
-        const j = await r.json();
-        const raw = j.candidates?.[0]?.content?.parts?.[0]?.text || '';
-        const m = raw.match(/\[.*?\]/s);
-        return m ? JSON.parse(m[0]) : null;
-      }
-    } catch (e) { return null; }
-  },
-
-  async _gemini(prompt, el, max = 150) {
-    const r = await fetch(this.GURL + this.key, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { maxOutputTokens: max, temperature: .85 } })
-    });
-    if (!r.ok) throw new Error(r.status);
-    const cur = document.createElement('span');
-    cur.className = 'stream-cur';
-    el.appendChild(cur);
-    const reader = r.body.getReader();
-    const dec = new TextDecoder();
-    let buf = '';
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buf += dec.decode(value, { stream: true });
-      const lines = buf.split('\n');
-      buf = lines.pop() || '';
-      for (const ln of lines) {
-        if (!ln.startsWith('data: ') || ln.includes('[DONE]')) continue;
-        try {
-          const j = JSON.parse(ln.slice(6));
-          const t = j.candidates?.[0]?.content?.parts?.[0]?.text || '';
-          if (t) { el.insertBefore(document.createTextNode(t), cur); scrollB(); }
-        } catch (e) {}
-      }
-    }
-    cur.remove();
+    return null;
   }
 };
 
