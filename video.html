@@ -366,6 +366,16 @@ function getFallbackResponse(stepIdx, ans) {
   return fn(ans);
 }
 
+function getFallbackHints(fwCode) {
+  if (fwCode === 'PAS') {
+    return ['Sợ kích ứng da, hàng giả', 'Sợ sản phẩm không giống hình quảng cáo', 'Sợ mua về không biết cách dùng'];
+  } else if (fwCode === 'AIDA') {
+    return ['Lười học, không có thời gian', 'Sợ học xong không áp dụng thực tế được', 'Sợ giá cao so với chất lượng'];
+  } else {
+    return ['Sợ làm video không ai xem', 'Sợ người quen phán xét', 'Không biết bắt đầu từ đâu'];
+  }
+}
+
 // ══════════════════════════════════════════════════════════
 //  STATE
 // ══════════════════════════════════════════════════════════
@@ -595,10 +605,10 @@ function detectFramework(answer) {
 // ══════════════════════════════════════════════════════════
 //  FLOW
 // ══════════════════════════════════════════════════════════
-async function askQ(n) {
+async function askQ(n, customHints) {
   const label = n === 0 ? 'Bước 1 / 2' : 'Bước 2 / 2';
   await novaSay(`<span class="qlabel">${label}</span>${Q[n].q}`);
-  tags(Q[n].h); setIn(true); uin.focus();
+  tags(customHints || Q[n].h); setIn(true); uin.focus();
 }
 
 async function send() {
@@ -666,9 +676,7 @@ async function send() {
     );
 
     await sleep(350);
-    await askQ(1);
-    tags(dynHints || Q[1].h);
-    setIn(true); uin.focus();
+    await askQ(1, dynHints || getFallbackHints(userData.fwCode));
 
   } else if (s === 1) {
     userData.painPoint = val;
