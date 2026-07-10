@@ -17,7 +17,7 @@ export default function App() {
     return <LoginScreen pin={state.pin} setPin={actions.setPin} handleLogin={actions.handleLogin} />;
   return (
     <div
-      className="flex-col w-full min-h-screen fade-in flex bg-[var(--bg-body)] pb-20"
+      className="flex-col w-full min-h-screen flex bg-[var(--bg-body)] pb-20"
       onClick={() => actions.setActiveColorPickerCard(null)}
     >
       <Header cms={cms} />
