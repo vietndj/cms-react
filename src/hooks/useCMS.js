@@ -6,6 +6,7 @@ import { useSearch } from "./useSearch";
 import { useSync } from "./useSync";
 import { fetchText, getFileShaSafe, encodeBase64UTF8Async } from "../services/github";
 import { getPreviewText, safeEnc } from "../utils/helpers";
+import { fetchSupabaseDB } from "../services/supabase";
 
 export function useCMS() {
   const auth = useAuth();
