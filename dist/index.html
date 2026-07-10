@@ -6,7 +6,47 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>vietndj - Workspace</title>
     <script>
-        try { const savedTheme = localStorage.getItem('cms_theme') || 'light'; document.documentElement.setAttribute('data-theme', savedTheme); } catch(e){}
+      try { const savedTheme = localStorage.getItem('cms_theme') || 'light'; document.documentElement.setAttribute('data-theme', savedTheme); } catch(e){}
+      
+      window.addEventListener('error', function(e) {
+        var div = document.createElement('div');
+        div.style.position = 'fixed';
+        div.style.top = '10px';
+        div.style.left = '10px';
+        div.style.right = '10px';
+        div.style.background = '#FFF5F5';
+        div.style.color = '#E53E3E';
+        div.style.border = '2px solid #FEB2B2';
+        div.style.padding = '20px';
+        div.style.borderRadius = '10px';
+        div.style.zIndex = '999999';
+        div.style.fontFamily = 'monospace';
+        div.style.fontSize = '14px';
+        div.style.whiteSpace = 'pre-wrap';
+        div.style.boxShadow = '0 10px 15px -3px rgba(0,0,0,0.1)';
+        div.innerHTML = '<h3>🚨 Lỗi JavaScript Runtime:</h3><p>' + e.message + '</p><p>Tại: ' + e.filename + ':' + e.lineno + ':' + e.colno + '</p><h4>Stack Trace:</h4><pre>' + (e.error ? e.error.stack : '') + '</pre>';
+        document.body.appendChild(div);
+      });
+      
+      window.addEventListener('unhandledrejection', function(e) {
+        var div = document.createElement('div');
+        div.style.position = 'fixed';
+        div.style.top = '10px';
+        div.style.left = '10px';
+        div.style.right = '10px';
+        div.style.background = '#FFF5F5';
+        div.style.color = '#E53E3E';
+        div.style.border = '2px solid #FEB2B2';
+        div.style.padding = '20px';
+        div.style.borderRadius = '10px';
+        div.style.zIndex = '999999';
+        div.style.fontFamily = 'monospace';
+        div.style.fontSize = '14px';
+        div.style.whiteSpace = 'pre-wrap';
+        div.style.boxShadow = '0 10px 15px -3px rgba(0,0,0,0.1)';
+        div.innerHTML = '<h3>🚨 Lỗi Unhandled Promise Rejection:</h3><p>' + (e.reason ? (e.reason.message || e.reason) : 'Unknown reason') + '</p>';
+        document.body.appendChild(div);
+      });
     </script>
     <script type="module" crossorigin src="./assets/index-C2DO9Sow.js"></script>
     <link rel="stylesheet" crossorigin href="./assets/index-KbRqqbS1.css">
