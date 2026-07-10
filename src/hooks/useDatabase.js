@@ -118,7 +118,17 @@ export function useDatabase(isAuthenticated) {
       const cDbRaw = await fetchSupabaseDB();
       const cDb = cDbRaw ? (({ _encToken, ...rest }) => rest)(cDbRaw) : null;
       const lStr = localStorage.getItem("cms_repo_data");
-      const lDb = lStr ? JSON.parse(lStr) : null;
+      let lDb = null;
+      try {
+        lDb = lStr ? JSON.parse(lStr) : null;
+        if (lDb && (!Array.isArray(lDb.files) || !lDb.files)) {
+          lDb = null;
+          localStorage.removeItem("cms_repo_data");
+        }
+      } catch (e) {
+        lDb = null;
+        localStorage.removeItem("cms_repo_data");
+      }
       if (!cDb && !lDb) {
         setStatus({
           text: "⚠️ Không kết nối được Cloud DB. Kiểm tra mạng!",
